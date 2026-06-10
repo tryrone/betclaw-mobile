@@ -1,12 +1,12 @@
-import { Bell, Search, Sparkles, Star } from 'lucide-react-native';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { Bell, Search, Star, Calendar, ChevronUp, ChevronDown } from 'lucide-react-native';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
-import { enterUp, GlassCard, LiveDot, PressableScale, Screen, SPRING_LAYOUT, StatusBadge } from '@/components/ui';
+import { enterUp, GlassCard, PressableScale, Screen, SPRING_LAYOUT, TeamLogo } from '@/components/ui';
 import {
-  dateChips,
-  leagues,
   liveMatch,
   matches,
   sports,
@@ -18,33 +18,28 @@ import { colors } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
-function TeamAvatar({ name, size = 40 }: { name: string; size?: number }) {
-  return (
-    <View style={[styles.avatar, { borderRadius: size / 2, height: size, width: size }]}>
-      <Text style={[styles.avatarText, { fontSize: size * 0.28 }]}>{name.slice(0, 3).toUpperCase()}</Text>
-    </View>
-  );
-}
+const userAvatar = require('@/../assets/images/user_avatar.png');
 
 function BalanceHeader() {
   return (
     <View style={styles.headerRow}>
       <View style={styles.headerLeft}>
-        <View style={styles.profileAvatar}>
-          <Text style={styles.profileInitial}>T</Text>
-        </View>
-        <View>
+        <Image
+          source={userAvatar}
+          style={styles.profileAvatar}
+          contentFit="cover"
+        />
+        <View style={styles.balanceInfo}>
           <Text style={styles.balanceLabel}>Balance</Text>
           <Text style={styles.balanceValue}>{wallet.balance}</Text>
         </View>
       </View>
       <View style={styles.headerActions}>
         <PressableScale accessibilityLabel="Search" accessibilityRole="button" style={styles.circleButton}>
-          <Search color={colors.mutedLight} size={18} strokeWidth={2.2} />
+          <Search color={colors.foreground} size={18} strokeWidth={2.4} />
         </PressableScale>
         <PressableScale accessibilityLabel="Notifications" accessibilityRole="button" style={styles.circleButton}>
-          <Bell color={colors.mutedLight} size={18} strokeWidth={2.2} />
-          <View style={styles.unreadDot} />
+          <Bell color={colors.foreground} size={18} strokeWidth={2.4} />
         </PressableScale>
       </View>
     </View>
@@ -68,8 +63,10 @@ function SportPills() {
               accessibilityLabel={sport.label}
               accessibilityRole="button"
               onPress={() => setSelected(sport.id)}
-              style={[styles.sportPill, active && styles.sportPillActive]}>
-              <Text style={styles.sportEmoji}>{sport.emoji}</Text>
+              style={active ? styles.sportPillActive : styles.sportPillCircle}>
+              <Text style={[styles.sportEmoji, active && styles.sportEmojiActive]}>
+                {sport.emoji}
+              </Text>
               {active ? (
                 <Animated.Text entering={FadeIn.duration(180)} style={styles.sportLabel}>
                   {sport.label}
@@ -96,7 +93,7 @@ function OddsChip({
     <PressableScale
       accessibilityLabel={`${label} at ${value}`}
       accessibilityRole="button"
-      scaleTo={0.93}
+      scaleTo={0.94}
       style={[styles.oddsChip, highlighted && styles.oddsChipActive]}>
       <Text style={[styles.oddsLabel, highlighted && styles.oddsLabelActive]}>{label}</Text>
       <Text style={[styles.oddsValue, highlighted && styles.oddsValueActive]}>{value.toFixed(2)}</Text>
@@ -108,127 +105,120 @@ function OddsRow({ odds, recommended }: { odds: MatchOdds; recommended?: keyof M
   return (
     <View style={styles.oddsRow}>
       <OddsChip highlighted={recommended === 'home'} label="1" value={odds.home} />
-      <OddsChip highlighted={recommended === 'draw'} label="X" value={odds.draw} />
+      <OddsChip highlighted={recommended === 'draw'} label="x" value={odds.draw} />
       <OddsChip highlighted={recommended === 'away'} label="2" value={odds.away} />
     </View>
   );
 }
 
 function LiveMatchHero() {
+  const router = useRouter();
+
   return (
-    <GlassCard gradient="hero" style={styles.heroCard}>
-      <View style={styles.heroTop}>
-        <Text style={styles.heroEyebrow}>Match day 1</Text>
-        <View style={styles.heroTopRight}>
-          <LiveDot label="Live" />
-          <PressableScale accessibilityLabel="Favorite match" accessibilityRole="button" style={styles.starButton}>
-            <Star color={colors.accent} size={15} strokeWidth={2.4} />
-          </PressableScale>
+    <PressableScale
+      accessibilityLabel="Open live match details"
+      accessibilityRole="button"
+      onPress={() => router.push('/live-match' as any)}
+      scaleTo={0.98}
+      style={styles.heroPressable}>
+      <GlassCard style={styles.heroCard}>
+        {/* Top Header */}
+        <View style={styles.heroTop}>
+          <Text style={styles.heroEyebrow}>Match day 1</Text>
+          <View style={styles.heroTopRight}>
+            <Calendar color={colors.muted} size={15} strokeWidth={2.4} />
+            <Star color={colors.muted} size={15} strokeWidth={2.4} style={styles.starIcon} />
+          </View>
         </View>
-      </View>
 
-      <View style={styles.heroTeams}>
-        <View style={styles.heroTeam}>
-          <TeamAvatar name={liveMatch.home} size={52} />
-          <Text numberOfLines={1} style={styles.heroTeamName}>
-            {liveMatch.home}
-          </Text>
-        </View>
-        <View style={styles.heroCenter}>
-          <Text style={styles.heroLeague}>{liveMatch.league}</Text>
-          <Text style={styles.heroStage}>{liveMatch.stage}</Text>
-        </View>
-        <View style={styles.heroTeam}>
-          <TeamAvatar name={liveMatch.away} size={52} />
-          <Text numberOfLines={1} style={styles.heroTeamName}>
-            {liveMatch.away}
-          </Text>
-        </View>
-      </View>
+        {/* Teams, Crests, Scores & Live Clock */}
+        <View style={styles.heroTeamsContainer}>
+          {/* Home Team */}
+          <View style={styles.heroTeamSide}>
+            <TeamLogo name={liveMatch.home} size={48} />
+            <Text numberOfLines={1} style={styles.heroTeamName}>
+              {liveMatch.home}
+            </Text>
+          </View>
 
-      <View style={styles.scoreRow}>
-        <Text style={styles.score}>{liveMatch.homeScore}</Text>
-        <View style={styles.clockChip}>
-          <Text style={styles.clock}>{liveMatch.clock}</Text>
-          <Text style={styles.period}>{liveMatch.period}</Text>
-        </View>
-        <Text style={styles.score}>{liveMatch.awayScore}</Text>
-      </View>
+          {/* Center Info: UCL, Live dot, Time and score numbers */}
+          <View style={styles.heroCenterBlock}>
+            <Text style={styles.heroLeague}>{liveMatch.league}</Text>
+            <Text style={styles.heroStage}>{liveMatch.stage}</Text>
 
-      <OddsRow odds={liveMatch.odds} />
-    </GlassCard>
+            <View style={styles.scoreAndClock}>
+              <Text style={styles.scoreValue}>{liveMatch.homeScore}</Text>
+
+              <View style={styles.centerClockPill}>
+                <View style={styles.liveIndicator}>
+                  <View style={styles.liveRedDot} />
+                  <Text style={styles.liveText}>Live</Text>
+                </View>
+                <Text style={styles.clockTime}>{liveMatch.clock}</Text>
+                <Text style={styles.periodLabel}>{liveMatch.period}</Text>
+              </View>
+
+              <Text style={styles.scoreValue}>{liveMatch.awayScore}</Text>
+            </View>
+          </View>
+
+          {/* Away Team */}
+          <View style={styles.heroTeamSide}>
+            <TeamLogo name={liveMatch.away} size={48} />
+            <Text numberOfLines={1} style={styles.heroTeamName}>
+              {liveMatch.away}
+            </Text>
+          </View>
+        </View>
+      </GlassCard>
+
+      {/* Pagination indicators under the card */}
+      <View style={styles.cardPagination}>
+        <View style={[styles.paginationDot, styles.paginationDotActive]} />
+        <View style={styles.paginationDot} />
+        <View style={styles.paginationDot} />
+      </View>
+    </PressableScale>
   );
 }
 
-function MatchCard({ match }: { match: MatchCardData }) {
-  const confidenceTone = match.confidence >= 70 ? 'success' : match.confidence >= 55 ? 'warning' : 'danger';
-
+function MatchFeedCard({ match }: { match: MatchCardData }) {
   return (
-    <GlassCard style={styles.matchCard}>
-      <View style={styles.matchTop}>
-        <View style={styles.matchTeam}>
-          <TeamAvatar name={match.home} />
-          <Text numberOfLines={1} style={styles.matchTeamName}>
+    <GlassCard style={styles.matchFeedCard}>
+      {/* Teams Row with time in between */}
+      <View style={styles.matchTeamsRow}>
+        {/* Home */}
+        <View style={styles.matchTeamCol}>
+          <TeamLogo name={match.home} size={44} />
+          <Text numberOfLines={1} style={styles.matchTeamLabel}>
             {match.home}
           </Text>
         </View>
-        <View style={styles.matchTimeChip}>
-          <Text style={styles.matchTime}>{match.time}</Text>
-          <Text numberOfLines={1} style={styles.matchLeague}>
-            {match.league}
-          </Text>
+
+        {/* Center Date */}
+        <View style={styles.matchDateCol}>
+          <Text style={styles.matchDateText}>{match.time.split(' ')[0]} {match.time.split(' ')[1]}</Text>
+          <Text style={styles.matchTimeText}>{match.time.split(' ')[2]}</Text>
         </View>
-        <View style={[styles.matchTeam, styles.matchTeamRight]}>
-          <TeamAvatar name={match.away} />
-          <Text numberOfLines={1} style={styles.matchTeamName}>
+
+        {/* Away */}
+        <View style={styles.matchTeamCol}>
+          <TeamLogo name={match.away} size={44} />
+          <Text numberOfLines={1} style={styles.matchTeamLabel}>
             {match.away}
           </Text>
         </View>
       </View>
 
+      {/* Odds Row at the bottom */}
       <OddsRow odds={match.odds} recommended={match.recommended} />
-
-      <View style={styles.pickBox}>
-        <View style={styles.pickCopy}>
-          <Text numberOfLines={1} style={styles.pick}>
-            {match.pick}
-          </Text>
-          <Text style={styles.readiness}>{match.readiness} data · edge {match.edge}</Text>
-        </View>
-        <StatusBadge label={`${match.confidence}%`} tone={confidenceTone} />
-      </View>
     </GlassCard>
   );
 }
 
-function DateChips() {
-  const [selected, setSelected] = useState('today');
-
-  return (
-    <ScrollView
-      contentContainerStyle={styles.chipRow}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.horizontal}>
-      {dateChips.map((chip) => {
-        const active = chip.id === selected;
-        return (
-          <PressableScale
-            accessibilityLabel={`${chip.day} ${chip.date}`}
-            accessibilityRole="button"
-            key={chip.id}
-            onPress={() => setSelected(chip.id)}
-            style={[styles.dateChip, active && styles.selectedChip]}>
-            <Text style={[styles.dateDay, active && styles.selectedText]}>{chip.day}</Text>
-            <Text style={styles.dateValue}>{chip.date}</Text>
-          </PressableScale>
-        );
-      })}
-    </ScrollView>
-  );
-}
-
 export default function DashboardScreen() {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
     <Screen hasTabs>
       <Animated.View entering={enterUp(0)}>
@@ -243,145 +233,95 @@ export default function DashboardScreen() {
         <LiveMatchHero />
       </Animated.View>
 
-      <Animated.View entering={enterUp(3)}>
-        <GlassCard gradient="card" style={styles.dailyCard}>
-          <View style={styles.dailyTop}>
-            <StatusBadge label="Daily ticket" tone="accent" />
-            <Text style={styles.legs}>5 legs</Text>
+      {/* UCL Section Header */}
+      <Animated.View entering={enterUp(3)} style={styles.sectionHeader}>
+        <View style={styles.sectionHeaderLeft}>
+          <Text style={styles.sectionTitle}>UEFA Champions League</Text>
+          <View style={styles.countBadge}>
+            <Text style={styles.countText}>4</Text>
           </View>
-          <View style={styles.statsGrid}>
-            <View>
-              <Text style={styles.statLabel}>Total odds</Text>
-              <Text style={styles.statValue}>8.42</Text>
-            </View>
-            <View>
-              <Text style={styles.statLabel}>Avg conf.</Text>
-              <Text style={[styles.statValue, styles.successText]}>71%</Text>
-            </View>
-            <View>
-              <Text style={styles.statLabel}>Edge</Text>
-              <Text style={[styles.statValue, styles.primaryText]}>+7.1</Text>
-            </View>
-          </View>
-          <View style={styles.heroSummary}>
-            <Sparkles color={colors.primary} size={17} />
-            <Text style={styles.heroSummaryText}>
-              AI-curated slip favors resilient markets and verified source coverage.
-            </Text>
-          </View>
-        </GlassCard>
+        </View>
+        <PressableScale
+          accessibilityLabel="Toggle league feed"
+          accessibilityRole="button"
+          onPress={() => setCollapsed(!collapsed)}>
+          {collapsed ? (
+            <ChevronDown color={colors.foreground} size={18} strokeWidth={2.4} />
+          ) : (
+            <ChevronUp color={colors.foreground} size={18} strokeWidth={2.4} />
+          )}
+        </PressableScale>
       </Animated.View>
 
-      <Animated.View entering={enterUp(4)}>
-        <DateChips />
-      </Animated.View>
-
-      <Animated.View entering={enterUp(5)} style={styles.leagueWrap}>
-        <ScrollView
-          contentContainerStyle={styles.leagueRow}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.horizontal}>
-          {leagues.map((league) => (
-            <StatusBadge key={league} label={league} tone={league === 'All' ? 'accent' : 'neutral'} />
-          ))}
-        </ScrollView>
-      </Animated.View>
-
-      <Animated.View entering={enterUp(6)} style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Matchday feed</Text>
-        <Text style={styles.sectionAction}>Today</Text>
-      </Animated.View>
-
-      {matches.map((match, index) => (
-        <Animated.View entering={enterUp(7 + index)} key={match.id}>
-          <MatchCard match={match} />
-        </Animated.View>
-      ))}
+      {/* UCL Matches Feed */}
+      {!collapsed &&
+        matches.map((match, index) => (
+          <Animated.View entering={enterUp(4 + index)} key={match.id}>
+            <MatchFeedCard match={match} />
+          </Animated.View>
+        ))}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  avatar: {
-    alignItems: 'center',
-    backgroundColor: colors.primaryMuted,
-    borderColor: colors.borderAccent,
-    borderWidth: 1,
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: colors.primary,
-    fontFamily: fonts.extraBold,
+  balanceInfo: {
+    marginLeft: spacing.sm,
   },
   balanceLabel: {
     color: colors.muted,
-    fontFamily: fonts.semibold,
+    fontFamily: fonts.medium,
     fontSize: 12,
   },
   balanceValue: {
     color: colors.foregroundStrong,
     fontFamily: fonts.extraBold,
-    fontSize: 19,
+    fontSize: 20,
     marginTop: 1,
   },
-  chipRow: {
-    gap: spacing.sm,
-    paddingRight: spacing.lg,
+  cardPagination: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    marginTop: spacing.md,
+  },
+  centerClockPill: {
+    alignItems: 'center',
+    backgroundColor: '#0a0b0b',
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    width: 90,
   },
   circleButton: {
     alignItems: 'center',
-    backgroundColor: colors.input,
-    borderColor: colors.border,
+    backgroundColor: colors.panel,
+    borderColor: colors.borderStrong,
     borderRadius: radius.pill,
     borderWidth: 1,
     height: 44,
     justifyContent: 'center',
     width: 44,
   },
-  clock: {
+  clockTime: {
     color: colors.foregroundStrong,
     fontFamily: fonts.extraBold,
-    fontSize: 15,
+    fontSize: 14,
+    marginTop: 2,
   },
-  clockChip: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.28)',
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    minWidth: 86,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+  countBadge: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: radius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
-  dailyCard: {
-    overflow: 'hidden',
-  },
-  dailyTop: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  dateChip: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    height: 58,
-    justifyContent: 'center',
-    width: 70,
-  },
-  dateDay: {
+  countText: {
     color: colors.mutedLight,
     fontFamily: fonts.bold,
-    fontSize: 12,
-  },
-  dateValue: {
-    color: colors.muted,
-    fontFamily: fonts.semibold,
-    fontSize: 10,
-    marginTop: 3,
+    fontSize: 11,
   },
   headerActions: {
     flexDirection: 'row',
@@ -390,68 +330,57 @@ const styles = StyleSheet.create({
   headerLeft: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.md,
   },
   headerRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingHorizontal: spacing.xs,
   },
   heroCard: {
+    backgroundColor: '#151718',
+    borderColor: '#202123',
+    borderWidth: 1,
     gap: spacing.lg,
-    overflow: 'hidden',
+    padding: spacing.lg,
   },
-  heroCenter: {
+  heroCenterBlock: {
     alignItems: 'center',
     flex: 1,
-    paddingHorizontal: spacing.sm,
   },
   heroEyebrow: {
     color: colors.mutedLight,
     fontFamily: fonts.bold,
-    fontSize: 12,
-    letterSpacing: 0.3,
+    fontSize: 13,
   },
   heroLeague: {
     color: colors.foreground,
     fontFamily: fonts.bold,
-    fontSize: 12,
+    fontSize: 11,
     textAlign: 'center',
+  },
+  heroPressable: {
+    width: '100%',
   },
   heroStage: {
     color: colors.muted,
-    fontFamily: fonts.semibold,
+    fontFamily: fonts.medium,
     fontSize: 10,
     marginTop: 2,
-  },
-  heroSummary: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.16)',
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    padding: spacing.md,
-  },
-  heroSummaryText: {
-    color: colors.mutedLight,
-    flex: 1,
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  heroTeam: {
-    alignItems: 'center',
-    gap: spacing.xs,
-    width: 84,
+    textTransform: 'uppercase',
   },
   heroTeamName: {
-    color: colors.foreground,
+    color: colors.foregroundStrong,
     fontFamily: fonts.bold,
     fontSize: 12,
+    marginTop: spacing.xs,
+    textAlign: 'center',
   },
-  heroTeams: {
+  heroTeamSide: {
+    alignItems: 'center',
+    width: 80,
+  },
+  heroTeamsContainer: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -464,84 +393,86 @@ const styles = StyleSheet.create({
   heroTopRight: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.sm,
   },
   horizontal: {
     marginRight: -spacing.lg,
   },
-  leagueRow: {
-    gap: spacing.sm,
-    paddingRight: spacing.lg,
+  liveIndicator: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
   },
-  leagueWrap: {
-    marginTop: -spacing.xs,
+  liveRedDot: {
+    backgroundColor: colors.danger,
+    borderRadius: radius.pill,
+    height: 6,
+    width: 6,
   },
-  legs: {
-    color: colors.accent,
+  liveText: {
+    color: colors.danger,
+    fontFamily: fonts.bold,
+    fontSize: 9,
+    textTransform: 'uppercase',
+  },
+  matchDateCol: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  matchDateText: {
+    color: colors.foregroundStrong,
     fontFamily: fonts.bold,
     fontSize: 13,
   },
-  matchCard: {
-    gap: spacing.md,
-    padding: spacing.md,
+  matchFeedCard: {
+    backgroundColor: '#151718',
+    borderColor: '#202123',
+    borderWidth: 1,
+    gap: spacing.lg,
+    padding: spacing.md + 2,
   },
-  matchLeague: {
-    color: colors.muted,
-    fontFamily: fonts.semibold,
-    fontSize: 9,
-    marginTop: 1,
-    maxWidth: 110,
-  },
-  matchTeam: {
+  matchTeamCol: {
     alignItems: 'center',
-    flex: 1,
-    gap: spacing.xs,
+    width: 80,
   },
-  matchTeamName: {
+  matchTeamLabel: {
     color: colors.foreground,
     fontFamily: fonts.bold,
-    fontSize: 12,
+    fontSize: 11,
+    marginTop: spacing.xs,
+    textAlign: 'center',
   },
-  matchTeamRight: {},
-  matchTime: {
-    color: colors.foregroundStrong,
-    fontFamily: fonts.extraBold,
-    fontSize: 13,
-  },
-  matchTimeChip: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  matchTop: {
+  matchTeamsRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingHorizontal: spacing.sm,
+  },
+  matchTimeText: {
+    color: colors.muted,
+    fontFamily: fonts.medium,
+    fontSize: 11,
+    marginTop: 2,
   },
   oddsChip: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: '#0a0b0b',
+    borderColor: colors.borderStrong,
     borderRadius: radius.md,
     borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
     gap: spacing.sm,
     justifyContent: 'center',
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: 12,
   },
   oddsChipActive: {
     backgroundColor: colors.primaryMuted,
-    borderColor: colors.borderAccent,
+    borderColor: colors.primary,
   },
   oddsLabel: {
     color: colors.muted,
     fontFamily: fonts.bold,
-    fontSize: 11,
+    fontSize: 12,
   },
   oddsLabelActive: {
     color: colors.primary,
@@ -551,165 +482,96 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   oddsValue: {
-    color: colors.foreground,
+    color: colors.foregroundStrong,
     fontFamily: fonts.extraBold,
     fontSize: 13,
   },
   oddsValueActive: {
     color: colors.primary,
   },
-  period: {
+  paginationDot: {
+    backgroundColor: '#3a3f3e',
+    borderRadius: radius.pill,
+    height: 6,
+    width: 6,
+  },
+  paginationDotActive: {
+    backgroundColor: colors.primary,
+    width: 20,
+  },
+  periodLabel: {
     color: colors.muted,
-    fontFamily: fonts.semibold,
+    fontFamily: fonts.medium,
     fontSize: 10,
     marginTop: 1,
-  },
-  pick: {
-    color: colors.foreground,
-    fontFamily: fonts.bold,
-    fontSize: 13,
-  },
-  pickBox: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.16)',
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.md,
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  pickCopy: {
-    flex: 1,
-    minWidth: 0,
   },
   pillRow: {
     gap: spacing.sm,
     paddingRight: spacing.lg,
   },
-  primaryText: {
-    color: colors.primary,
-  },
   profileAvatar: {
-    alignItems: 'center',
-    backgroundColor: colors.primaryMuted,
-    borderColor: colors.borderAccent,
     borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 46,
-    justifyContent: 'center',
-    width: 46,
+    height: 44,
+    width: 44,
   },
-  profileInitial: {
-    color: colors.primary,
-    fontFamily: fonts.extraBold,
-    fontSize: 17,
-  },
-  readiness: {
-    color: colors.muted,
-    fontFamily: fonts.semibold,
-    fontSize: 10,
-    marginTop: 2,
-  },
-  score: {
-    color: colors.foregroundStrong,
-    fontFamily: fonts.extraBold,
-    fontSize: 44,
-  },
-  scoreRow: {
+  scoreAndClock: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
+    gap: spacing.md,
+    marginTop: spacing.sm,
   },
-  sectionAction: {
-    color: colors.primary,
-    fontFamily: fonts.bold,
-    fontSize: 12,
+  scoreValue: {
+    color: colors.foregroundStrong,
+    fontFamily: fonts.extraBold,
+    fontSize: 36,
   },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.xs,
+  },
+  sectionHeaderLeft: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   sectionTitle: {
     color: colors.foregroundStrong,
     fontFamily: fonts.extraBold,
-    fontSize: 17,
-  },
-  selectedChip: {
-    backgroundColor: colors.primaryMuted,
-    borderColor: colors.borderAccent,
-  },
-  selectedText: {
-    color: colors.primary,
+    fontSize: 16,
   },
   sportEmoji: {
     fontSize: 15,
   },
+  sportEmojiActive: {},
   sportLabel: {
-    color: colors.foregroundStrong,
+    color: colors.black,
     fontFamily: fonts.bold,
     fontSize: 13,
   },
-  sportPill: {
+  sportPillActive: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: colors.primary,
     borderRadius: radius.pill,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.sm,
-    height: 44,
+    height: 40,
     justifyContent: 'center',
-    minWidth: 44,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.md + 4,
   },
-  sportPillActive: {
-    backgroundColor: colors.primaryMuted,
-    borderColor: colors.borderAccent,
-    paddingHorizontal: spacing.lg,
-  },
-  starButton: {
+  sportPillCircle: {
     alignItems: 'center',
-    backgroundColor: colors.accentMuted,
-    borderColor: 'rgba(255,211,77,0.35)',
+    backgroundColor: '#151718',
+    borderColor: '#202123',
     borderRadius: radius.pill,
     borderWidth: 1,
-    height: 30,
+    height: 40,
     justifyContent: 'center',
-    width: 30,
+    width: 40,
   },
-  statLabel: {
-    color: colors.muted,
-    fontFamily: fonts.bold,
-    fontSize: 10,
-    textTransform: 'uppercase',
-  },
-  statValue: {
-    color: colors.foregroundStrong,
-    fontFamily: fonts.extraBold,
-    fontSize: 25,
-    marginTop: 4,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  successText: {
-    color: '#86efac',
-  },
-  unreadDot: {
-    backgroundColor: colors.accent,
-    borderColor: colors.backgroundAlt,
-    borderRadius: radius.pill,
-    borderWidth: 2,
-    height: 11,
-    position: 'absolute',
-    right: 9,
-    top: 9,
-    width: 11,
+  starIcon: {
+    marginLeft: spacing.sm,
   },
 });

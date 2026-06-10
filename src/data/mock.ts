@@ -75,7 +75,7 @@ export const sports = [
 ];
 
 export const wallet = {
-  balance: '₦ 24,300',
+  balance: '$2,432',
 };
 
 export const liveMatch: LiveMatchData = {
@@ -93,43 +93,30 @@ export const liveMatch: LiveMatchData = {
 
 export const matches: MatchCardData[] = [
   {
-    id: 'ars-che',
-    away: 'Chelsea',
-    confidence: 74,
-    edge: '+8.7',
-    home: 'Arsenal',
-    league: 'Premier League',
-    odds: { away: 4.1, draw: 3.6, home: 1.92 },
-    pick: 'Home win or draw',
+    id: 'bvb-mun',
+    away: 'Man United',
+    confidence: 82,
+    edge: '+9.4',
+    home: 'Borussia D',
+    league: 'UEFA Champions League',
+    odds: { away: 1.84, draw: 4.2, home: 3.74 },
+    pick: 'Away win or draw',
     readiness: 'Verified',
-    recommended: 'home',
-    time: '19:30',
+    recommended: 'away',
+    time: '16 April 20:00',
   },
   {
-    id: 'dor-lev',
-    away: 'Leverkusen',
-    confidence: 68,
-    edge: '+5.1',
-    home: 'Dortmund',
-    league: 'Bundesliga',
-    odds: { away: 3.74, draw: 4.2, home: 1.84 },
-    pick: 'Over 1.5 goals',
-    readiness: 'Partial',
-    recommended: 'home',
-    time: '20:00',
-  },
-  {
-    id: 'mil-int',
-    away: 'Inter',
-    confidence: 71,
-    edge: '+7.4',
-    home: 'Milan',
-    league: 'Serie A',
-    odds: { away: 2.95, draw: 3.1, home: 2.45 },
-    pick: 'Both teams score',
+    id: 'liv-eve',
+    away: 'Everton',
+    confidence: 75,
+    edge: '+6.2',
+    home: 'Liverpool',
+    league: 'UEFA Champions League',
+    odds: { away: 5.60, draw: 4.4, home: 1.45 },
+    pick: 'Home win',
     readiness: 'Verified',
-    recommended: 'draw',
-    time: '20:45',
+    recommended: 'home',
+    time: '17 April 21:00',
   },
 ];
 

@@ -1,164 +1,171 @@
-import { Link, useRouter } from 'expo-router';
-import { ArrowRight } from 'lucide-react-native';
-import { useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, {
-  Easing,
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { ArrowUpRight } from 'lucide-react-native';
+import { View, StyleSheet, Text } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BrandMark, enterUp, GradientButton, Screen, StatusBadge } from '@/components/ui';
+import { enterUp, PressableScale } from '@/components/ui';
 import { colors } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
-function FloatingMark() {
-  const float = useSharedValue(0);
-
-  useEffect(() => {
-    float.value = withRepeat(withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.quad) }), -1, true);
-  }, [float]);
-
-  const floatStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: interpolate(float.value, [0, 1], [0, -12]) }],
-  }));
-
-  return (
-    <View style={styles.markWrap}>
-      <View style={styles.markGlow} />
-      <Animated.View style={floatStyle}>
-        <BrandMark size={120} />
-      </Animated.View>
-    </View>
-  );
-}
+const onboardingImage = require('@/../assets/images/neymar_onboarding.png');
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   return (
-    <Screen scroll={false}>
-      <View style={styles.root}>
-        <Animated.View entering={enterUp(0)} style={styles.topRow}>
-          <StatusBadge label="BetClaw" tone="accent" />
-          <StatusBadge label="Mobile MVP" />
-        </Animated.View>
+    <View style={styles.root}>
+      {/* Background Image */}
+      <Image
+        source={onboardingImage}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+      />
 
-        <Animated.View entering={enterUp(1)}>
-          <FloatingMark />
-        </Animated.View>
+      {/* Dark Overlay Mask */}
+      <View style={styles.overlay} />
 
-        <View style={styles.bottom}>
-          <Animated.View entering={enterUp(2)} style={styles.headlineRow}>
-            <Text style={styles.title}>Step into the game.{'\n'}Own the win.</Text>
-            <View style={styles.chipRow}>
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>⚽</Text>
-              </View>
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>🏆</Text>
+      {/* Content Container */}
+      <View style={[styles.content, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 24) }]}>
+        {/* Top Spacer */}
+        <View style={styles.flex} />
+
+        {/* Text and CTA Block */}
+        <View style={styles.bottomBlock}>
+          {/* Title and Emoji pill */}
+          <Animated.View entering={enterUp(0)} style={styles.titleContainer}>
+            <Text style={styles.title}>Step into the game</Text>
+            <View style={styles.titleSecondRow}>
+              <Text style={styles.title}>Own the win</Text>
+              <View style={styles.emojiPill}>
+                <Text style={styles.emoji}>⚽</Text>
+                <Text style={styles.emoji}>🏆</Text>
               </View>
             </View>
           </Animated.View>
 
-          <Animated.View entering={enterUp(3)}>
+          {/* Description copy */}
+          <Animated.View entering={enterUp(1)}>
             <Text style={styles.copy}>
-              Join the action, make your moves, and claim your victory with AI-verified picks.
+              Join the action make your moves{'\n'}and claim your victory
             </Text>
           </Animated.View>
 
-          <Animated.View entering={enterUp(4)} style={styles.ctaBlock}>
-            <GradientButton icon={ArrowRight} onPress={() => router.push('/(auth)/signup')}>
-              Get Started
-            </GradientButton>
-            <Link href="/(auth)/login" asChild>
-              <Pressable style={styles.centerLink}>
-                <Text style={styles.link}>Already have an account? Sign in</Text>
-              </Pressable>
-            </Link>
+          {/* Footer: Pagination & CTA */}
+          <Animated.View entering={enterUp(2)} style={styles.footerRow}>
+            {/* Pagination Indicators */}
+            <View style={styles.pagination}>
+              <View style={styles.dot} />
+              <View style={styles.dot} />
+              <View style={[styles.dot, styles.dotActive]} />
+            </View>
+
+            {/* Lime Green Button */}
+            <PressableScale
+              accessibilityLabel="Get started"
+              accessibilityRole="button"
+              onPress={() => router.push('/(tabs)')}
+              style={styles.ctaButton}>
+              <Text style={styles.ctaText}>Get started</Text>
+              <ArrowUpRight color={colors.black} size={18} strokeWidth={2.6} />
+            </PressableScale>
           </Animated.View>
         </View>
       </View>
-    </Screen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bottom: {
+  bottomBlock: {
     gap: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
-  centerLink: {
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  chip: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 38,
-    justifyContent: 'center',
-    width: 38,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  chipText: {
-    fontSize: 16,
-  },
-  copy: {
-    color: colors.mutedLight,
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    lineHeight: 24,
-    maxWidth: 300,
-  },
-  ctaBlock: {
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  headlineRow: {
-    gap: spacing.md,
-  },
-  link: {
-    color: colors.primary,
-    fontFamily: fonts.bold,
-    fontSize: 13,
-  },
-  markGlow: {
-    backgroundColor: 'rgba(46,242,208,0.10)',
-    borderRadius: radius.pill,
-    height: 220,
-    position: 'absolute',
-    width: 220,
-  },
-  markWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xxxl,
-  },
-  root: {
+  content: {
     flex: 1,
     justifyContent: 'space-between',
-    paddingBottom: spacing.lg,
-    paddingTop: spacing.xl,
+  },
+  copy: {
+    color: '#a0a8a5',
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  ctaButton: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: 22,
+    paddingVertical: 14,
+  },
+  ctaText: {
+    color: colors.black,
+    fontFamily: fonts.bold,
+    fontSize: 15,
+  },
+  dot: {
+    backgroundColor: '#3a3f3e',
+    borderRadius: radius.pill,
+    height: 6,
+    width: 6,
+  },
+  dotActive: {
+    backgroundColor: colors.primary,
+    width: 24,
+  },
+  emoji: {
+    fontSize: 15,
+  },
+  emojiPill: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: 'center',
+    marginLeft: spacing.sm,
+  },
+  flex: {
+    flex: 1,
+  },
+  footerRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.55)', // Gradient-like overlay from image
+  },
+  pagination: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  root: {
+    backgroundColor: colors.black,
+    flex: 1,
   },
   title: {
     color: colors.foregroundStrong,
     fontFamily: fonts.extraBold,
-    fontSize: 38,
-    letterSpacing: 0,
-    lineHeight: 44,
+    fontSize: 34,
+    letterSpacing: -0.5,
+    lineHeight: 40,
   },
-  topRow: {
+  titleContainer: {
+    gap: 2,
+  },
+  titleSecondRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
   },
 });

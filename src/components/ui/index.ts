@@ -14,3 +14,4 @@ export * from './ScreenHeader';
 export * from './StatusBadge';
 export * from './TabBar';
 export * from './ToggleSwitch';
+export * from './TeamLogo';

@@ -1,4 +1,5 @@
 import type { BottomTabBarProps } from 'expo-router/tabs';
+import { Home, Compass, Ticket, Star, Menu } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useDerivedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,7 +29,7 @@ function TabItem({
   }));
 
   const iconStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -2 * progress.value }],
+    transform: [{ translateY: -1 * progress.value }],
   }));
 
   return (
@@ -48,43 +49,59 @@ function TabItem({
 }
 
 export function TabBar({
-  descriptors,
-  icons,
   navigation,
   state,
-}: BottomTabBarProps & { icons: Record<string, IconComponent> }) {
+}: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
 
+  const activeRoute = state.routes[state.index].name;
+
+  const handleNavigate = (routeName: string) => {
+    navigation.navigate(routeName);
+  };
+
   return (
-    <View pointerEvents="box-none" style={[styles.wrap, { bottom: Math.max(insets.bottom, 10) }]}>
+    <View pointerEvents="box-none" style={[styles.wrap, { bottom: Math.max(insets.bottom, 12) }]}>
       <View style={styles.bar}>
-        {state.routes.map((route, index) => {
-          const focused = state.index === index;
-          const { options } = descriptors[route.key];
-          const label = options.title ?? route.name;
-          const Icon = icons[route.name];
+        {/* Tab 1: Home */}
+        <TabItem
+          focused={activeRoute === 'index'}
+          icon={Home}
+          label="Home"
+          onPress={() => handleNavigate('index')}
+        />
 
-          if (!Icon) return null;
+        {/* Tab 2: Explore */}
+        <TabItem
+          focused={activeRoute === 'wallet'}
+          icon={Compass}
+          label="Explore"
+          onPress={() => handleNavigate('wallet')}
+        />
 
-          return (
-            <TabItem
-              focused={focused}
-              icon={Icon}
-              key={route.key}
-              label={label}
-              onPress={() => {
-                const event = navigation.emit({
-                  canPreventDefault: true,
-                  target: route.key,
-                  type: 'tabPress',
-                });
-                if (!focused && !event.defaultPrevented) {
-                  navigation.navigate(route.name);
-                }
-              }}
-            />
-          );
-        })}
+        {/* Tab 3: Tickets */}
+        <TabItem
+          focused={activeRoute === 'fix-ticket'}
+          icon={Ticket}
+          label="Tickets"
+          onPress={() => handleNavigate('fix-ticket')}
+        />
+
+        {/* Tab 4: Favorites */}
+        <TabItem
+          focused={false}
+          icon={Star}
+          label="Favorites"
+          onPress={() => {}}
+        />
+
+        {/* Tab 5: Menu */}
+        <TabItem
+          focused={activeRoute === 'settings'}
+          icon={Menu}
+          label="Menu"
+          onPress={() => handleNavigate('settings')}
+        />
       </View>
     </View>
   );
@@ -93,8 +110,8 @@ export function TabBar({
 const styles = StyleSheet.create({
   bar: {
     alignItems: 'center',
-    backgroundColor: 'rgba(5,18,15,0.97)',
-    borderColor: colors.borderStrong,
+    backgroundColor: 'rgba(13,14,15,0.95)',
+    borderColor: '#202123',
     borderRadius: radius.pill,
     borderWidth: 1,
     elevation: 12,
@@ -104,24 +121,24 @@ const styles = StyleSheet.create({
     maxWidth: 380,
     paddingHorizontal: spacing.sm,
     shadowColor: colors.black,
-    shadowOffset: { height: 10, width: 0 },
+    shadowOffset: { height: 8, width: 0 },
     shadowOpacity: 0.45,
-    shadowRadius: 22,
+    shadowRadius: 16,
     width: '100%',
   },
   halo: {
     backgroundColor: colors.primary,
     borderRadius: radius.pill,
-    height: 46,
+    height: 44,
     position: 'absolute',
-    width: 46,
+    width: 44,
   },
   item: {
     alignItems: 'center',
     borderRadius: radius.pill,
-    height: 52,
+    height: 48,
     justifyContent: 'center',
-    width: 52,
+    width: 48,
   },
   wrap: {
     alignItems: 'center',
