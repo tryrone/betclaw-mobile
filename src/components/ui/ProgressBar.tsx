@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSpring } from 'react-native-reanimated';
 
-import { colors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/colors';
 import { radius } from '@/theme/spacing';
 
 export function ProgressBar({
@@ -14,7 +14,8 @@ export function ProgressBar({
   tone?: 'accent' | 'warning' | 'success';
   value: number;
 }) {
-  const fillColor = tone === 'warning' ? colors.warning : tone === 'success' ? colors.success : colors.primary;
+  const theme = useAppTheme();
+  const fillColor = tone === 'warning' ? theme.warning : tone === 'success' ? theme.success : theme.progressFill;
   const clamped = Math.max(0, Math.min(100, value));
   const progress = useSharedValue(0);
 
@@ -27,7 +28,7 @@ export function ProgressBar({
   }));
 
   return (
-    <View style={styles.track}>
+    <View style={[styles.track, { backgroundColor: theme.statTrack }]}>
       <Animated.View style={[styles.fill, { backgroundColor: fillColor }, fillStyle]} />
     </View>
   );
@@ -39,9 +40,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   track: {
-    backgroundColor: 'rgba(255,255,255,0.11)',
     borderRadius: radius.pill,
-    height: 8,
+    height: 6,
     overflow: 'hidden',
     width: '100%',
   },

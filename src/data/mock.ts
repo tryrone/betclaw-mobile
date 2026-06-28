@@ -1,7 +1,17 @@
-export type MatchOdds = {
+export type Readiness = 'Verified' | 'Partial' | 'Limited';
+
+export type MatchStatData = {
+  id: string;
+  label: string;
   home: number;
-  draw: number;
   away: number;
+  suffix?: string;
+};
+
+export type LineupItemData = {
+  role: string;
+  home: string;
+  away: string;
 };
 
 export type MatchCardData = {
@@ -9,26 +19,24 @@ export type MatchCardData = {
   home: string;
   away: string;
   league: string;
+  leagueId: string;
+  sportId: string;
+  venue: string;
+  date: string;
+  dateId: string;
   time: string;
-  pick: string;
   confidence: number;
-  edge: string;
-  readiness: 'Verified' | 'Partial' | 'Limited';
-  odds: MatchOdds;
-  recommended: keyof MatchOdds;
-};
-
-export type LiveMatchData = {
-  id: string;
-  league: string;
-  stage: string;
-  home: string;
-  away: string;
-  homeScore: number;
-  awayScore: number;
-  clock: string;
-  period: string;
-  odds: MatchOdds;
+  readiness: Readiness;
+  signal: string;
+  trend: string;
+  status: 'Live' | 'Today' | 'Tomorrow' | 'Upcoming';
+  homeScore?: number;
+  awayScore?: number;
+  clock?: string;
+  period?: string;
+  stats: MatchStatData[];
+  lineup: LineupItemData[];
+  summary: string[];
 };
 
 export type TicketRowData = {
@@ -57,68 +65,284 @@ export type BillingItemData = {
 };
 
 export const dateChips = [
-  { id: 'mon', day: 'Mon', date: '28 May' },
-  { id: 'tue', day: 'Tue', date: '29 May' },
   { id: 'today', day: 'Today', date: '30 May' },
-  { id: 'thu', day: 'Thu', date: '31 May' },
-  { id: 'fri', day: 'Fri', date: '1 Jun' },
+  { id: 'sat', day: 'Sat', date: '31 May' },
+  { id: 'sun', day: 'Sun', date: '1 Jun' },
+  { id: 'mon', day: 'Mon', date: '2 Jun' },
 ];
 
-export const leagues = ['All', 'EPL', 'Serie A', 'UCL'];
+export const leagues = [
+  { id: 'all', label: 'All' },
+  { id: 'epl', label: 'Premier League' },
+  { id: 'ucl', label: 'UCL' },
+  { id: 'serie-a', label: 'Serie A' },
+  { id: 'nba', label: 'NBA' },
+];
 
 export const sports = [
-  { emoji: '⚽', id: 'football', label: 'Football' },
-  { emoji: '🏀', id: 'basketball', label: 'Basketball' },
-  { emoji: '🎾', id: 'tennis', label: 'Tennis' },
-  { emoji: '🏐', id: 'volleyball', label: 'Volleyball' },
-  { emoji: '🏈', id: 'nfl', label: 'NFL' },
+  { id: 'football', label: 'Football', short: 'FB' },
+  { id: 'basketball', label: 'Basketball', short: 'BB' },
+  { id: 'tennis', label: 'Tennis', short: 'TN' },
+  { id: 'nfl', label: 'NFL', short: 'NF' },
 ];
 
 export const wallet = {
-  balance: '$2,432',
+  balance: '700k',
 };
 
-export const liveMatch: LiveMatchData = {
-  away: 'Chelsea',
-  awayScore: 2,
-  clock: '32:29',
-  home: 'Barcelona',
-  homeScore: 0,
-  id: 'bar-che',
-  league: 'UEFA Champions League',
-  odds: { away: 1.24, draw: 4.2, home: 3.74 },
-  period: '1st half',
-  stage: 'Group A',
-};
+const coreStats: MatchStatData[] = [
+  { id: 'shots-on-goal', away: 6, home: 2, label: 'Shots on goal' },
+  { id: 'shots', away: 15, home: 4, label: 'Shots' },
+  { id: 'possession', away: 74, home: 26, label: 'Possession', suffix: '%' },
+  { id: 'cards', away: 2, home: 3, label: 'Yellow cards' },
+  { id: 'corners', away: 2, home: 0, label: 'Corner kicks' },
+  { id: 'crosses', away: 23, home: 10, label: 'Crosses' },
+  { id: 'saves', away: 2, home: 3, label: 'Goalkeeper saves' },
+];
+
+const defaultLineup: LineupItemData[] = [
+  { away: 'High press 4-3-3', home: 'Compact 4-2-3-1', role: 'Shape' },
+  { away: 'Wide overloads', home: 'Mid-block recovery', role: 'Primary route' },
+  { away: 'Right flank', home: 'Central counters', role: 'Pressure point' },
+];
 
 export const matches: MatchCardData[] = [
   {
-    id: 'bvb-mun',
-    away: 'Man United',
-    confidence: 82,
-    edge: '+9.4',
-    home: 'Borussia D',
-    league: 'UEFA Champions League',
-    odds: { away: 1.84, draw: 4.2, home: 3.74 },
-    pick: 'Away win or draw',
+    id: 'new-che',
+    away: 'Chelsea',
+    awayScore: 3,
+    clock: "83'",
+    confidence: 86,
+    date: '30 May',
+    dateId: 'today',
+    home: 'Newcastle',
+    homeScore: 0,
+    league: 'Premier League',
+    leagueId: 'epl',
+    lineup: defaultLineup,
+    period: '2nd half',
     readiness: 'Verified',
-    recommended: 'away',
-    time: '16 April 20:00',
+    signal: 'Away control is backed by shot volume and sustained possession.',
+    stats: coreStats,
+    status: 'Live',
+    sportId: 'football',
+    summary: [
+      'Chelsea are controlling territory and chance quality late in the match.',
+      'Newcastle need direct transitions, but their shot profile is thin.',
+      'Card pressure is rising for the home side and limits aggressive pressing.',
+    ],
+    time: 'Live now',
+    trend: 'Away pressure',
+    venue: "St James' Park",
   },
   {
-    id: 'liv-eve',
-    away: 'Everton',
-    confidence: 75,
-    edge: '+6.2',
-    home: 'Liverpool',
-    league: 'UEFA Champions League',
-    odds: { away: 5.60, draw: 4.4, home: 1.45 },
-    pick: 'Home win',
+    id: 'mci-cry',
+    away: 'Palace',
+    confidence: 79,
+    date: '30 May',
+    dateId: 'today',
+    home: 'Man City',
+    league: 'Premier League',
+    leagueId: 'epl',
+    lineup: defaultLineup,
     readiness: 'Verified',
-    recommended: 'home',
-    time: '17 April 21:00',
+    signal: 'City project stronger shot control, Palace counter threat remains live.',
+    stats: [
+      { id: 'shots', away: 8, home: 17, label: 'Projected shots' },
+      { id: 'xg', away: 0.9, home: 2.1, label: 'xG trend' },
+      { id: 'corners', away: 3, home: 7, label: 'Corner trend' },
+    ],
+    status: 'Today',
+    sportId: 'football',
+    summary: ['City should own the ball, but Palace pace keeps transition risk above baseline.'],
+    time: '06:30',
+    trend: 'Home control',
+    venue: 'Etihad Stadium',
+  },
+  {
+    id: 'bur-bre',
+    away: 'Brentford',
+    confidence: 68,
+    date: '30 May',
+    dateId: 'today',
+    home: 'Burnley',
+    league: 'Premier League',
+    leagueId: 'epl',
+    lineup: defaultLineup,
+    readiness: 'Partial',
+    signal: 'Both teams trend toward set-piece volume and uneven defensive coverage.',
+    stats: [
+      { id: 'shots', away: 11, home: 9, label: 'Projected shots' },
+      { id: 'cards', away: 2, home: 3, label: 'Card trend' },
+      { id: 'corners', away: 5, home: 4, label: 'Corner trend' },
+    ],
+    status: 'Today',
+    sportId: 'football',
+    summary: ['The model likes set-piece activity more than a clean match winner angle.'],
+    time: '06:30',
+    trend: 'Set-piece edge',
+    venue: 'Turf Moor',
+  },
+  {
+    id: 'lei-ars',
+    away: 'Arsenal',
+    confidence: 82,
+    date: '30 May',
+    dateId: 'today',
+    home: 'Leicester',
+    league: 'Premier League',
+    leagueId: 'epl',
+    lineup: defaultLineup,
+    readiness: 'Verified',
+    signal: 'Arsenal have the cleaner possession profile and stronger defensive floor.',
+    stats: [
+      { id: 'shots', away: 16, home: 7, label: 'Projected shots' },
+      { id: 'possession', away: 63, home: 37, label: 'Possession', suffix: '%' },
+      { id: 'saves', away: 2, home: 5, label: 'Keeper saves' },
+    ],
+    status: 'Today',
+    sportId: 'football',
+    summary: ['Arsenal rate well across possession, shot volume, and defensive recoveries.'],
+    time: '08:30',
+    trend: 'Away advantage',
+    venue: 'King Power Stadium',
+  },
+  {
+    id: 'tot-mun',
+    away: 'Man United',
+    confidence: 72,
+    date: '30 May',
+    dateId: 'today',
+    home: 'Spurs',
+    league: 'Premier League',
+    leagueId: 'epl',
+    lineup: defaultLineup,
+    readiness: 'Limited',
+    signal: 'Volatility is high; both sides expose space after turnovers.',
+    stats: [
+      { id: 'shots', away: 13, home: 14, label: 'Projected shots' },
+      { id: 'cards', away: 3, home: 2, label: 'Card trend' },
+      { id: 'xg', away: 1.5, home: 1.6, label: 'xG trend' },
+    ],
+    status: 'Today',
+    sportId: 'football',
+    summary: ['This is a higher variance matchup, better suited to evidence review than a bold lean.'],
+    time: '08:30',
+    trend: 'High variance',
+    venue: 'Tottenham Hotspur Stadium',
+  },
+  {
+    id: 'psg-bay',
+    away: 'Bayern',
+    confidence: 76,
+    date: '30 May',
+    dateId: 'today',
+    home: 'PSG',
+    league: 'UCL',
+    leagueId: 'ucl',
+    lineup: defaultLineup,
+    readiness: 'Verified',
+    signal: 'Both sides carry elite shot volume, with transition defense deciding the edge.',
+    sportId: 'football',
+    stats: [
+      { id: 'shots', away: 14, home: 15, label: 'Projected shots' },
+      { id: 'xg', away: 1.8, home: 1.9, label: 'xG trend' },
+      { id: 'corners', away: 5, home: 6, label: 'Corner trend' },
+    ],
+    status: 'Today',
+    summary: ['The profile is strong but volatile because both teams attack quickly after regains.'],
+    time: '20:00',
+    trend: 'Transition risk',
+    venue: 'Parc des Princes',
+  },
+  {
+    id: 'int-mil',
+    away: 'Milan',
+    confidence: 74,
+    date: '1 Jun',
+    dateId: 'sun',
+    home: 'Inter',
+    league: 'Serie A',
+    leagueId: 'serie-a',
+    lineup: defaultLineup,
+    readiness: 'Partial',
+    signal: 'Inter rate cleaner on territory, while Milan create enough wide pressure to keep variance live.',
+    sportId: 'football',
+    stats: [
+      { id: 'shots', away: 10, home: 13, label: 'Projected shots' },
+      { id: 'possession', away: 47, home: 53, label: 'Possession', suffix: '%' },
+      { id: 'cards', away: 3, home: 2, label: 'Card trend' },
+    ],
+    status: 'Upcoming',
+    summary: ['The matchup leans toward control rather than an aggressive winner angle.'],
+    time: '19:45',
+    trend: 'Home control',
+    venue: 'San Siro',
+  },
+  {
+    id: 'lal-bos',
+    away: 'Celtics',
+    confidence: 70,
+    date: '31 May',
+    dateId: 'sat',
+    home: 'Lakers',
+    league: 'NBA',
+    leagueId: 'nba',
+    lineup: [
+      { away: 'Five-out spacing', home: 'Paint pressure', role: 'Shape' },
+      { away: 'Corner threes', home: 'Rim attacks', role: 'Primary route' },
+      { away: 'Bench shooting', home: 'Defensive glass', role: 'Pressure point' },
+    ],
+    readiness: 'Limited',
+    signal: 'Boston spacing lifts the baseline, but pace and rotation news keep confidence capped.',
+    sportId: 'basketball',
+    stats: [
+      { id: 'pace', away: 101, home: 99, label: 'Pace rating' },
+      { id: 'threes', away: 39, home: 34, label: '3PT attempt trend' },
+      { id: 'rebounds', away: 42, home: 45, label: 'Rebound trend' },
+    ],
+    status: 'Tomorrow',
+    summary: ['The evidence favors spacing and depth, but injury confirmation still matters.'],
+    time: '22:00',
+    trend: 'Spacing edge',
+    venue: 'Crypto.com Arena',
   },
 ];
+
+export const liveMatch = matches[0];
+
+export function getMatchById(id?: string) {
+  return matches.find((match) => match.id === id);
+}
+
+export function getLeagueLabel(id: string) {
+  return leagues.find((league) => league.id === id)?.label ?? 'All leagues';
+}
+
+export function getSportLabel(id: string) {
+  return sports.find((sport) => sport.id === id)?.label ?? 'Sport';
+}
+
+export function filterMatches({
+  dateId,
+  excludeIds = [],
+  leagueId = 'all',
+  sportId,
+}: {
+  dateId?: string;
+  excludeIds?: string[];
+  leagueId?: string;
+  sportId?: string;
+} = {}) {
+  const excluded = new Set(excludeIds);
+  return matches.filter((match) => {
+    if (excluded.has(match.id)) return false;
+    if (sportId && sportId !== 'all' && match.sportId !== sportId) return false;
+    if (leagueId !== 'all' && match.leagueId !== leagueId) return false;
+    if (dateId && dateId !== 'all' && match.dateId !== dateId) return false;
+    return true;
+  });
+}
 
 export const ticketRows: TicketRowData[] = [
   {

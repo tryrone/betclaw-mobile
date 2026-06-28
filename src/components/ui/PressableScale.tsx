@@ -29,6 +29,7 @@ export function PressableScale({
     <AnimatedPressable
       {...rest}
       onPressIn={(event) => {
+        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared values are mutable by design.
         scale.value = withSpring(scaleTo, { damping: 18, stiffness: 360 });
         if (haptic && Platform.OS !== 'web') {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -36,6 +37,7 @@ export function PressableScale({
         onPressIn?.(event);
       }}
       onPressOut={(event) => {
+        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared values are mutable by design.
         scale.value = withSpring(1, { damping: 15, stiffness: 280 });
         onPressOut?.(event);
       }}

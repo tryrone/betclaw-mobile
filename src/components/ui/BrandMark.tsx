@@ -1,6 +1,6 @@
 import Svg, { Path } from 'react-native-svg';
 
-import { colors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/colors';
 
 const paths = [
   'M31.2 50.8C44.5 29.3 68.6 16.3 99.8 14.2C84.3 21.6 66.7 34.1 47.1 51.7C38.8 59.2 28.9 64.7 17.4 68.4C20.7 61.7 25.3 55.8 31.2 50.8Z',
@@ -8,11 +8,13 @@ const paths = [
   'M43.8 107.8C62.2 90.3 84.8 78.9 111.6 73.6C98.8 85.4 86.6 97.4 75 109.7C62.9 122.5 43.7 123.9 17.3 113.7C25.8 113.1 34.7 111.1 43.8 107.8Z',
 ];
 
-export function BrandMark({ size = 44, color = colors.primary }: { size?: number; color?: string }) {
+export function BrandMark({ size = 44, color }: { size?: number; color?: string }) {
+  const theme = useAppTheme();
+
   return (
     <Svg accessibilityRole="image" height={size} viewBox="0 0 128 128" width={size}>
       {paths.map((path) => (
-        <Path d={path} fill={color} key={path} />
+        <Path d={path} fill={color ?? theme.primary} key={path} />
       ))}
     </Svg>
   );

@@ -1,6 +1,6 @@
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { colors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/colors';
 import { radius } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
@@ -19,16 +19,18 @@ export function FormField({
   secure?: boolean;
   value?: string;
 }) {
+  const theme = useAppTheme();
+
   return (
-    <View style={styles.field}>
-      <Icon color={colors.muted} size={18} strokeWidth={2} />
+    <View style={[styles.field, { backgroundColor: theme.field, borderColor: theme.border }]}>
+      <Icon color={theme.muted} size={18} strokeWidth={2} />
       <View style={styles.inputWrap}>
-        <Text style={styles.label}>{label}</Text>
+        <Text style={[styles.label, { color: theme.muted }]}>{label}</Text>
         <TextInput
           placeholder={placeholder}
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={theme.muted}
           secureTextEntry={secure}
-          style={styles.input}
+          style={[styles.input, { color: theme.foreground }]}
           value={value}
         />
       </View>
@@ -39,17 +41,14 @@ export function FormField({
 const styles = StyleSheet.create({
   field: {
     alignItems: 'center',
-    backgroundColor: colors.input,
-    borderColor: colors.border,
     borderRadius: radius.pill,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
-    minHeight: 56,
-    paddingHorizontal: 17,
+    minHeight: 52,
+    paddingHorizontal: 15,
   },
   input: {
-    color: colors.foreground,
     fontFamily: fonts.bold,
     fontSize: 14,
     height: 26,
@@ -60,7 +59,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   label: {
-    color: colors.muted,
     fontFamily: fonts.bold,
     fontSize: 10,
     letterSpacing: 0.3,

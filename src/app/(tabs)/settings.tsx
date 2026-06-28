@@ -1,12 +1,13 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { Bell, Copy, KeyRound, LogOut, Settings, ShieldCheck, UserRound } from 'lucide-react-native';
+import { Bell, ChevronRight, Copy, KeyRound, LogOut, Settings, ShieldCheck, SunMoon, UserRound } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import {
   enterUp,
   GlassCard,
-  GradientButton,
   IconButton,
   PressableScale,
   Screen,
@@ -14,30 +15,105 @@ import {
   StatusBadge,
   ToggleSwitch,
 } from '@/components/ui';
-import { colors } from '@/theme/colors';
+import { useAppTheme, useThemeController } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
 type IconComponent = React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
+const SETTINGS_STORAGE_PREFIX = 'betclaw.settings';
 
-function SettingRow({ checked = true, icon: Icon, label }: { checked?: boolean; icon: IconComponent; label: string }) {
+function useStoredBoolean(key: string, initialValue: boolean) {
+  const [value, setValue] = useState(initialValue);
+
+  useEffect(() => {
+    let mounted = true;
+    AsyncStorage.getItem(`${SETTINGS_STORAGE_PREFIX}.${key}`)
+      .then((storedValue) => {
+        if (!mounted) return;
+        if (storedValue === 'true') setValue(true);
+        if (storedValue === 'false') setValue(false);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      mounted = false;
+    };
+  }, [key]);
+
+  const updateValue = useCallback((nextValue: boolean) => {
+    setValue(nextValue);
+    AsyncStorage.setItem(`${SETTINGS_STORAGE_PREFIX}.${key}`, String(nextValue)).catch(() => undefined);
+  }, [key]);
+
+  return [value, updateValue] as const;
+}
+
+function SettingRow({
+  checked = true,
+  icon: Icon,
+  label,
+  onChange,
+}: {
+  checked?: boolean;
+  icon: IconComponent;
+  label: string;
+  onChange?: (value: boolean) => void;
+}) {
+  const theme = useAppTheme();
+
   return (
-    <View style={styles.settingRow}>
+    <View style={[styles.settingRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
       <View style={styles.settingLeft}>
-        <View style={styles.settingIcon}>
-          <Icon color={colors.primary} size={17} />
+        <View style={[styles.settingIcon, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
+          <Icon color={theme.primarySoft} size={16} />
         </View>
-        <Text numberOfLines={1} style={styles.settingLabel}>
+        <Text numberOfLines={1} style={[styles.settingLabel, { color: theme.foreground }]}>
           {label}
         </Text>
       </View>
-      <ToggleSwitch value={checked} />
+      <ToggleSwitch onChange={onChange} value={checked} />
     </View>
+  );
+}
+
+function ActionRow({
+  icon: Icon,
+  label,
+  onPress,
+}: {
+  icon: IconComponent;
+  label: string;
+  onPress: () => void;
+}) {
+  const theme = useAppTheme();
+
+  return (
+    <PressableScale
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.settingRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <View style={styles.settingLeft}>
+        <View style={[styles.settingIcon, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
+          <Icon color={theme.primarySoft} size={16} />
+        </View>
+        <Text numberOfLines={1} style={[styles.settingLabel, { color: theme.foreground }]}>
+          {label}
+        </Text>
+      </View>
+      <ChevronRight color={theme.mutedLight} size={18} strokeWidth={2.4} />
+    </PressableScale>
   );
 }
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const theme = useAppTheme();
+  const { mode, setThemeMode } = useThemeController();
+  const darkModeEnabled = mode === 'dark';
+  const [twoFactorAuth, setTwoFactorAuth] = useStoredBoolean('twoFactorAuth', false);
+  const [emailNotifications, setEmailNotifications] = useStoredBoolean('emailNotifications', true);
+  const [publicProfile, setPublicProfile] = useStoredBoolean('publicProfile', false);
 
   return (
     <Screen hasTabs>
@@ -48,14 +124,14 @@ export default function SettingsScreen() {
       <Animated.View entering={enterUp(1)}>
         <GlassCard>
           <View style={styles.profileRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>TO</Text>
+            <View style={[styles.avatar, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
+              <Text style={[styles.avatarText, { color: theme.primarySoft }]}>TO</Text>
             </View>
             <View style={styles.profileCopy}>
-              <Text numberOfLines={1} style={styles.name}>
+              <Text numberOfLines={1} style={[styles.name, { color: theme.foregroundStrong }]}>
                 Tega Oboraruvwe
               </Text>
-              <Text numberOfLines={1} style={styles.email}>
+              <Text numberOfLines={1} style={[styles.email, { color: theme.mutedLight }]}>
                 tega@betsclaw.win
               </Text>
               <StatusBadge label="Premium" tone="accent" />
@@ -65,54 +141,60 @@ export default function SettingsScreen() {
       </Animated.View>
 
       <Animated.View entering={enterUp(2)}>
-        <Text style={styles.sectionTitle}>Security</Text>
+        <Text style={[styles.sectionTitle, { color: theme.foregroundStrong }]}>Security</Text>
       </Animated.View>
       <Animated.View entering={enterUp(3)} style={styles.settingList}>
-        <SettingRow icon={KeyRound} label="Password update" />
-        <SettingRow checked={false} icon={ShieldCheck} label="Two-factor authentication" />
+        <ActionRow icon={KeyRound} label="Reset password" onPress={() => router.push('/(auth)/forgot-password' as any)} />
+        <SettingRow checked={twoFactorAuth} icon={ShieldCheck} label="Two-factor authentication" onChange={setTwoFactorAuth} />
       </Animated.View>
 
       <Animated.View entering={enterUp(4)} style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Preferences</Text>
-        <StatusBadge label="Dark only" />
+        <Text style={[styles.sectionTitle, { color: theme.foregroundStrong }]}>Preferences</Text>
+        <StatusBadge label={darkModeEnabled ? 'Dark mode' : 'Light mode'} />
       </Animated.View>
       <Animated.View entering={enterUp(5)} style={styles.settingList}>
-        <SettingRow icon={Bell} label="Email notifications" />
-        <SettingRow icon={UserRound} label="Public profile" />
+        <SettingRow
+          checked={darkModeEnabled}
+          icon={SunMoon}
+          label="Dark mode"
+          onChange={(enabled) => setThemeMode(enabled ? 'dark' : 'light')}
+        />
+        <SettingRow checked={emailNotifications} icon={Bell} label="Email notifications" onChange={setEmailNotifications} />
+        <SettingRow checked={publicProfile} icon={UserRound} label="Public profile" onChange={setPublicProfile} />
       </Animated.View>
 
       <Animated.View entering={enterUp(6)}>
         <GlassCard>
           <View style={styles.telegramHeader}>
             <View style={styles.telegramCopy}>
-              <Text style={styles.cardTitle}>Telegram delivery</Text>
-              <Text style={styles.cardCaption}>VIP pick alerts linked to mobile.</Text>
+              <Text style={[styles.cardTitle, { color: theme.foregroundStrong }]}>Telegram delivery</Text>
+              <Text style={[styles.cardCaption, { color: theme.muted }]}>VIP pick alerts linked to mobile.</Text>
             </View>
             <StatusBadge label="Token" tone="warning" />
           </View>
-          <View style={styles.telegramToken}>
-            <Text numberOfLines={1} style={styles.tokenText}>
+          <View style={[styles.telegramToken, { backgroundColor: theme.field, borderColor: theme.border }]}>
+            <Text numberOfLines={1} style={[styles.tokenText, { color: theme.foreground }]}>
               /link BCLW-2849
             </Text>
-            <PressableScale accessibilityLabel="Copy Telegram link command" accessibilityRole="button" scaleTo={0.85} style={styles.copyButton}>
-              <Copy color={colors.primary} size={16} />
+            <PressableScale
+              accessibilityLabel="Copy Telegram link command"
+              accessibilityRole="button"
+              scaleTo={0.85}
+              style={[styles.copyButton, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
+              <Copy color={theme.primarySoft} size={15} />
             </PressableScale>
           </View>
         </GlassCard>
       </Animated.View>
 
       <Animated.View entering={enterUp(7)}>
-        <GradientButton>Save Changes</GradientButton>
-      </Animated.View>
-
-      <Animated.View entering={enterUp(8)}>
         <PressableScale
           accessibilityLabel="Sign out"
           accessibilityRole="button"
           onPress={() => router.replace('/(auth)/login')}
           style={styles.signOut}>
-          <LogOut color={colors.danger} size={17} />
-          <Text style={styles.signOutText}>Sign Out</Text>
+          <LogOut color={theme.danger} size={17} />
+          <Text style={[styles.signOutText, { color: theme.danger }]}>Sign Out</Text>
         </PressableScale>
       </Animated.View>
     </Screen>
@@ -122,34 +204,27 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   avatar: {
     alignItems: 'center',
-    backgroundColor: colors.primaryMuted,
-    borderColor: colors.borderAccent,
     borderRadius: radius.pill,
     borderWidth: 1,
-    height: 68,
+    height: 60,
     justifyContent: 'center',
-    width: 68,
+    width: 60,
   },
   avatarText: {
-    color: colors.primary,
     fontFamily: fonts.extraBold,
-    fontSize: 23,
+    fontSize: 21,
   },
   cardCaption: {
-    color: colors.muted,
     fontFamily: fonts.medium,
     fontSize: 12,
     marginTop: 4,
   },
   cardTitle: {
-    color: colors.foregroundStrong,
     fontFamily: fonts.extraBold,
     fontSize: 16,
   },
   copyButton: {
     alignItems: 'center',
-    backgroundColor: colors.primaryMuted,
-    borderColor: colors.borderAccent,
     borderRadius: radius.pill,
     borderWidth: 1,
     height: 34,
@@ -157,13 +232,11 @@ const styles = StyleSheet.create({
     width: 34,
   },
   email: {
-    color: colors.mutedLight,
     fontFamily: fonts.semibold,
     fontSize: 12,
     marginBottom: 10,
   },
   name: {
-    color: colors.foregroundStrong,
     fontFamily: fonts.extraBold,
     fontSize: 17,
   },
@@ -174,7 +247,7 @@ const styles = StyleSheet.create({
   profileRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.lg,
+    gap: spacing.md,
   },
   sectionHeader: {
     alignItems: 'center',
@@ -182,22 +255,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionTitle: {
-    color: colors.foregroundStrong,
     fontFamily: fonts.extraBold,
     fontSize: 17,
   },
   settingIcon: {
     alignItems: 'center',
-    backgroundColor: colors.primaryMuted,
-    borderColor: colors.border,
     borderRadius: radius.pill,
     borderWidth: 1,
-    height: 40,
+    height: 36,
     justifyContent: 'center',
-    width: 40,
+    width: 36,
   },
   settingLabel: {
-    color: colors.foreground,
     flex: 1,
     fontFamily: fonts.bold,
     fontSize: 13,
@@ -206,22 +275,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
     minWidth: 0,
   },
   settingList: {
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   settingRow: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
     borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
     justifyContent: 'space-between',
-    padding: spacing.md,
+    padding: spacing.sm,
   },
   signOut: {
     alignItems: 'center',
@@ -231,7 +298,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   signOutText: {
-    color: colors.danger,
     fontFamily: fonts.bold,
     fontSize: 13,
   },
@@ -242,22 +308,19 @@ const styles = StyleSheet.create({
   telegramHeader: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
     justifyContent: 'space-between',
   },
   telegramToken: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.18)',
-    borderColor: colors.border,
     borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
     justifyContent: 'space-between',
-    padding: spacing.md,
+    padding: spacing.sm,
   },
   tokenText: {
-    color: colors.foreground,
     flex: 1,
     fontFamily: fonts.extraBold,
     fontSize: 13,

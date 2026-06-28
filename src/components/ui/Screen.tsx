@@ -14,7 +14,7 @@ export function Screen({
   scroll?: boolean;
 }) {
   const insets = useSafeAreaInsets();
-  const bottomPadding = (hasTabs ? 104 : 28) + insets.bottom;
+  const bottomPadding = (hasTabs ? 88 : 24) + insets.bottom;
 
   return (
     <Background>
@@ -38,10 +38,10 @@ export function Screen({
 
 const styles = StyleSheet.create({
   content: {
-    gap: spacing.lg,
+    gap: spacing.md,
     maxWidth: 390,
-    paddingHorizontal: spacing.sm,
-    paddingTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
     width: '100%',
   },
   fill: {

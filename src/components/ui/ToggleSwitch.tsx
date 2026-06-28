@@ -9,26 +9,28 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
-import { colors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/colors';
 import { radius } from '@/theme/spacing';
 
 export function ToggleSwitch({
   onChange,
-  value = true,
+  value,
 }: {
   onChange?: (value: boolean) => void;
   value?: boolean;
 }) {
-  const [checked, setChecked] = useState(value);
+  const theme = useAppTheme();
+  const [internalChecked, setInternalChecked] = useState(value ?? true);
+  const checked = value ?? internalChecked;
   const progress = useDerivedValue(() => withSpring(checked ? 1 : 0, { damping: 17, stiffness: 280 }), [checked]);
 
   const trackStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(progress.value, [0, 1], ['rgba(255,255,255,0.07)', colors.primary]),
-    borderColor: interpolateColor(progress.value, [0, 1], ['rgba(255,255,255,0.10)', 'rgba(46,242,208,0.70)']),
+    backgroundColor: interpolateColor(progress.value, [0, 1], [theme.field, theme.primarySubtle]),
+    borderColor: interpolateColor(progress.value, [0, 1], [theme.border, theme.selectionBorder]),
   }));
 
   const thumbStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(progress.value, [0, 1], ['#c9d4d2', colors.primaryDark]),
+    backgroundColor: interpolateColor(progress.value, [0, 1], [theme.mutedLight, theme.primarySoft]),
     transform: [{ translateX: interpolate(progress.value, [0, 1], [0, 22]) }],
   }));
 
@@ -41,7 +43,7 @@ export function ToggleSwitch({
           Haptics.selectionAsync().catch(() => undefined);
         }
         const next = !checked;
-        setChecked(next);
+        setInternalChecked(next);
         onChange?.(next);
       }}>
       <Animated.View style={[styles.track, trackStyle]}>

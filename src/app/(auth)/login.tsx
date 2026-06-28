@@ -4,12 +4,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { BrandMark, enterUp, FormField, GradientButton, PressableScale, Screen, StatusBadge } from '@/components/ui';
-import { colors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const theme = useAppTheme();
 
   return (
     <Screen scroll={false}>
@@ -21,9 +22,9 @@ export default function LoginScreen() {
           </Animated.View>
 
           <Animated.View entering={enterUp(1)} style={styles.hero}>
-            <Text style={styles.eyebrow}>BetClaw</Text>
-            <Text style={styles.title}>Sign in to your matchday edge.</Text>
-            <Text style={styles.copy}>AI ticket research, wallet tokens, and verified picks in one mobile workspace.</Text>
+            <Text style={[styles.eyebrow, { color: theme.primarySoft }]}>BetClaw</Text>
+            <Text style={[styles.title, { color: theme.foregroundStrong }]}>Sign in to your matchday workspace.</Text>
+            <Text style={[styles.copy, { color: theme.mutedLight }]}>Ticket research, match signals, and wallet tokens in one mobile flow.</Text>
           </Animated.View>
 
           <Animated.View entering={enterUp(2)} style={styles.form}>
@@ -35,17 +36,17 @@ export default function LoginScreen() {
           </Animated.View>
 
           <Animated.View entering={enterUp(3)} style={styles.dividerRow}>
-            <View style={styles.divider} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
+            <Text style={[styles.dividerText, { color: theme.muted }]}>or</Text>
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
           </Animated.View>
 
           <Animated.View entering={enterUp(4)} style={styles.oauthRow}>
-            <PressableScale accessibilityLabel="Continue with Google" accessibilityRole="button" style={styles.oauthButton}>
-              <Text style={styles.oauthText}>Google</Text>
+            <PressableScale accessibilityLabel="Continue with Google" accessibilityRole="button" style={[styles.oauthButton, { backgroundColor: theme.field, borderColor: theme.border }]}>
+              <Text style={[styles.oauthText, { color: theme.foreground }]}>Google</Text>
             </PressableScale>
-            <PressableScale accessibilityLabel="Continue with GitHub" accessibilityRole="button" style={styles.oauthButton}>
-              <Text style={styles.oauthText}>GitHub</Text>
+            <PressableScale accessibilityLabel="Continue with GitHub" accessibilityRole="button" style={[styles.oauthButton, { backgroundColor: theme.field, borderColor: theme.border }]}>
+              <Text style={[styles.oauthText, { color: theme.foreground }]}>GitHub</Text>
             </PressableScale>
           </Animated.View>
         </View>
@@ -53,12 +54,12 @@ export default function LoginScreen() {
         <Animated.View entering={enterUp(5)} style={styles.footerRow}>
           <Link href="/(auth)/forgot-password" asChild>
             <Pressable>
-              <Text style={styles.link}>Forgot password</Text>
+              <Text style={[styles.link, { color: theme.primarySoft }]}>Forgot password</Text>
             </Pressable>
           </Link>
           <Link href="/(auth)/signup" asChild>
             <Pressable>
-              <Text style={styles.secondaryLink}>Create account</Text>
+              <Text style={[styles.secondaryLink, { color: theme.mutedLight }]}>Create account</Text>
             </Pressable>
           </Link>
         </Animated.View>
@@ -69,14 +70,12 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   copy: {
-    color: colors.mutedLight,
     fontFamily: fonts.regular,
     fontSize: 14,
     lineHeight: 24,
     marginTop: 12,
   },
   divider: {
-    backgroundColor: colors.border,
     flex: 1,
     height: 1,
   },
@@ -87,13 +86,11 @@ const styles = StyleSheet.create({
     marginVertical: spacing.lg,
   },
   dividerText: {
-    color: colors.muted,
     fontFamily: fonts.bold,
     fontSize: 10,
     textTransform: 'uppercase',
   },
   eyebrow: {
-    color: colors.primary,
     fontFamily: fonts.extraBold,
     fontSize: 12,
     textTransform: 'uppercase',
@@ -106,21 +103,18 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   hero: {
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.xl,
   },
   link: {
-    color: colors.primary,
     fontFamily: fonts.bold,
     fontSize: 13,
   },
   oauthButton: {
     alignItems: 'center',
-    backgroundColor: colors.input,
-    borderColor: colors.border,
     borderRadius: 999,
     borderWidth: 1,
     flex: 1,
-    height: 46,
+    height: 44,
     justifyContent: 'center',
   },
   oauthRow: {
@@ -128,34 +122,31 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   oauthText: {
-    color: colors.foreground,
     fontFamily: fonts.bold,
     fontSize: 13,
   },
   root: {
     flex: 1,
     justifyContent: 'space-between',
-    paddingBottom: spacing.lg,
-    paddingTop: spacing.xxl,
+    paddingBottom: spacing.md,
+    paddingTop: spacing.xl,
   },
   secondaryLink: {
-    color: colors.mutedLight,
     fontFamily: fonts.bold,
     fontSize: 13,
   },
   title: {
-    color: colors.foregroundStrong,
     fontFamily: fonts.extraBold,
-    fontSize: 34,
+    fontSize: 30,
     letterSpacing: 0,
-    lineHeight: 38,
+    lineHeight: 35,
     marginTop: 10,
-    maxWidth: 300,
+    maxWidth: 315,
   },
   topRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 52,
+    marginBottom: 36,
   },
 });

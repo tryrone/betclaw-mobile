@@ -2,9 +2,12 @@ import React from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
+import { useAppTheme } from '@/theme/colors';
+
 export type TeamName = 'Barcelona' | 'Chelsea' | 'Borussia D' | 'Man United' | string;
 
 export function TeamLogo({ name, size = 40 }: { name: TeamName; size?: number }) {
+  const theme = useAppTheme();
   const normalized = name.toLowerCase().trim();
 
   if (normalized.includes('barcelona') || normalized.includes('bar')) {
@@ -104,10 +107,19 @@ export function TeamLogo({ name, size = 40 }: { name: TeamName; size?: number })
     );
   }
 
-  // Fallback text avatar inside a premium dark circular badge
   return (
-    <View style={[styles.avatar, { borderRadius: size / 2, height: size, width: size }]}>
-      <Text style={[styles.avatarText, { fontSize: size * 0.3 }]}>
+    <View
+      style={[
+        styles.avatar,
+        {
+          backgroundColor: theme.primarySubtle,
+          borderColor: theme.selectionBorder,
+          borderRadius: size / 2,
+          height: size,
+          width: size,
+        },
+      ]}>
+      <Text style={[styles.avatarText, { color: theme.primarySoft, fontSize: size * 0.3 }]}>
         {name.slice(0, 3).toUpperCase()}
       </Text>
     </View>
@@ -117,13 +129,10 @@ export function TeamLogo({ name, size = 40 }: { name: TeamName; size?: number })
 const styles = StyleSheet.create({
   avatar: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1,
     justifyContent: 'center',
   },
   avatarText: {
-    color: '#b0b8b5',
     fontWeight: 'bold',
   },
 });

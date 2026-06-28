@@ -1,18 +1,20 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors } from '@/theme/colors';
+import { type AppTheme, useAppTheme } from '@/theme/colors';
 import { radius } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
 export type BadgeTone = 'accent' | 'success' | 'warning' | 'danger' | 'neutral';
 
-const badgeColors: Record<BadgeTone, { backgroundColor: string; borderColor: string; color: string }> = {
-  accent: { backgroundColor: colors.primaryMuted, borderColor: colors.borderAccent, color: colors.primary },
-  danger: { backgroundColor: colors.dangerSoft, borderColor: 'rgba(248,113,113,0.35)', color: '#fca5a5' },
-  neutral: { backgroundColor: colors.surface, borderColor: colors.border, color: '#c9d4d2' },
-  success: { backgroundColor: colors.successSoft, borderColor: 'rgba(74,222,128,0.35)', color: '#86efac' },
-  warning: { backgroundColor: colors.warningSoft, borderColor: 'rgba(251,191,36,0.35)', color: '#fde68a' },
-};
+function badgeColors(theme: AppTheme): Record<BadgeTone, { backgroundColor: string; borderColor: string; color: string }> {
+  return {
+    accent: { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder, color: theme.primarySoft },
+    danger: { backgroundColor: theme.dangerSoft, borderColor: theme.dangerSoft, color: theme.danger },
+    neutral: { backgroundColor: theme.cardMuted, borderColor: theme.border, color: theme.mutedLight },
+    success: { backgroundColor: theme.successSoft, borderColor: theme.successSoft, color: theme.success },
+    warning: { backgroundColor: theme.warningSoft, borderColor: theme.warningSoft, color: theme.warning },
+  };
+}
 
 export function StatusBadge({
   label,
@@ -21,7 +23,8 @@ export function StatusBadge({
   label: string;
   tone?: BadgeTone;
 }) {
-  const palette = badgeColors[tone];
+  const theme = useAppTheme();
+  const palette = badgeColors(theme)[tone];
 
   return (
     <View style={[styles.badge, { backgroundColor: palette.backgroundColor, borderColor: palette.borderColor }]}>
@@ -36,12 +39,12 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderRadius: radius.pill,
     borderWidth: 1,
-    minHeight: 30,
-    paddingHorizontal: 11,
+    minHeight: 26,
+    paddingHorizontal: 9,
   },
   label: {
     fontFamily: fonts.bold,
     fontSize: 11,
-    lineHeight: 28,
+    lineHeight: 24,
   },
 });

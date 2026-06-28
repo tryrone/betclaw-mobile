@@ -16,7 +16,7 @@ import {
   StatusBadge,
 } from '@/components/ui';
 import { ticketRows, type TicketRowData } from '@/data/mock';
-import { colors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
@@ -31,21 +31,30 @@ const pipeline = [
 const riskLevels = ['Safe', 'Balanced', 'Bold'];
 
 function PipelineStep({ label, state }: { label: string; state: string }) {
+  const theme = useAppTheme();
   const done = state === 'done';
   const active = state === 'active';
 
   return (
     <View style={styles.pipelineStep}>
-      <View style={[styles.stepIcon, done && styles.doneStep, active && styles.activeStep]}>
-        {done ? <Check color="#86efac" size={14} /> : <Clock3 color={active ? colors.warning : colors.muted} size={13} />}
+      <View
+        style={[
+          styles.stepIcon,
+          {
+            backgroundColor: done ? theme.successSoft : active ? theme.warningSoft : theme.field,
+            borderColor: done ? theme.successSoft : active ? theme.warningSoft : theme.border,
+          },
+        ]}>
+        {done ? <Check color={theme.success} size={14} /> : <Clock3 color={active ? theme.warning : theme.muted} size={13} />}
       </View>
-      <Text style={styles.stepLabel}>{label}</Text>
-      {active ? <LiveDot color={colors.warning} size={6} /> : null}
+      <Text style={[styles.stepLabel, { color: theme.foreground }]}>{label}</Text>
+      {active ? <LiveDot color={theme.warning} size={6} /> : null}
     </View>
   );
 }
 
 function TicketRow({ row }: { row: TicketRowData }) {
+  const theme = useAppTheme();
   const keep = row.status === 'Keep';
 
   return (
@@ -53,19 +62,19 @@ function TicketRow({ row }: { row: TicketRowData }) {
       <GlassCard style={styles.ticketRow}>
         <View style={styles.ticketTop}>
           <View style={styles.ticketCopy}>
-            <Text numberOfLines={1} style={styles.ticketTeams}>
+            <Text numberOfLines={1} style={[styles.ticketTeams, { color: theme.foregroundStrong }]}>
               {row.teams}
             </Text>
-            <Text numberOfLines={1} style={styles.ticketMarket}>
+            <Text numberOfLines={1} style={[styles.ticketMarket, { color: theme.mutedLight }]}>
               {row.market}
             </Text>
           </View>
           <StatusBadge label={row.status} tone={keep ? 'success' : 'danger'} />
         </View>
-        <Text style={styles.reason}>{row.reason}</Text>
+        <Text style={[styles.reason, { color: theme.mutedLight }]}>{row.reason}</Text>
         <View style={styles.confidenceRow}>
-          <Text style={styles.confidenceLabel}>Confidence</Text>
-          <Text style={styles.confidenceValue}>{row.confidence}%</Text>
+          <Text style={[styles.confidenceLabel, { color: theme.muted }]}>Confidence</Text>
+          <Text style={[styles.confidenceValue, { color: keep ? theme.success : theme.warning }]}>{row.confidence}%</Text>
         </View>
         <ProgressBar tone={keep ? 'success' : 'warning'} value={row.confidence} />
       </GlassCard>
@@ -75,6 +84,7 @@ function TicketRow({ row }: { row: TicketRowData }) {
 
 export default function FixTicketScreen() {
   const [risk, setRisk] = useState('Balanced');
+  const theme = useAppTheme();
 
   return (
     <Screen hasTabs>
@@ -83,15 +93,19 @@ export default function FixTicketScreen() {
       </Animated.View>
 
       <Animated.View entering={enterUp(1)}>
-        <GlassCard>
+        <GlassCard style={styles.bookingCard}>
           <View style={styles.bookingTop}>
             <StatusBadge label="Booking code" tone="accent" />
             <StatusBadge label="SportyBet" />
           </View>
-          <View style={styles.bookingCode}>
-            <Text style={styles.bookingText}>SB-84K2-P9X</Text>
-            <PressableScale accessibilityLabel="Copy booking code" accessibilityRole="button" scaleTo={0.85} style={styles.copyButton}>
-              <Copy color={colors.primary} size={17} />
+          <View style={[styles.bookingCode, { backgroundColor: theme.field, borderColor: theme.border }]}>
+            <Text style={[styles.bookingText, { color: theme.foregroundStrong }]}>SB-84K2-P9X</Text>
+            <PressableScale
+              accessibilityLabel="Copy booking code"
+              accessibilityRole="button"
+              scaleTo={0.85}
+              style={[styles.copyButton, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
+              <Copy color={theme.primarySoft} size={16} />
             </PressableScale>
           </View>
           <View style={styles.riskGrid}>
@@ -103,8 +117,14 @@ export default function FixTicketScreen() {
                   accessibilityRole="button"
                   key={level}
                   onPress={() => setRisk(level)}
-                  style={[styles.riskPill, active && styles.activeRisk]}>
-                  <Text style={[styles.riskText, active && styles.activeRiskText]}>{level}</Text>
+                  style={[
+                    styles.riskPill,
+                    {
+                      backgroundColor: active ? theme.primarySubtle : theme.field,
+                      borderColor: active ? theme.selectionBorder : theme.border,
+                    },
+                  ]}>
+                  <Text style={[styles.riskText, { color: active ? theme.primarySoft : theme.mutedLight }]}>{level}</Text>
                 </PressableScale>
               );
             })}
@@ -116,7 +136,7 @@ export default function FixTicketScreen() {
       <Animated.View entering={enterUp(2)}>
         <GlassCard>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Pipeline</Text>
+            <Text style={[styles.cardTitle, { color: theme.foregroundStrong }]}>Pipeline</Text>
             <StatusBadge label="Researching" tone="warning" />
           </View>
           <View style={styles.pipelineGrid}>
@@ -131,17 +151,17 @@ export default function FixTicketScreen() {
         <GlassCard gradient="amberCard">
           <View style={styles.cardHeader}>
             <View>
-              <Text style={styles.cardTitle}>Ticket trust</Text>
-              <Text style={styles.cardCaption}>Verified data coverage across kept legs.</Text>
+              <Text style={[styles.cardTitle, { color: theme.foregroundStrong }]}>Ticket trust</Text>
+              <Text style={[styles.cardCaption, { color: theme.muted }]}>Verified data coverage across kept legs.</Text>
             </View>
-            <Target color={colors.primary} size={22} />
+            <Target color={theme.primarySoft} size={21} />
           </View>
           <ProgressBar value={82} />
         </GlassCard>
       </Animated.View>
 
       <Animated.View entering={enterUp(4)} style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Optimized slip</Text>
+        <Text style={[styles.sectionTitle, { color: theme.foregroundStrong }]}>Optimized slip</Text>
         <StatusBadge label="2 kept" tone="success" />
       </Animated.View>
 
@@ -155,33 +175,22 @@ export default function FixTicketScreen() {
 }
 
 const styles = StyleSheet.create({
-  activeRisk: {
-    backgroundColor: colors.primaryMuted,
-    borderColor: colors.borderAccent,
-  },
-  activeRiskText: {
-    color: colors.primary,
-  },
-  activeStep: {
-    backgroundColor: colors.warningSoft,
-    borderColor: 'rgba(251,191,36,0.35)',
+  bookingCard: {
+    gap: spacing.md,
   },
   bookingCode: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.18)',
-    borderColor: colors.border,
     borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   bookingText: {
-    color: colors.foregroundStrong,
     fontFamily: fonts.extraBold,
-    fontSize: 22,
-    letterSpacing: 0.5,
+    fontSize: 20,
+    letterSpacing: 0,
   },
   bookingTop: {
     alignItems: 'center',
@@ -189,7 +198,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardCaption: {
-    color: colors.muted,
     fontFamily: fonts.medium,
     fontSize: 12,
     marginTop: 4,
@@ -200,12 +208,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardTitle: {
-    color: colors.foregroundStrong,
     fontFamily: fonts.extraBold,
     fontSize: 16,
   },
   confidenceLabel: {
-    color: colors.muted,
     fontFamily: fonts.semibold,
     fontSize: 12,
   },
@@ -215,26 +221,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   confidenceValue: {
-    color: colors.primary,
     fontFamily: fonts.extraBold,
     fontSize: 13,
   },
   copyButton: {
     alignItems: 'center',
-    backgroundColor: colors.primaryMuted,
-    borderColor: colors.borderAccent,
     borderRadius: radius.pill,
     borderWidth: 1,
-    height: 38,
+    height: 34,
     justifyContent: 'center',
-    width: 38,
-  },
-  doneStep: {
-    backgroundColor: colors.successSoft,
-    borderColor: 'rgba(74,222,128,0.35)',
+    width: 34,
   },
   pipelineGrid: {
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   pipelineStep: {
     alignItems: 'center',
@@ -242,7 +241,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   reason: {
-    color: colors.mutedLight,
     fontFamily: fonts.regular,
     fontSize: 12,
     lineHeight: 19,
@@ -253,16 +251,13 @@ const styles = StyleSheet.create({
   },
   riskPill: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
     borderRadius: radius.pill,
     borderWidth: 1,
     flex: 1,
-    height: 38,
+    height: 36,
     justifyContent: 'center',
   },
   riskText: {
-    color: colors.mutedLight,
     fontFamily: fonts.bold,
     fontSize: 12,
   },
@@ -272,14 +267,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionTitle: {
-    color: colors.foregroundStrong,
     fontFamily: fonts.extraBold,
     fontSize: 17,
   },
   stepIcon: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
     borderRadius: radius.pill,
     borderWidth: 1,
     height: 30,
@@ -287,7 +279,6 @@ const styles = StyleSheet.create({
     width: 30,
   },
   stepLabel: {
-    color: colors.foreground,
     fontFamily: fonts.bold,
     fontSize: 13,
   },
@@ -296,7 +287,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   ticketMarket: {
-    color: colors.mutedLight,
     fontFamily: fonts.medium,
     fontSize: 12,
     marginTop: 4,
@@ -306,7 +296,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   ticketTeams: {
-    color: colors.foregroundStrong,
     fontFamily: fonts.extraBold,
     fontSize: 14,
   },

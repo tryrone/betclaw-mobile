@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
 export function ScreenHeader({
@@ -12,11 +12,13 @@ export function ScreenHeader({
   eyebrow: string;
   title: string;
 }) {
+  const theme = useAppTheme();
+
   return (
     <View style={styles.row}>
       <View style={styles.copy}>
-        <Text style={styles.eyebrow}>{eyebrow}</Text>
-        <Text numberOfLines={1} style={styles.title}>
+        <Text style={[styles.eyebrow, { color: theme.muted }]}>{eyebrow}</Text>
+        <Text numberOfLines={1} style={[styles.title, { color: theme.foregroundStrong }]}>
           {title}
         </Text>
       </View>
@@ -31,7 +33,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   eyebrow: {
-    color: colors.muted,
     fontFamily: fonts.semibold,
     fontSize: 12,
   },
@@ -42,10 +43,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   title: {
-    color: colors.foregroundStrong,
     fontFamily: fonts.extraBold,
-    fontSize: 28,
+    fontSize: 26,
     letterSpacing: 0,
-    lineHeight: 34,
+    lineHeight: 31,
   },
 });

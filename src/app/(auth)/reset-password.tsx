@@ -4,19 +4,21 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { BrandLogo, enterUp, FormField, GlassCard, GradientButton, Screen, StatusBadge } from '@/components/ui';
-import { colors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
 export default function ResetPasswordScreen() {
+  const theme = useAppTheme();
+
   return (
     <Screen>
       <Animated.View entering={enterUp(0)}>
         <BrandLogo />
       </Animated.View>
       <Animated.View entering={enterUp(1)}>
-        <Text style={styles.title}>Choose a new password</Text>
-        <Text style={styles.copy}>This visual screen is ready for the future deep-link token flow.</Text>
+        <Text style={[styles.title, { color: theme.foregroundStrong }]}>Choose a new password</Text>
+        <Text style={[styles.copy, { color: theme.mutedLight }]}>This screen is ready for the future deep-link token flow.</Text>
       </Animated.View>
       <Animated.View entering={enterUp(2)}>
         <GlassCard>
@@ -29,7 +31,7 @@ export default function ResetPasswordScreen() {
       <Animated.View entering={enterUp(3)}>
         <Link href="/(auth)/login" asChild>
           <Pressable style={styles.centerLink}>
-            <Text style={styles.link}>Back to sign in</Text>
+            <Text style={[styles.link, { color: theme.primarySoft }]}>Back to sign in</Text>
           </Pressable>
         </Link>
       </Animated.View>
@@ -42,21 +44,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   copy: {
-    color: colors.mutedLight,
     fontFamily: fonts.regular,
-    fontSize: 15,
-    lineHeight: 24,
+    fontSize: 14,
+    lineHeight: 22,
     marginTop: spacing.sm,
   },
   link: {
-    color: colors.primary,
     fontFamily: fonts.bold,
     fontSize: 13,
   },
   title: {
-    color: colors.foregroundStrong,
     fontFamily: fonts.extraBold,
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: 29,
+    lineHeight: 34,
   },
 });

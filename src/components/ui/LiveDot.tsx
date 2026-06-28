@@ -2,11 +2,11 @@ import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
-import { colors } from '@/theme/colors';
+import { useAppTheme } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
 export function LiveDot({
-  color = colors.danger,
+  color,
   label,
   size = 7,
 }: {
@@ -14,6 +14,8 @@ export function LiveDot({
   label?: string;
   size?: number;
 }) {
+  const theme = useAppTheme();
+  const dotColor = color ?? theme.danger;
   const pulse = useSharedValue(0);
 
   useEffect(() => {
@@ -31,13 +33,13 @@ export function LiveDot({
         <Animated.View
           style={[
             styles.ring,
-            { backgroundColor: color, borderRadius: size, height: size * 2, width: size * 2 },
+            { backgroundColor: dotColor, borderRadius: size, height: size * 2, width: size * 2 },
             ringStyle,
           ]}
         />
-        <View style={{ backgroundColor: color, borderRadius: size / 2, height: size, width: size }} />
+        <View style={{ backgroundColor: dotColor, borderRadius: size / 2, height: size, width: size }} />
       </View>
-      {label ? <Text style={[styles.label, { color }]}>{label}</Text> : null}
+      {label ? <Text style={[styles.label, { color: dotColor }]}>{label}</Text> : null}
     </View>
   );
 }

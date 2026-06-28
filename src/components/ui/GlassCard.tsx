@@ -1,8 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
-import { colors } from '@/theme/colors';
-import { gradients } from '@/theme/gradients';
+import { useAppTheme } from '@/theme/colors';
+import { type GradientName, useAppGradients } from '@/theme/gradients';
 import { radius, spacing } from '@/theme/spacing';
 
 export function GlassCard({
@@ -11,27 +11,41 @@ export function GlassCard({
   style,
 }: {
   children: React.ReactNode;
-  gradient?: keyof typeof gradients;
+  gradient?: GradientName;
   style?: StyleProp<ViewStyle>;
 }) {
+  const theme = useAppTheme();
+  const gradients = useAppGradients();
+  const cardStyle = [
+    styles.card,
+    {
+      backgroundColor: theme.card,
+      borderColor: theme.border,
+      shadowColor: theme.shadow,
+    },
+    style,
+  ];
+
   if (gradient) {
     return (
-      <LinearGradient colors={gradients[gradient]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={[styles.card, style]}>
+      <LinearGradient colors={gradients[gradient]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={cardStyle}>
         {children}
       </LinearGradient>
     );
   }
 
-  return <View style={[styles.card, style]}>{children}</View>;
+  return <View style={cardStyle}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.xl,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    gap: spacing.md,
-    padding: spacing.lg,
+    elevation: 5,
+    gap: spacing.sm,
+    padding: spacing.md,
+    shadowOffset: { height: 12, width: 0 },
+    shadowOpacity: 0.09,
+    shadowRadius: 22,
   },
 });
