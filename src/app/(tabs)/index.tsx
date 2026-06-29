@@ -1,19 +1,27 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Bell, CalendarDays, ChevronRight, Search } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { enterUp, GlassCard, PressableScale, ProgressBar, Screen, SPRING_LAYOUT, StatusBadge, TeamLogo } from '@/components/ui';
-import { filterMatches, getSportLabel, leagues, liveMatch, sports, wallet, type MatchCardData } from '@/data/mock';
+import { getSportLabel, sports, type MatchCardData } from '@/data/mock';
+import { useHomeFeed, useLeagues, useMe, useNotificationSummary, useSubscriptionCurrent } from '@/lib/api/hooks';
+import { flattenHomeFeed } from '@/lib/mobile-mappers';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
 const userAvatar = require('@/../assets/images/user_avatar.png');
 
-function HomeHeader() {
+type LeaguePillOption = {
+  id: string;
+  label: string;
+};
+
+function HomeHeader({ name, unreadCount = 0 }: { name?: string | null; unreadCount?: number }) {
+  const router = useRouter();
   const theme = useAppTheme();
 
   return (
@@ -21,7 +29,7 @@ function HomeHeader() {
       <View style={styles.headerLeft}>
         <Image source={userAvatar} style={styles.profileAvatar} contentFit="cover" />
         <View>
-          <Text style={[styles.kicker, { color: theme.muted }]}>BetClaw</Text>
+          <Text style={[styles.kicker, { color: theme.muted }]}>{name ? `Hi, ${name.split(' ')[0]}` : 'BetClaw'}</Text>
           <Text style={[styles.headerTitle, { color: theme.foregroundStrong }]}>Matchday</Text>
         </View>
       </View>
@@ -29,8 +37,9 @@ function HomeHeader() {
         <PressableScale accessibilityLabel="Search" accessibilityRole="button" style={[styles.circleButton, { backgroundColor: theme.field, borderColor: theme.border }]}>
           <Search color={theme.foreground} size={18} strokeWidth={2.4} />
         </PressableScale>
-        <PressableScale accessibilityLabel="Notifications" accessibilityRole="button" style={[styles.circleButton, { backgroundColor: theme.field, borderColor: theme.border }]}>
+        <PressableScale accessibilityLabel="Notifications" accessibilityRole="button" onPress={() => router.push('/notifications' as any)} style={[styles.circleButton, { backgroundColor: theme.field, borderColor: theme.border }]}>
           <Bell color={theme.foreground} size={18} strokeWidth={2.4} />
+          {unreadCount > 0 ? <View style={[styles.unreadDot, { backgroundColor: theme.danger }]} /> : null}
         </PressableScale>
       </View>
     </View>
@@ -80,16 +89,18 @@ function SportPills({
 
 function LeaguePills({
   onSelect,
+  options,
   selected,
 }: {
   onSelect: (leagueId: string) => void;
+  options: LeaguePillOption[];
   selected: string;
 }) {
   const theme = useAppTheme();
 
   return (
     <ScrollView contentContainerStyle={styles.pillRow} horizontal showsHorizontalScrollIndicator={false} style={styles.horizontal}>
-      {leagues.map((league) => {
+      {options.map((league) => {
         const active = league.id === selected;
         return (
           <PressableScale
@@ -113,7 +124,7 @@ function LeaguePills({
   );
 }
 
-function LiveMatchHero() {
+function LiveMatchHero({ match }: { match: MatchCardData }) {
   const router = useRouter();
   const theme = useAppTheme();
 
@@ -121,46 +132,46 @@ function LiveMatchHero() {
     <PressableScale
       accessibilityLabel="Open live match details"
       accessibilityRole="button"
-      onPress={() => router.push(`/match/${liveMatch.id}` as any)}
+      onPress={() => router.push(`/match/${match.id}` as any)}
       scaleTo={0.98}
       style={styles.heroPressable}>
       <GlassCard gradient="matchHero" style={styles.heroCard}>
         <View style={styles.heroTop}>
-          <Text style={styles.heroEyebrow}>{liveMatch.league}</Text>
-          <StatusBadge label={liveMatch.clock ?? 'Live'} tone="danger" />
+          <Text style={styles.heroEyebrow}>{match.league}</Text>
+          <StatusBadge label={match.clock ?? match.status} tone={match.status === 'Live' ? 'danger' : 'accent'} />
         </View>
 
         <View style={styles.heroTeamsContainer}>
           <View style={styles.heroTeamSide}>
-            <TeamLogo name={liveMatch.home} size={48} />
+            <TeamLogo name={match.home} size={48} />
             <Text numberOfLines={1} style={styles.heroTeamName}>
-              {liveMatch.home}
+              {match.home}
             </Text>
             <Text style={styles.heroSideLabel}>Home</Text>
           </View>
 
           <View style={styles.heroCenterBlock}>
-            <Text style={styles.heroVenue}>{liveMatch.venue}</Text>
+            <Text style={styles.heroVenue}>{match.venue}</Text>
             <View style={styles.scoreAndClock}>
-              <Text style={styles.scoreValue}>{liveMatch.homeScore}</Text>
+              <Text style={styles.scoreValue}>{match.homeScore ?? '-'}</Text>
               <Text style={styles.scoreDivider}>:</Text>
-              <Text style={styles.scoreValue}>{liveMatch.awayScore}</Text>
+              <Text style={styles.scoreValue}>{match.awayScore ?? '-'}</Text>
             </View>
-            <Text style={styles.heroStage}>{liveMatch.period}</Text>
+            <Text style={styles.heroStage}>{match.period ?? match.time}</Text>
           </View>
 
           <View style={styles.heroTeamSide}>
-            <TeamLogo name={liveMatch.away} size={48} />
+            <TeamLogo name={match.away} size={48} />
             <Text numberOfLines={1} style={styles.heroTeamName}>
-              {liveMatch.away}
+              {match.away}
             </Text>
             <Text style={styles.heroSideLabel}>Away</Text>
           </View>
         </View>
 
         <View style={styles.heroSignal}>
-          <Text style={styles.heroSignalText}>{liveMatch.trend}</Text>
-          <Text style={[styles.heroConfidence, { color: theme.primarySoft }]}>{liveMatch.confidence}%</Text>
+          <Text style={styles.heroSignalText}>{match.trend}</Text>
+          <Text style={[styles.heroConfidence, { color: theme.primarySoft }]}>{match.confidence}%</Text>
         </View>
       </GlassCard>
     </PressableScale>
@@ -218,14 +229,33 @@ export default function DashboardScreen() {
   const router = useRouter();
   const theme = useAppTheme();
   const [selectedSport, setSelectedSport] = useState('football');
-  const [selectedLeague, setSelectedLeague] = useState('epl');
-  const feedMatches = filterMatches({
-    dateId: 'today',
-    excludeIds: [liveMatch.id],
-    leagueId: selectedLeague,
-    sportId: selectedSport,
-  }).slice(0, 3);
+  const [selectedLeague, setSelectedLeague] = useState('all');
+  const me = useMe();
+  const subscription = useSubscriptionCurrent();
+  const notificationSummary = useNotificationSummary();
+  const leagueList = useLeagues({ dateRange: 'today', windowDays: 1 });
+  const leagueOptions = useMemo<LeaguePillOption[]>(
+    () => [
+      { id: 'all', label: 'All' },
+      ...(leagueList.data ?? []).map((league) => ({
+        id: league.key,
+        label: league.name,
+      })),
+    ],
+    [leagueList.data],
+  );
+  const activeLeague = leagueOptions.some((league) => league.id === selectedLeague) ? selectedLeague : 'all';
+  const homeFeed = useHomeFeed({
+    leagueKey: activeLeague !== 'all' ? activeLeague : undefined,
+    limit: 24,
+    windowDays: 1,
+  });
+  const matches = useMemo(() => flattenHomeFeed(homeFeed.data), [homeFeed.data]);
+  const liveMatch = matches.find((match) => match.status === 'Live') ?? matches[0];
+  const feedMatches = matches.filter((match) => match.id !== liveMatch?.id).slice(0, 3);
   const sectionCaption = `${getSportLabel(selectedSport)} analysis-ready fixtures`;
+  const tokenBalance = subscription.data?.researchTokensRemaining ?? me.data?.researchTokensRemaining ?? 0;
+
   const handleSportSelect = (sportId: string) => {
     setSelectedSport(sportId);
     if (sportId !== 'football') {
@@ -236,14 +266,14 @@ export default function DashboardScreen() {
   return (
     <Screen hasTabs>
       <Animated.View entering={enterUp(0)}>
-        <HomeHeader />
+        <HomeHeader name={me.data?.name} unreadCount={notificationSummary.data?.unreadCount ?? 0} />
       </Animated.View>
 
       <Animated.View entering={enterUp(1)}>
         <GlassCard style={styles.balanceStrip}>
           <View>
             <Text style={[styles.kicker, { color: theme.muted }]}>Research balance</Text>
-            <Text style={[styles.balanceValue, { color: theme.foregroundStrong }]}>{wallet.balance} tokens</Text>
+            <Text style={[styles.balanceValue, { color: theme.foregroundStrong }]}>{Number(tokenBalance).toLocaleString()} tokens</Text>
           </View>
           <View style={[styles.calendarChip, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
             <CalendarDays color={theme.primarySoft} size={15} />
@@ -257,11 +287,22 @@ export default function DashboardScreen() {
       </Animated.View>
 
       <Animated.View entering={enterUp(3)}>
-        <LeaguePills onSelect={setSelectedLeague} selected={selectedLeague} />
+        <LeaguePills onSelect={setSelectedLeague} options={leagueOptions} selected={activeLeague} />
       </Animated.View>
 
       <Animated.View entering={enterUp(4)}>
-        <LiveMatchHero />
+        {liveMatch ? (
+          <LiveMatchHero match={liveMatch} />
+        ) : (
+          <GlassCard style={styles.emptyState}>
+            <Text style={[styles.emptyTitle, { color: theme.foregroundStrong }]}>
+              {homeFeed.isLoading ? 'Loading fixtures' : 'No live fixture yet'}
+            </Text>
+            <Text style={[styles.emptyCopy, { color: theme.muted }]}>
+              Matchday analysis will appear here when the feed has fixtures.
+            </Text>
+          </GlassCard>
+        )}
       </Animated.View>
 
       <Animated.View entering={enterUp(5)} style={styles.sectionHeader}>
@@ -584,6 +625,14 @@ const styles = StyleSheet.create({
   sportShort: {
     fontFamily: fonts.extraBold,
     fontSize: 12,
+  },
+  unreadDot: {
+    borderRadius: radius.pill,
+    height: 8,
+    position: 'absolute',
+    right: 9,
+    top: 9,
+    width: 8,
   },
   pillIndicator: {
     borderRadius: radius.pill,

@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { useAppTheme } from '@/theme/colors';
 import { radius } from '@/theme/spacing';
@@ -7,28 +7,37 @@ import { fonts } from '@/theme/typography';
 type IconComponent = React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
 
 export function FormField({
+  autoCapitalize = 'none',
+  keyboardType,
   icon: Icon,
   label,
+  onChangeText,
   placeholder,
   secure,
   value,
 }: {
   icon: IconComponent;
   label: string;
+  keyboardType?: TextInputProps['keyboardType'];
+  onChangeText?: (value: string) => void;
   placeholder?: string;
   secure?: boolean;
   value?: string;
+  autoCapitalize?: TextInputProps['autoCapitalize'];
 }) {
   const theme = useAppTheme();
 
   return (
-    <View style={[styles.field, { backgroundColor: theme.field, borderColor: theme.border }]}>
-      <Icon color={theme.muted} size={18} strokeWidth={2} />
-      <View style={styles.inputWrap}>
-        <Text style={[styles.label, { color: theme.muted }]}>{label}</Text>
+    <View style={styles.fieldGroup}>
+      <Text style={[styles.label, { color: theme.foregroundStrong }]}>{label}</Text>
+      <View style={[styles.field, { backgroundColor: theme.backgroundAlt, borderColor: theme.borderStrong }]}>
+        <Icon color={theme.muted} size={20} strokeWidth={2} />
         <TextInput
+          autoCapitalize={autoCapitalize}
+          keyboardType={keyboardType}
+          onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={theme.muted}
+          placeholderTextColor={theme.mutedLight}
           secureTextEntry={secure}
           style={[styles.input, { color: theme.foreground }]}
           value={value}
@@ -45,23 +54,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
-    minHeight: 52,
+    minHeight: 54,
     paddingHorizontal: 15,
   },
+  fieldGroup: {
+    gap: 8,
+  },
   input: {
-    fontFamily: fonts.bold,
-    fontSize: 14,
-    height: 26,
+    flex: 1,
+    fontFamily: fonts.semibold,
+    fontSize: 16,
+    height: 30,
     padding: 0,
   },
-  inputWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
   label: {
-    fontFamily: fonts.bold,
-    fontSize: 10,
-    letterSpacing: 0.3,
-    textTransform: 'uppercase',
+    fontFamily: fonts.extraBold,
+    fontSize: 14,
   },
 });

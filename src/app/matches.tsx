@@ -1,27 +1,36 @@
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Search } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { enterUp, GlassCard, IconButton, PressableScale, ProgressBar, Screen, StatusBadge, TeamLogo } from '@/components/ui';
-import { dateChips, filterMatches, getLeagueLabel, leagues, type MatchCardData } from '@/data/mock';
+import { dateChips, type MatchCardData } from '@/data/mock';
+import { useHomeFeed, useLeagues } from '@/lib/api/hooks';
+import { flattenHomeFeed } from '@/lib/mobile-mappers';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
+type LeagueRailOption = {
+  id: string;
+  label: string;
+};
+
 function LeagueRail({
   onSelect,
+  options,
   selected,
 }: {
   onSelect: (leagueId: string) => void;
+  options: LeagueRailOption[];
   selected: string;
 }) {
   const theme = useAppTheme();
 
   return (
     <ScrollView contentContainerStyle={styles.railContent} horizontal showsHorizontalScrollIndicator={false} style={styles.rail}>
-      {leagues.map((league) => {
+      {options.map((league) => {
         const active = league.id === selected;
         return (
           <PressableScale
@@ -110,10 +119,31 @@ function MatchRow({ match }: { match: MatchCardData }) {
 export default function MatchesScreen() {
   const router = useRouter();
   const theme = useAppTheme();
-  const [selectedLeague, setSelectedLeague] = useState('epl');
+  const [selectedLeague, setSelectedLeague] = useState('all');
   const [selectedDate, setSelectedDate] = useState('today');
-  const visibleMatches = filterMatches({ dateId: selectedDate, leagueId: selectedLeague });
-  const sectionTitle = selectedLeague === 'all' ? 'All leagues' : getLeagueLabel(selectedLeague);
+  const leagueDateRange = selectedDate === 'today' ? 'today' : selectedDate === 'tomorrow' ? 'tomorrow' : 'week';
+  const leagueList = useLeagues({
+    dateRange: leagueDateRange,
+    windowDays: selectedDate === 'today' ? 1 : 3,
+  });
+  const leagueOptions = useMemo<LeagueRailOption[]>(
+    () => [
+      { id: 'all', label: 'All' },
+      ...(leagueList.data ?? []).map((league) => ({
+        id: league.key,
+        label: league.name,
+      })),
+    ],
+    [leagueList.data],
+  );
+  const activeLeague = leagueOptions.some((league) => league.id === selectedLeague) ? selectedLeague : 'all';
+  const homeFeed = useHomeFeed({
+    leagueKey: activeLeague !== 'all' ? activeLeague : undefined,
+    limit: 48,
+    windowDays: selectedDate === 'today' ? 1 : 3,
+  });
+  const visibleMatches = useMemo(() => flattenHomeFeed(homeFeed.data), [homeFeed.data]);
+  const sectionTitle = leagueOptions.find((league) => league.id === activeLeague)?.label ?? 'All leagues';
 
   return (
     <Screen>
@@ -124,7 +154,7 @@ export default function MatchesScreen() {
       </Animated.View>
 
       <Animated.View entering={enterUp(1)}>
-        <LeagueRail onSelect={setSelectedLeague} selected={selectedLeague} />
+        <LeagueRail onSelect={setSelectedLeague} options={leagueOptions} selected={activeLeague} />
       </Animated.View>
       <Animated.View entering={enterUp(2)}>
         <DateRail onSelect={setSelectedDate} selected={selectedDate} />
@@ -138,8 +168,12 @@ export default function MatchesScreen() {
       {visibleMatches.length === 0 ? (
         <Animated.View entering={enterUp(4)}>
           <GlassCard style={styles.emptyState}>
-            <Text style={[styles.emptyTitle, { color: theme.foregroundStrong }]}>No fixtures found</Text>
-            <Text style={[styles.emptyCopy, { color: theme.muted }]}>Try another league or date.</Text>
+            <Text style={[styles.emptyTitle, { color: theme.foregroundStrong }]}>
+              {homeFeed.isLoading ? 'Loading fixtures' : 'No fixtures found'}
+            </Text>
+            <Text style={[styles.emptyCopy, { color: theme.muted }]}>
+              {homeFeed.isLoading ? 'Fetching the latest matchday slate.' : 'Try another league or date.'}
+            </Text>
           </GlassCard>
         </Animated.View>
       ) : null}

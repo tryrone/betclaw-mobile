@@ -1,15 +1,34 @@
-import { Link } from 'expo-router';
+import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { Lock } from 'lucide-react-native';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { BrandLogo, enterUp, FormField, GlassCard, GradientButton, Screen, StatusBadge } from '@/components/ui';
+import { BrandLogo, enterUp, FormField, GradientButton, Screen, StatusBadge } from '@/components/ui';
+import { getErrorMessage } from '@/lib/api/client';
+import { useResetPasswordMutation } from '@/lib/api/hooks';
 import { useAppTheme } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
 export default function ResetPasswordScreen() {
   const theme = useAppTheme();
+  const router = useRouter();
+  const { token: tokenParam } = useLocalSearchParams<{ token?: string }>();
+  const resetPassword = useResetPasswordMutation();
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const token = Array.isArray(tokenParam) ? tokenParam[0] : tokenParam;
+
+  const handleReset = () => {
+    if (!token || password !== confirmPassword) return;
+    resetPassword.mutate(
+      { token, password },
+      {
+        onSuccess: () => router.replace('/(auth)/login'),
+      },
+    );
+  };
 
   return (
     <Screen>
@@ -20,13 +39,14 @@ export default function ResetPasswordScreen() {
         <Text style={[styles.title, { color: theme.foregroundStrong }]}>Choose a new password</Text>
         <Text style={[styles.copy, { color: theme.mutedLight }]}>This screen is ready for the future deep-link token flow.</Text>
       </Animated.View>
-      <Animated.View entering={enterUp(2)}>
-        <GlassCard>
-          <StatusBadge label="Secure reset" tone="accent" />
-          <FormField icon={Lock} label="New password" secure value="password123" />
-          <FormField icon={Lock} label="Confirm password" secure value="password123" />
-          <GradientButton>Update Password</GradientButton>
-        </GlassCard>
+      <Animated.View entering={enterUp(2)} style={styles.form}>
+        <StatusBadge label="Secure reset" tone="accent" />
+        <FormField icon={Lock} label="New password" onChangeText={setPassword} placeholder="8+ characters" secure value={password} />
+        <FormField icon={Lock} label="Confirm password" onChangeText={setConfirmPassword} placeholder="Repeat password" secure value={confirmPassword} />
+        {!token ? <Text style={[styles.message, { color: theme.warning }]}>Open the reset link from your email to continue.</Text> : null}
+        {password && confirmPassword && password !== confirmPassword ? <Text style={[styles.message, { color: theme.danger }]}>Passwords do not match.</Text> : null}
+        {resetPassword.error ? <Text style={[styles.message, { color: theme.danger }]}>{getErrorMessage(resetPassword.error)}</Text> : null}
+        <GradientButton onPress={handleReset}>{resetPassword.isPending ? 'Updating...' : 'Update Password'}</GradientButton>
       </Animated.View>
       <Animated.View entering={enterUp(3)}>
         <Link href="/(auth)/login" asChild>
@@ -49,9 +69,17 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginTop: spacing.sm,
   },
+  form: {
+    gap: spacing.md,
+  },
   link: {
     fontFamily: fonts.bold,
     fontSize: 13,
+  },
+  message: {
+    fontFamily: fonts.bold,
+    fontSize: 12,
+    lineHeight: 18,
   },
   title: {
     fontFamily: fonts.extraBold,

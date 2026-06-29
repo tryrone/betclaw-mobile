@@ -1,5 +1,8 @@
+import * as Linking from 'expo-linking';
+import { useLocalSearchParams } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { CreditCard, FileText, ShieldCheck, Trophy, WalletCards, Zap } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -14,7 +17,15 @@ import {
   ScreenHeader,
   StatusBadge,
 } from '@/components/ui';
-import { billingHistory, tokenPacks, type BillingItemData, type TokenPackData } from '@/data/mock';
+import { tokenPacks, type BillingItemData, type TokenPackData } from '@/data/mock';
+import { getErrorMessage } from '@/lib/api/client';
+import {
+  useBillingHistory,
+  useCreateCheckoutMutation,
+  usePlans,
+  useSubscriptionCurrent,
+  useVerifyReturnedPaymentMutation,
+} from '@/lib/api/hooks';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
@@ -68,8 +79,74 @@ function BillingRow({ item }: { item: BillingItemData }) {
 }
 
 export default function WalletScreen() {
-  const [selectedPack, setSelectedPack] = useState('weekly');
+  const { reference } = useLocalSearchParams<{ reference?: string }>();
   const theme = useAppTheme();
+  const plans = usePlans();
+  const subscription = useSubscriptionCurrent();
+  const billing = useBillingHistory();
+  const createCheckout = useCreateCheckoutMutation();
+  const verifyPayment = useVerifyReturnedPaymentMutation();
+  const verifyReturnedPayment = verifyPayment.mutate;
+  const verifiedReturnReference = useRef<string | null>(null);
+  const returnedReference = Array.isArray(reference) ? reference[0] : reference;
+  const availablePacks = useMemo<TokenPackData[]>(() => {
+    const premiumPlan = plans.data?.find((plan: any) => plan.name === 'premium');
+    const options = premiumPlan?.purchaseOptions;
+    if (!Array.isArray(options) || options.length === 0) return tokenPacks;
+
+    return options.map((option: any) => ({
+      id: String(option.durationDays),
+      label: option.label ?? `${option.durationDays} day access`,
+      price: `₦${Math.round((option.amountKobo ?? 0) / 100).toLocaleString()}`,
+      tokens: Number(option.researchTokens ?? 0).toLocaleString(),
+      featured: option.durationDays === 7,
+    }));
+  }, [plans.data]);
+  const [selectedPack, setSelectedPack] = useState(availablePacks[0]?.id ?? 'weekly');
+  const activeSelectedPack = availablePacks.some((pack) => pack.id === selectedPack)
+    ? selectedPack
+    : availablePacks[0]?.id ?? 'weekly';
+  const selectedDuration = Number(activeSelectedPack) === 1 || Number(activeSelectedPack) === 7 ? (Number(activeSelectedPack) as 1 | 7) : 7;
+  const tokenBalance = subscription.data?.researchTokensRemaining ?? 0;
+  const minimumBalance = subscription.data?.minimumActiveResearchTokens ?? 1;
+  const balanceProgress = Math.min(100, Math.round((tokenBalance / Math.max(1, minimumBalance)) * 100));
+  const billingItems = useMemo<BillingItemData[]>(() => {
+    const items = billing.data?.items;
+    if (!Array.isArray(items) || items.length === 0) return [];
+
+    return items.map((item: any) => ({
+      id: item.id,
+      label: item.description ?? 'Token purchase',
+      date: new Date(item.createdAt).toLocaleDateString(),
+      amount: `${item.currency ?? 'NGN'} ${Number(item.amount ?? 0).toLocaleString()}`,
+      status: item.status === 'PAID' ? 'Paid' : 'Pending',
+    }));
+  }, [billing.data]);
+
+  useEffect(() => {
+    if (returnedReference && verifiedReturnReference.current !== returnedReference) {
+      verifiedReturnReference.current = returnedReference;
+      verifyReturnedPayment({ reference: returnedReference });
+    }
+  }, [returnedReference, verifyReturnedPayment]);
+
+  const handleKoraCheckout = async () => {
+    const returnUrl = Linking.createURL('/(tabs)/wallet');
+    const checkout = await createCheckout.mutateAsync({
+      durationDays: selectedDuration,
+      returnUrl,
+    });
+    const result = await WebBrowser.openAuthSessionAsync(checkout.url, returnUrl);
+    if (result.type === 'success') {
+      const parsed = Linking.parse(result.url);
+      const parsedReference = parsed.queryParams?.reference;
+      const verificationReference =
+        checkout.providerReference ?? checkout.reference ?? (Array.isArray(parsedReference) ? parsedReference[0] : parsedReference);
+      if (verificationReference) {
+        verifyReturnedPayment({ reference: String(verificationReference) });
+      }
+    }
+  };
 
   return (
     <Screen hasTabs>
@@ -85,10 +162,10 @@ export default function WalletScreen() {
           </View>
           <View>
             <Text style={[styles.balanceLabel, { color: theme.muted }]}>Token balance</Text>
-            <Text style={[styles.balanceValue, { color: theme.foregroundStrong }]}>700,000</Text>
+            <Text style={[styles.balanceValue, { color: theme.foregroundStrong }]}>{Number(tokenBalance).toLocaleString()}</Text>
             <Text style={[styles.balanceSub, { color: theme.mutedLight }]}>tokens remaining</Text>
           </View>
-          <ProgressBar value={74} />
+          <ProgressBar value={balanceProgress} />
         </GlassCard>
       </Animated.View>
 
@@ -101,13 +178,13 @@ export default function WalletScreen() {
             </View>
             <Zap color={theme.accent} size={22} />
           </View>
-          <ProgressBar tone="warning" value={32} />
+          <ProgressBar tone="warning" value={subscription.data?.isBelowMinimumTokenBalance ? 24 : 100} />
         </GlassCard>
       </Animated.View>
 
       <Animated.View entering={enterUp(3)} style={styles.packGrid}>
-        {tokenPacks.map((pack) => (
-          <TokenPack key={pack.id} onPress={() => setSelectedPack(pack.id)} pack={pack} selected={selectedPack === pack.id} />
+        {availablePacks.map((pack) => (
+          <TokenPack key={pack.id} onPress={() => setSelectedPack(pack.id)} pack={pack} selected={activeSelectedPack === pack.id} />
         ))}
       </Animated.View>
 
@@ -115,16 +192,14 @@ export default function WalletScreen() {
         <GlassCard>
           <View style={styles.cardHeader}>
             <Text style={[styles.cardTitle, { color: theme.foregroundStrong }]}>Payment paths</Text>
-            <StatusBadge label="Kora + IAP" tone="accent" />
+            <StatusBadge label="Kora" tone="accent" />
           </View>
           <View style={styles.paymentGrid}>
-            <GradientButton icon={WalletCards}>Pay with Kora</GradientButton>
-            <PressableScale
-              accessibilityLabel="Pay with Apple or Google"
-              accessibilityRole="button"
-              style={[styles.storePay, { backgroundColor: theme.field, borderColor: theme.border }]}>
-              <Text style={[styles.storePayText, { color: theme.foreground }]}>Apple / Google</Text>
-            </PressableScale>
+            {createCheckout.error ? <Text style={[styles.cardCaption, { color: theme.danger }]}>{getErrorMessage(createCheckout.error)}</Text> : null}
+            {verifyPayment.data ? <Text style={[styles.cardCaption, { color: theme.success }]}>Payment status: {verifyPayment.data.status}</Text> : null}
+            <GradientButton icon={WalletCards} onPress={handleKoraCheckout}>
+              {createCheckout.isPending || verifyPayment.isPending ? 'Processing...' : 'Pay with Kora'}
+            </GradientButton>
           </View>
         </GlassCard>
       </Animated.View>
@@ -134,8 +209,21 @@ export default function WalletScreen() {
         <Text style={[styles.sectionAction, { color: theme.primarySoft }]}>View all</Text>
       </Animated.View>
 
-      {billingHistory.map((item, index) => (
-        <Animated.View entering={enterUp(6 + index)} key={item.id}>
+      {billingItems.length === 0 ? (
+        <Animated.View entering={enterUp(6)}>
+          <GlassCard style={styles.emptyCard}>
+            <Text style={[styles.emptyTitle, { color: theme.foregroundStrong }]}>
+              {billing.isLoading ? 'Loading purchase history' : 'No purchases yet'}
+            </Text>
+            <Text style={[styles.emptyCopy, { color: theme.muted }]}>
+              {billing.isLoading ? 'Fetching your wallet activity.' : 'Completed Kora purchases will appear here.'}
+            </Text>
+          </GlassCard>
+        </Animated.View>
+      ) : null}
+
+      {billingItems.map((item, index) => (
+        <Animated.View entering={enterUp(7 + index)} key={item.id}>
           <BillingRow item={item} />
         </Animated.View>
       ))}
@@ -219,6 +307,19 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontFamily: fonts.extraBold,
     fontSize: 16,
+  },
+  emptyCard: {
+    gap: spacing.xs,
+    padding: spacing.lg,
+  },
+  emptyCopy: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  emptyTitle: {
+    fontFamily: fonts.extraBold,
+    fontSize: 15,
   },
   packCard: {
     flex: 1,

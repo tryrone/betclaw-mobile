@@ -1,9 +1,14 @@
 import { Link, useRouter } from 'expo-router';
 import { Fingerprint, Lock, Mail } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { BrandMark, enterUp, FormField, GradientButton, PressableScale, Screen, StatusBadge } from '@/components/ui';
+import { BrandLogo, enterUp, FormField, GradientButton, PressableScale, Screen, StatusBadge } from '@/components/ui';
+import { getErrorMessage } from '@/lib/api/client';
+import { useLoginMutation, useOAuthLoginMutation } from '@/lib/api/hooks';
+import type { MobileOAuthProvider } from '@/lib/api/types';
+import { useAuthStore } from '@/store/auth-store';
 import { useAppTheme } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
@@ -11,27 +16,54 @@ import { fonts } from '@/theme/typography';
 export default function LoginScreen() {
   const router = useRouter();
   const theme = useAppTheme();
+  const authStatus = useAuthStore((state) => state.status);
+  const login = useLoginMutation();
+  const oauthLogin = useOAuthLoginMutation();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  useEffect(() => {
+    if (authStatus === 'authenticated') {
+      router.replace('/(tabs)');
+    }
+  }, [authStatus, router]);
+
+  const handleLogin = () => {
+    login.mutate(
+      { email: email.trim(), password },
+      {
+        onSuccess: () => router.replace('/(tabs)'),
+      },
+    );
+  };
+
+  const handleOAuthLogin = (provider: MobileOAuthProvider) => {
+    oauthLogin.mutate(provider, {
+      onSuccess: () => router.replace('/(tabs)'),
+    });
+  };
 
   return (
     <Screen scroll={false}>
       <View style={styles.root}>
         <View>
           <Animated.View entering={enterUp(0)} style={styles.topRow}>
-            <BrandMark size={52} />
+            <BrandLogo markSize={52} textSize={24} />
             <StatusBadge label="Mobile MVP" tone="accent" />
           </Animated.View>
 
           <Animated.View entering={enterUp(1)} style={styles.hero}>
-            <Text style={[styles.eyebrow, { color: theme.primarySoft }]}>BetClaw</Text>
             <Text style={[styles.title, { color: theme.foregroundStrong }]}>Sign in to your matchday workspace.</Text>
             <Text style={[styles.copy, { color: theme.mutedLight }]}>Ticket research, match signals, and wallet tokens in one mobile flow.</Text>
           </Animated.View>
 
           <Animated.View entering={enterUp(2)} style={styles.form}>
-            <FormField icon={Mail} label="Email" value="tega@betsclaw.win" />
-            <FormField icon={Lock} label="Password" secure value="password123" />
-            <GradientButton icon={Fingerprint} onPress={() => router.replace('/(tabs)')}>
-              Sign In
+            <FormField icon={Mail} keyboardType="email-address" label="Email" onChangeText={setEmail} placeholder="you@example.com" value={email} />
+            <FormField icon={Lock} label="Password" onChangeText={setPassword} placeholder="Your password" secure value={password} />
+            {login.error ? <Text style={[styles.errorText, { color: theme.danger }]}>{getErrorMessage(login.error)}</Text> : null}
+            {oauthLogin.error ? <Text style={[styles.errorText, { color: theme.danger }]}>{getErrorMessage(oauthLogin.error)}</Text> : null}
+            <GradientButton icon={Fingerprint} onPress={handleLogin}>
+              {login.isPending ? 'Signing In...' : 'Sign In'}
             </GradientButton>
           </Animated.View>
 
@@ -42,10 +74,20 @@ export default function LoginScreen() {
           </Animated.View>
 
           <Animated.View entering={enterUp(4)} style={styles.oauthRow}>
-            <PressableScale accessibilityLabel="Continue with Google" accessibilityRole="button" style={[styles.oauthButton, { backgroundColor: theme.field, borderColor: theme.border }]}>
-              <Text style={[styles.oauthText, { color: theme.foreground }]}>Google</Text>
+            <PressableScale
+              accessibilityLabel="Continue with Google"
+              accessibilityRole="button"
+              disabled={oauthLogin.isPending}
+              onPress={() => handleOAuthLogin('google')}
+              style={[styles.oauthButton, { backgroundColor: theme.field, borderColor: theme.border, opacity: oauthLogin.isPending ? 0.64 : 1 }]}>
+              <Text style={[styles.oauthText, { color: theme.foreground }]}>{oauthLogin.isPending ? 'Opening...' : 'Google'}</Text>
             </PressableScale>
-            <PressableScale accessibilityLabel="Continue with GitHub" accessibilityRole="button" style={[styles.oauthButton, { backgroundColor: theme.field, borderColor: theme.border }]}>
+            <PressableScale
+              accessibilityLabel="Continue with GitHub"
+              accessibilityRole="button"
+              disabled={oauthLogin.isPending}
+              onPress={() => handleOAuthLogin('github')}
+              style={[styles.oauthButton, { backgroundColor: theme.field, borderColor: theme.border, opacity: oauthLogin.isPending ? 0.64 : 1 }]}>
               <Text style={[styles.oauthText, { color: theme.foreground }]}>GitHub</Text>
             </PressableScale>
           </Animated.View>
@@ -90,10 +132,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textTransform: 'uppercase',
   },
-  eyebrow: {
-    fontFamily: fonts.extraBold,
+  errorText: {
+    fontFamily: fonts.bold,
     fontSize: 12,
-    textTransform: 'uppercase',
+    lineHeight: 18,
   },
   footerRow: {
     flexDirection: 'row',

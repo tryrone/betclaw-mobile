@@ -1,7 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Bell, ChevronRight, Copy, KeyRound, LogOut, Settings, ShieldCheck, SunMoon, UserRound } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -15,38 +13,17 @@ import {
   StatusBadge,
   ToggleSwitch,
 } from '@/components/ui';
+import {
+  useCreateTelegramTokenMutation,
+  useLogoutMutation,
+  useMe,
+  useUpdatePreferencesMutation,
+} from '@/lib/api/hooks';
 import { useAppTheme, useThemeController } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
 type IconComponent = React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
-const SETTINGS_STORAGE_PREFIX = 'betclaw.settings';
-
-function useStoredBoolean(key: string, initialValue: boolean) {
-  const [value, setValue] = useState(initialValue);
-
-  useEffect(() => {
-    let mounted = true;
-    AsyncStorage.getItem(`${SETTINGS_STORAGE_PREFIX}.${key}`)
-      .then((storedValue) => {
-        if (!mounted) return;
-        if (storedValue === 'true') setValue(true);
-        if (storedValue === 'false') setValue(false);
-      })
-      .catch(() => undefined);
-
-    return () => {
-      mounted = false;
-    };
-  }, [key]);
-
-  const updateValue = useCallback((nextValue: boolean) => {
-    setValue(nextValue);
-    AsyncStorage.setItem(`${SETTINGS_STORAGE_PREFIX}.${key}`, String(nextValue)).catch(() => undefined);
-  }, [key]);
-
-  return [value, updateValue] as const;
-}
 
 function SettingRow({
   checked = true,
@@ -110,10 +87,23 @@ export default function SettingsScreen() {
   const router = useRouter();
   const theme = useAppTheme();
   const { mode, setThemeMode } = useThemeController();
+  const me = useMe();
+  const updatePreferences = useUpdatePreferencesMutation();
+  const logout = useLogoutMutation();
+  const telegramToken = useCreateTelegramTokenMutation();
   const darkModeEnabled = mode === 'dark';
-  const [twoFactorAuth, setTwoFactorAuth] = useStoredBoolean('twoFactorAuth', false);
-  const [emailNotifications, setEmailNotifications] = useStoredBoolean('emailNotifications', true);
-  const [publicProfile, setPublicProfile] = useStoredBoolean('publicProfile', false);
+  const profile = me.data;
+  const displayName = profile?.name ?? 'BetClaw user';
+  const email = profile?.email ?? '';
+  const initials = displayName
+    .split(' ')
+    .map((part: string) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+  const telegramCommand =
+    telegramToken.data?.command ??
+    (profile?.telegramLink ? `Linked: @${profile.telegramLink.username ?? profile.telegramLink.chatId}` : 'Generate a link token');
 
   return (
     <Screen hasTabs>
@@ -125,16 +115,16 @@ export default function SettingsScreen() {
         <GlassCard>
           <View style={styles.profileRow}>
             <View style={[styles.avatar, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
-              <Text style={[styles.avatarText, { color: theme.primarySoft }]}>TO</Text>
+              <Text style={[styles.avatarText, { color: theme.primarySoft }]}>{initials || 'BC'}</Text>
             </View>
             <View style={styles.profileCopy}>
               <Text numberOfLines={1} style={[styles.name, { color: theme.foregroundStrong }]}>
-                Tega Oboraruvwe
+                {displayName}
               </Text>
               <Text numberOfLines={1} style={[styles.email, { color: theme.mutedLight }]}>
-                tega@betsclaw.win
+                {email}
               </Text>
-              <StatusBadge label="Premium" tone="accent" />
+              <StatusBadge label={profile?.accessTier ?? 'Account'} tone={profile?.accessTier === 'PREMIUM' ? 'accent' : 'neutral'} />
             </View>
           </View>
         </GlassCard>
@@ -145,7 +135,7 @@ export default function SettingsScreen() {
       </Animated.View>
       <Animated.View entering={enterUp(3)} style={styles.settingList}>
         <ActionRow icon={KeyRound} label="Reset password" onPress={() => router.push('/(auth)/forgot-password' as any)} />
-        <SettingRow checked={twoFactorAuth} icon={ShieldCheck} label="Two-factor authentication" onChange={setTwoFactorAuth} />
+        <SettingRow checked={Boolean(profile?.twoFactorAuth)} icon={ShieldCheck} label="Two-factor authentication" onChange={(twoFactorAuth) => updatePreferences.mutate({ twoFactorAuth })} />
       </Animated.View>
 
       <Animated.View entering={enterUp(4)} style={styles.sectionHeader}>
@@ -157,10 +147,14 @@ export default function SettingsScreen() {
           checked={darkModeEnabled}
           icon={SunMoon}
           label="Dark mode"
-          onChange={(enabled) => setThemeMode(enabled ? 'dark' : 'light')}
+          onChange={(enabled) => {
+            setThemeMode(enabled ? 'dark' : 'light');
+            updatePreferences.mutate({ darkMode: enabled });
+          }}
         />
-        <SettingRow checked={emailNotifications} icon={Bell} label="Email notifications" onChange={setEmailNotifications} />
-        <SettingRow checked={publicProfile} icon={UserRound} label="Public profile" onChange={setPublicProfile} />
+        <SettingRow checked={profile?.emailNotifications ?? true} icon={Bell} label="Email notifications" onChange={(emailNotifications) => updatePreferences.mutate({ emailNotifications })} />
+        <SettingRow checked={profile?.pushNotifications ?? true} icon={Bell} label="Push notifications" onChange={(pushNotifications) => updatePreferences.mutate({ pushNotifications })} />
+        <SettingRow checked={Boolean(profile?.publicProfile)} icon={UserRound} label="Public profile" onChange={(publicProfile) => updatePreferences.mutate({ publicProfile })} />
       </Animated.View>
 
       <Animated.View entering={enterUp(6)}>
@@ -170,15 +164,16 @@ export default function SettingsScreen() {
               <Text style={[styles.cardTitle, { color: theme.foregroundStrong }]}>Telegram delivery</Text>
               <Text style={[styles.cardCaption, { color: theme.muted }]}>VIP pick alerts linked to mobile.</Text>
             </View>
-            <StatusBadge label="Token" tone="warning" />
+            <StatusBadge label={profile?.telegramLink ? 'Linked' : 'Token'} tone={profile?.telegramLink ? 'success' : 'warning'} />
           </View>
           <View style={[styles.telegramToken, { backgroundColor: theme.field, borderColor: theme.border }]}>
             <Text numberOfLines={1} style={[styles.tokenText, { color: theme.foreground }]}>
-              /link BCLW-2849
+              {telegramCommand}
             </Text>
             <PressableScale
-              accessibilityLabel="Copy Telegram link command"
+              accessibilityLabel="Create Telegram link command"
               accessibilityRole="button"
+              onPress={() => telegramToken.mutate()}
               scaleTo={0.85}
               style={[styles.copyButton, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
               <Copy color={theme.primarySoft} size={15} />
@@ -191,10 +186,10 @@ export default function SettingsScreen() {
         <PressableScale
           accessibilityLabel="Sign out"
           accessibilityRole="button"
-          onPress={() => router.replace('/(auth)/login')}
+          onPress={() => logout.mutate(undefined, { onSettled: () => router.replace('/(auth)/login') })}
           style={styles.signOut}>
           <LogOut color={theme.danger} size={17} />
-          <Text style={[styles.signOutText, { color: theme.danger }]}>Sign Out</Text>
+          <Text style={[styles.signOutText, { color: theme.danger }]}>{logout.isPending ? 'Signing Out...' : 'Sign Out'}</Text>
         </PressableScale>
       </Animated.View>
     </Screen>

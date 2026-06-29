@@ -1,10 +1,11 @@
 import { Check, Clock3, Copy, SlidersHorizontal, Target, Wand2 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import {
   enterUp,
+  FormField,
   GlassCard,
   GradientButton,
   IconButton,
@@ -15,7 +16,9 @@ import {
   ScreenHeader,
   StatusBadge,
 } from '@/components/ui';
-import { ticketRows, type TicketRowData } from '@/data/mock';
+import type { TicketRowData } from '@/data/mock';
+import { getErrorMessage } from '@/lib/api/client';
+import { useFixTicketMutation, useJobStatus, useTicketById } from '@/lib/api/hooks';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
@@ -29,6 +32,11 @@ const pipeline = [
 ];
 
 const riskLevels = ['Safe', 'Balanced', 'Bold'];
+const riskMap = {
+  Balanced: 'moderate',
+  Bold: 'aggressive',
+  Safe: 'conservative',
+} as const;
 
 function PipelineStep({ label, state }: { label: string; state: string }) {
   const theme = useAppTheme();
@@ -83,8 +91,42 @@ function TicketRow({ row }: { row: TicketRowData }) {
 }
 
 export default function FixTicketScreen() {
+  const [bookingCode, setBookingCode] = useState('');
+  const [jobId, setJobId] = useState<string | null>(null);
   const [risk, setRisk] = useState('Balanced');
   const theme = useAppTheme();
+  const fixTicket = useFixTicketMutation();
+  const jobStatus = useJobStatus(jobId);
+  const ticket = useTicketById(jobStatus.data?.status === 'done' ? jobStatus.data.ticketId : null);
+  const displayRows = useMemo<TicketRowData[]>(() => {
+    const matches = ticket.data?.matches;
+    if (!Array.isArray(matches) || matches.length === 0) return [];
+
+    return matches.map((match: any) => ({
+      id: match.id,
+      teams: `${match.homeTeam} vs ${match.awayTeam}`,
+      market: match.market,
+      confidence: Math.round(match.confidence ?? 0),
+      status: match.status === 'KEPT' ? 'Keep' : 'Remove',
+      reason: match.reason ?? match.selectionReason ?? 'Decision saved from BetClaw analysis.',
+    }));
+  }, [ticket.data]);
+  const pipelineState = jobStatus.data?.status ?? (fixTicket.isPending ? 'processing' : null);
+
+  const handleOptimize = () => {
+    fixTicket.mutate(
+      {
+        bookingCode: bookingCode.trim(),
+        platform: 'SPORTYBET',
+        riskTolerance: riskMap[risk as keyof typeof riskMap],
+      },
+      {
+        onSuccess: (result) => {
+          setJobId(result.jobId);
+        },
+      },
+    );
+  };
 
   return (
     <Screen hasTabs>
@@ -98,16 +140,7 @@ export default function FixTicketScreen() {
             <StatusBadge label="Booking code" tone="accent" />
             <StatusBadge label="SportyBet" />
           </View>
-          <View style={[styles.bookingCode, { backgroundColor: theme.field, borderColor: theme.border }]}>
-            <Text style={[styles.bookingText, { color: theme.foregroundStrong }]}>SB-84K2-P9X</Text>
-            <PressableScale
-              accessibilityLabel="Copy booking code"
-              accessibilityRole="button"
-              scaleTo={0.85}
-              style={[styles.copyButton, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
-              <Copy color={theme.primarySoft} size={16} />
-            </PressableScale>
-          </View>
+          <FormField autoCapitalize="characters" icon={Copy} label="Booking code" onChangeText={setBookingCode} placeholder="Paste SportyBet code" value={bookingCode} />
           <View style={styles.riskGrid}>
             {riskLevels.map((level) => {
               const active = level === risk;
@@ -129,7 +162,10 @@ export default function FixTicketScreen() {
               );
             })}
           </View>
-          <GradientButton icon={Wand2}>Optimize Ticket</GradientButton>
+          {fixTicket.error ? <Text style={[styles.reason, { color: theme.danger }]}>{getErrorMessage(fixTicket.error)}</Text> : null}
+          <GradientButton icon={Wand2} onPress={handleOptimize}>
+            {fixTicket.isPending ? 'Submitting...' : 'Optimize Ticket'}
+          </GradientButton>
         </GlassCard>
       </Animated.View>
 
@@ -137,8 +173,13 @@ export default function FixTicketScreen() {
         <GlassCard>
           <View style={styles.cardHeader}>
             <Text style={[styles.cardTitle, { color: theme.foregroundStrong }]}>Pipeline</Text>
-            <StatusBadge label="Researching" tone="warning" />
+            <StatusBadge
+              label={pipelineState === 'done' ? 'Done' : pipelineState === 'error' ? 'Failed' : pipelineState === 'processing' ? 'Researching' : 'Ready'}
+              tone={pipelineState === 'done' ? 'success' : pipelineState === 'error' ? 'danger' : pipelineState === 'processing' ? 'warning' : 'neutral'}
+            />
           </View>
+          {jobStatus.data?.status === 'error' ? <Text style={[styles.reason, { color: theme.danger }]}>{jobStatus.data.message}</Text> : null}
+          {jobStatus.data?.status === 'done' ? <Text style={[styles.reason, { color: theme.mutedLight }]}>{jobStatus.data.summary}</Text> : null}
           <View style={styles.pipelineGrid}>
             {pipeline.map((step) => (
               <PipelineStep key={step.id} label={step.label} state={step.state} />
@@ -156,17 +197,30 @@ export default function FixTicketScreen() {
             </View>
             <Target color={theme.primarySoft} size={21} />
           </View>
-          <ProgressBar value={82} />
+          <ProgressBar value={pipelineState === 'done' ? 100 : pipelineState === 'processing' ? 62 : 0} />
         </GlassCard>
       </Animated.View>
 
       <Animated.View entering={enterUp(4)} style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: theme.foregroundStrong }]}>Optimized slip</Text>
-        <StatusBadge label="2 kept" tone="success" />
+        <StatusBadge label={`${displayRows.filter((row) => row.status === 'Keep').length} kept`} tone="success" />
       </Animated.View>
 
-      {ticketRows.map((row, index) => (
-        <Animated.View entering={enterUp(5 + index)} key={row.id}>
+      {displayRows.length === 0 ? (
+        <Animated.View entering={enterUp(5)}>
+          <GlassCard style={styles.emptyCard}>
+            <Text style={[styles.emptyTitle, { color: theme.foregroundStrong }]}>
+              {ticket.isLoading ? 'Loading optimized slip' : 'No optimized slip yet'}
+            </Text>
+            <Text style={[styles.emptyCopy, { color: theme.muted }]}>
+              {ticket.isLoading ? 'Fetching the saved ticket decisions.' : 'Run a booking code to see real kept and removed legs.'}
+            </Text>
+          </GlassCard>
+        </Animated.View>
+      ) : null}
+
+      {displayRows.map((row, index) => (
+        <Animated.View entering={enterUp(6 + index)} key={row.id}>
           <TicketRow row={row} />
         </Animated.View>
       ))}
@@ -231,6 +285,19 @@ const styles = StyleSheet.create({
     height: 34,
     justifyContent: 'center',
     width: 34,
+  },
+  emptyCard: {
+    gap: spacing.xs,
+    padding: spacing.lg,
+  },
+  emptyCopy: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  emptyTitle: {
+    fontFamily: fonts.extraBold,
+    fontSize: 15,
   },
   pipelineGrid: {
     gap: spacing.sm,

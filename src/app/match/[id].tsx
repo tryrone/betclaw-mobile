@@ -5,7 +5,9 @@ import { StyleSheet, Text, View, type DimensionValue } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { enterUp, GlassCard, IconButton, PressableScale, ProgressBar, Screen, StatusBadge, TeamLogo } from '@/components/ui';
-import { getMatchById, type MatchStatData } from '@/data/mock';
+import type { MatchStatData } from '@/data/mock';
+import { useFixtureInsight, useHomeFeed } from '@/lib/api/hooks';
+import { flattenHomeFeed, insightSummary, mapInsightStats } from '@/lib/mobile-mappers';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
@@ -51,7 +53,23 @@ export default function MatchDetailScreen() {
   const router = useRouter();
   const theme = useAppTheme();
   const [activeTab, setActiveTab] = useState<DetailTab>('Stats');
-  const match = useMemo(() => getMatchById(Array.isArray(id) ? id[0] : id), [id]);
+  const fixtureId = Array.isArray(id) ? id[0] : id;
+  const homeFeed = useHomeFeed({ limit: 48, windowDays: 3 });
+  const insight = useFixtureInsight(fixtureId);
+  const match = useMemo(() => {
+    const baseMatch = flattenHomeFeed(homeFeed.data).find((item) => item.id === fixtureId);
+    if (!baseMatch) return null;
+
+    const insightStats = mapInsightStats(insight.data);
+    const summary = insightSummary(insight.data);
+    return {
+      ...baseMatch,
+      signal: insight.data?.recommendation?.summary ?? baseMatch.signal,
+      stats: insightStats.length > 0 ? insightStats : baseMatch.stats,
+      summary: summary.length > 0 ? summary : baseMatch.summary,
+      trend: insight.data?.recommendation?.label ?? baseMatch.trend,
+    };
+  }, [fixtureId, homeFeed.data, insight.data]);
 
   if (!match) {
     return (
@@ -64,9 +82,13 @@ export default function MatchDetailScreen() {
 
         <Animated.View entering={enterUp(1)}>
           <GlassCard style={styles.emptyCard}>
-            <Text style={[styles.emptyTitle, { color: theme.foregroundStrong }]}>Match unavailable</Text>
+            <Text style={[styles.emptyTitle, { color: theme.foregroundStrong }]}>
+              {homeFeed.isLoading || insight.isLoading ? 'Loading match' : 'Match unavailable'}
+            </Text>
             <Text style={[styles.emptyText, { color: theme.muted }]}>
-              This fixture is no longer in the match list.
+              {homeFeed.isLoading || insight.isLoading
+                ? 'Fetching fixture analysis.'
+                : 'This fixture is no longer in the match list.'}
             </Text>
             <PressableScale
               accessibilityLabel="View matches"

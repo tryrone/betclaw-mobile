@@ -62,11 +62,11 @@ export function AnimatedIcon() {
       </Animated.View>
 
       <Animated.View style={styles.background} entering={keyframe.duration(DURATION)}>
-        <div className={classes.expoLogoBackground} />
+        <div className={classes.betclawLogoBackground} />
       </Animated.View>
 
       <Animated.View style={styles.imageContainer} entering={logoKeyframe.duration(DURATION)}>
-        <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+        <Image contentFit="contain" style={styles.image} source={require('@/assets/images/splash-icon.png')} />
       </Animated.View>
     </View>
   );
@@ -97,8 +97,8 @@ const styles = StyleSheet.create({
   },
   image: {
     position: 'absolute',
-    width: 76,
-    height: 71,
+    width: 112,
+    height: 112,
   },
   background: {
     width: 128,

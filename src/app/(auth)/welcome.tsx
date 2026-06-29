@@ -13,7 +13,7 @@ import {
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BrandMark, enterUp, PressableScale, ProgressBar, StatusBadge, TeamLogo } from '@/components/ui';
+import { BrandLogo, enterUp, PressableScale, ProgressBar, StatusBadge, TeamLogo } from '@/components/ui';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
@@ -178,13 +178,17 @@ export default function WelcomeScreen() {
   const [activeIndex, setActiveIndex] = useState(0);
   const isLast = activeIndex === slides.length - 1;
 
-  const enterApp = () => {
-    router.replace('/(tabs)');
+  const goToLogin = () => {
+    router.replace('/(auth)/login');
+  };
+
+  const goToSignup = () => {
+    router.replace('/(auth)/signup');
   };
 
   const goNext = () => {
     if (isLast) {
-      enterApp();
+      goToSignup();
       return;
     }
 
@@ -210,12 +214,9 @@ export default function WelcomeScreen() {
         },
       ]}>
       <Animated.View entering={enterUp(0)} style={styles.topBar}>
-        <View style={styles.brandRow}>
-          <BrandMark color={theme.foregroundStrong} size={34} />
-          <Text style={[styles.brandText, { color: theme.foregroundStrong }]}>BetClaw</Text>
-        </View>
-        <PressableScale accessibilityLabel="Skip onboarding" accessibilityRole="button" onPress={enterApp} style={styles.skipButton}>
-          <Text style={[styles.skipText, { color: theme.muted }]}>Skip</Text>
+        <BrandLogo markSize={34} textSize={22} />
+        <PressableScale accessibilityLabel="Sign in" accessibilityRole="button" onPress={goToLogin} style={styles.skipButton}>
+          <Text style={[styles.skipText, { color: theme.muted }]}>Sign in</Text>
         </PressableScale>
       </Animated.View>
 
@@ -274,10 +275,15 @@ export default function WelcomeScreen() {
             },
           ]}>
           <Text style={[styles.ctaText, { color: isLast ? theme.primaryDark : theme.background }]}>
-            {isLast ? 'Get started' : 'Next'}
+            {isLast ? 'Create account' : 'Next'}
           </Text>
           <ArrowRight color={isLast ? theme.primaryDark : theme.background} size={18} strokeWidth={2.6} />
         </PressableScale>
+        {isLast ? (
+          <PressableScale accessibilityLabel="Sign in instead" accessibilityRole="button" onPress={goToLogin} style={styles.secondaryAuthButton}>
+            <Text style={[styles.secondaryAuthText, { color: theme.primarySoft }]}>Already have an account? Sign in</Text>
+          </PressableScale>
+        ) : null}
       </Animated.View>
     </View>
   );
@@ -318,16 +324,6 @@ const styles = StyleSheet.create({
   analystTitle: {
     fontFamily: fonts.extraBold,
     fontSize: 15,
-  },
-  brandRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  brandText: {
-    fontFamily: fonts.extraBold,
-    fontSize: 22,
-    letterSpacing: 0,
   },
   carousel: {
     flex: 1,
@@ -523,6 +519,15 @@ const styles = StyleSheet.create({
   searchText: {
     fontFamily: fonts.bold,
     fontSize: 12,
+  },
+  secondaryAuthButton: {
+    alignItems: 'center',
+    minHeight: 38,
+    justifyContent: 'center',
+  },
+  secondaryAuthText: {
+    fontFamily: fonts.bold,
+    fontSize: 13,
   },
   signalLabel: {
     fontFamily: fonts.bold,

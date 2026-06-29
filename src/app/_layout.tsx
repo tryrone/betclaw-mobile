@@ -6,12 +6,18 @@ import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { AuthBootstrap } from '@/components/bootstrap/AuthBootstrap';
+import { NotificationBootstrap } from '@/components/bootstrap/NotificationBootstrap';
+import { ApiProvider } from '@/lib/api/provider';
+import { useAuthStore } from '@/store/auth-store';
 import { ThemeControllerProvider, useAppTheme, useThemeController } from '@/theme/colors';
 import '@/global.css';
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.setOptions({ duration: 360, fade: true });
+void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const authStatus = useAuthStore((state) => state.status);
   const [loaded, error] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -19,20 +25,20 @@ export default function RootLayout() {
     Inter_700Bold,
     Inter_800ExtraBold,
   });
+  const appReady = (loaded || Boolean(error)) && authStatus !== 'hydrating';
 
   useEffect(() => {
-    if (loaded || error) {
-      SplashScreen.hideAsync();
+    if (appReady) {
+      SplashScreen.hideAsync().catch(() => undefined);
     }
-  }, [loaded, error]);
-
-  if (!loaded && !error) {
-    return null;
-  }
+  }, [appReady]);
 
   return (
     <ThemeControllerProvider>
-      <RootLayoutContent />
+      <ApiProvider>
+        <AuthBootstrap />
+        {appReady ? <RootLayoutContent /> : null}
+      </ApiProvider>
     </ThemeControllerProvider>
   );
 }
@@ -44,6 +50,7 @@ function RootLayoutContent() {
   return (
     <GestureHandlerRootView style={[styles.root, { backgroundColor: palette.background }]}>
       <ThemeProvider value={mode === 'light' ? DefaultTheme : DarkTheme}>
+        <NotificationBootstrap />
         <StatusBar style={mode === 'light' ? 'dark' : 'light'} />
         <Stack
           screenOptions={{
@@ -52,9 +59,11 @@ function RootLayoutContent() {
           }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />
+          <Stack.Screen name="oauth/callback" />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="matches" />
           <Stack.Screen name="match/[id]" />
+          <Stack.Screen name="notifications" />
           <Stack.Screen name="live-match" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
           <Stack.Screen name="+not-found" />
         </Stack>

@@ -4,14 +4,19 @@ import { BrandMark } from '@/components/ui/BrandMark';
 import { useAppTheme } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
-export function BrandLogo() {
+export function BrandLogo({
+  markSize = 42,
+  textSize = 22,
+}: {
+  markSize?: number;
+  textSize?: number;
+}) {
   const theme = useAppTheme();
 
   return (
     <View style={styles.logo}>
-      <BrandMark size={42} />
-      <Text style={[styles.bets, { color: theme.primarySoft }]}>Bets</Text>
-      <Text style={[styles.claw, { color: theme.accent }]}>Claw</Text>
+      <BrandMark color={theme.primarySoft} size={markSize} />
+      <Text style={[styles.wordmark, { color: theme.primarySoft, fontSize: textSize }]}>BetClaw</Text>
     </View>
   );
 }
@@ -22,13 +27,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  bets: {
+  wordmark: {
     fontFamily: fonts.extraBold,
-    fontSize: 22,
-  },
-  claw: {
-    fontFamily: fonts.extraBold,
-    fontSize: 22,
-    marginLeft: -8,
+    letterSpacing: 0,
   },
 });

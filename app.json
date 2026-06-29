@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.betclaw.app",
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/ios-icon.png"
     },
     "android": {
       "package": "com.betclaw.app",
@@ -30,14 +30,30 @@
       [
         "expo-splash-screen",
         {
+          "image": "./assets/images/splash-logo.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
           "backgroundColor": "#020605",
+          "dark": {
+            "image": "./assets/images/splash-logo.png",
+            "backgroundColor": "#020605"
+          },
+          "ios": {
+            "image": "./assets/images/splash-logo.png",
+            "imageWidth": 220,
+            "resizeMode": "contain",
+            "backgroundColor": "#020605"
+          },
           "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
+            "image": "./assets/images/splash-logo.png",
+            "imageWidth": 220,
+            "resizeMode": "contain",
+            "backgroundColor": "#020605"
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,8 +1,19 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 
 import { TabBar } from '@/components/ui';
+import { useAuthStore } from '@/store/auth-store';
 
 export default function TabLayout() {
+  const authStatus = useAuthStore((state) => state.status);
+
+  if (authStatus === 'hydrating') {
+    return null;
+  }
+
+  if (authStatus !== 'authenticated') {
+    return <Redirect href="/(auth)/welcome" />;
+  }
+
   return (
     <Tabs
       screenOptions={{ headerShown: false }}
