@@ -1,7 +1,7 @@
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { CreditCard, FileText, ShieldCheck, Trophy, WalletCards, Zap } from 'lucide-react-native';
+import { CreditCard, Download, FileText, ShieldCheck, Trophy, WalletCards, Zap } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -22,10 +22,13 @@ import { getErrorMessage } from '@/lib/api/client';
 import {
   useBillingHistory,
   useCreateCheckoutMutation,
+  useDownloadReceiptMutation,
   usePlans,
   useSubscriptionCurrent,
+  useSubscriptionUsage,
   useVerifyReturnedPaymentMutation,
 } from '@/lib/api/hooks';
+import { formatCurrency, openExternalUrl } from '@/lib/mobile-format';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
@@ -54,27 +57,53 @@ function TokenPack({ onPress, pack, selected }: { onPress: () => void; pack: Tok
   );
 }
 
-function BillingRow({ item }: { item: BillingItemData }) {
+type BillingRowData = BillingItemData & {
+  providerReference?: string | null;
+  receiptUrl?: string | null;
+};
+
+function BillingRow({
+  item,
+  onOpenReceipt,
+  receiptPending,
+}: {
+  item: BillingRowData;
+  onOpenReceipt: (item: BillingRowData) => void;
+  receiptPending?: boolean;
+}) {
   const theme = useAppTheme();
+  const canOpenReceipt = item.status === 'Paid';
 
   return (
-    <PressableScale accessibilityLabel={item.label} accessibilityRole="button" scaleTo={0.98}>
-      <GlassCard style={styles.billingRow}>
-        <View style={[styles.billingIcon, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
-          <FileText color={theme.primarySoft} size={15} />
+    <GlassCard style={styles.billingRow}>
+      <View style={[styles.billingIcon, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
+        <FileText color={theme.primarySoft} size={15} />
+      </View>
+      <View style={styles.billingCopy}>
+        <Text numberOfLines={1} style={[styles.billingTitle, { color: theme.foregroundStrong }]}>
+          {item.label}
+        </Text>
+        <Text style={[styles.billingDate, { color: theme.muted }]}>{item.date}</Text>
+      </View>
+      <View style={styles.billingRight}>
+        <Text style={[styles.billingAmount, { color: theme.foreground }]}>{item.amount}</Text>
+        <View style={styles.billingActions}>
+          <StatusBadge label={item.status} tone={item.status === 'Paid' ? 'success' : 'warning'} />
+          {canOpenReceipt ? (
+            <PressableScale
+              accessibilityLabel={`Open receipt for ${item.label}`}
+              accessibilityRole="button"
+              onPress={() => onOpenReceipt(item)}
+              style={[styles.receiptButton, { backgroundColor: theme.field, borderColor: theme.border }]}>
+              <Download color={theme.primarySoft} size={13} />
+              <Text style={[styles.receiptText, { color: theme.primarySoft }]}>
+                {receiptPending ? 'Opening' : 'Receipt'}
+              </Text>
+            </PressableScale>
+          ) : null}
         </View>
-        <View style={styles.billingCopy}>
-          <Text numberOfLines={1} style={[styles.billingTitle, { color: theme.foregroundStrong }]}>
-            {item.label}
-          </Text>
-          <Text style={[styles.billingDate, { color: theme.muted }]}>{item.date}</Text>
-        </View>
-        <View style={styles.billingRight}>
-          <Text style={[styles.billingAmount, { color: theme.foreground }]}>{item.amount}</Text>
-          <StatusBadge label={item.status} tone="success" />
-        </View>
-      </GlassCard>
-    </PressableScale>
+      </View>
+    </GlassCard>
   );
 }
 
@@ -83,8 +112,10 @@ export default function WalletScreen() {
   const theme = useAppTheme();
   const plans = usePlans();
   const subscription = useSubscriptionCurrent();
+  const usage = useSubscriptionUsage();
   const billing = useBillingHistory();
   const createCheckout = useCreateCheckoutMutation();
+  const downloadReceipt = useDownloadReceiptMutation();
   const verifyPayment = useVerifyReturnedPaymentMutation();
   const verifyReturnedPayment = verifyPayment.mutate;
   const verifiedReturnReference = useRef<string | null>(null);
@@ -110,7 +141,17 @@ export default function WalletScreen() {
   const tokenBalance = subscription.data?.researchTokensRemaining ?? 0;
   const minimumBalance = subscription.data?.minimumActiveResearchTokens ?? 1;
   const balanceProgress = Math.min(100, Math.round((tokenBalance / Math.max(1, minimumBalance)) * 100));
-  const billingItems = useMemo<BillingItemData[]>(() => {
+  const freeLimit = usage.data?.creditsPerMonth ?? 0;
+  const freeUsed = usage.data?.creditsUsed ?? usage.data?.requestsUsed ?? 0;
+  const freeRemaining = usage.data?.creditsRemaining ?? usage.data?.requestsRemaining ?? 0;
+  const usagePercent =
+    typeof usage.data?.percentUsed === 'number'
+      ? usage.data.percentUsed
+      : freeLimit > 0
+        ? Math.min(100, Math.round((freeUsed / freeLimit) * 100))
+        : 0;
+  const hasUnlimitedFreeUse = freeLimit === -1;
+  const billingItems = useMemo<BillingRowData[]>(() => {
     const items = billing.data?.items;
     if (!Array.isArray(items) || items.length === 0) return [];
 
@@ -118,7 +159,9 @@ export default function WalletScreen() {
       id: item.id,
       label: item.description ?? 'Token purchase',
       date: new Date(item.createdAt).toLocaleDateString(),
-      amount: `${item.currency ?? 'NGN'} ${Number(item.amount ?? 0).toLocaleString()}`,
+      amount: formatCurrency(item.amount, item.currency ?? 'NGN'),
+      providerReference: item.providerReference,
+      receiptUrl: item.receiptUrl,
       status: item.status === 'PAID' ? 'Paid' : 'Pending',
     }));
   }, [billing.data]);
@@ -148,6 +191,15 @@ export default function WalletScreen() {
     }
   };
 
+  const handleOpenReceipt = async (item: BillingRowData) => {
+    try {
+      const receiptUrl = item.receiptUrl ?? (await downloadReceipt.mutateAsync({ paymentId: item.id })).receiptUrl;
+      await openExternalUrl(receiptUrl);
+    } catch {
+      // downloadReceipt.error is surfaced to the user in the billing list below.
+    }
+  };
+
   return (
     <Screen hasTabs>
       <Animated.View entering={enterUp(0)}>
@@ -173,12 +225,36 @@ export default function WalletScreen() {
         <GlassCard>
           <View style={styles.cardHeader}>
             <View>
-              <Text style={[styles.cardTitle, { color: theme.foregroundStrong }]}>Usage progress</Text>
-              <Text style={[styles.cardCaption, { color: theme.muted }]}>Fix Ticket and Build Ticket consume research tokens.</Text>
+              <Text style={[styles.cardTitle, { color: theme.foregroundStrong }]}>Usage and limits</Text>
+              <Text style={[styles.cardCaption, { color: theme.muted }]}>Free checks plus token-backed research activity.</Text>
             </View>
             <Zap color={theme.accent} size={22} />
           </View>
-          <ProgressBar tone="warning" value={subscription.data?.isBelowMinimumTokenBalance ? 24 : 100} />
+          <View style={styles.usageGrid}>
+            <View style={[styles.usageTile, { backgroundColor: theme.field, borderColor: theme.border }]}>
+              <Text style={[styles.usageValue, { color: theme.primarySoft }]}>
+                {hasUnlimitedFreeUse ? 'Unlimited' : Number(freeRemaining).toLocaleString()}
+              </Text>
+              <Text style={[styles.usageLabel, { color: theme.muted }]}>Free remaining</Text>
+            </View>
+            <View style={[styles.usageTile, { backgroundColor: theme.field, borderColor: theme.border }]}>
+              <Text style={[styles.usageValue, { color: theme.foregroundStrong }]}>
+                {hasUnlimitedFreeUse ? 'Premium' : `${Number(freeUsed).toLocaleString()}/${Number(freeLimit).toLocaleString()}`}
+              </Text>
+              <Text style={[styles.usageLabel, { color: theme.muted }]}>Free usage</Text>
+            </View>
+          </View>
+          <ProgressBar
+            tone={subscription.data?.isBelowMinimumTokenBalance ? 'warning' : 'success'}
+            value={hasUnlimitedFreeUse ? 100 : usagePercent}
+          />
+          <Text style={[styles.cardCaption, { color: subscription.data?.isBelowMinimumTokenBalance ? theme.warning : theme.muted }]}>
+            {subscription.data?.isBelowMinimumTokenBalance
+              ? `Keep at least ${Number(minimumBalance).toLocaleString()} token${minimumBalance === 1 ? '' : 's'} for research actions.`
+              : usage.isLoading
+                ? 'Refreshing usage counters.'
+                : 'Fix Ticket and Build Ticket are available while your access and token balance are valid.'}
+          </Text>
         </GlassCard>
       </Animated.View>
 
@@ -224,9 +300,12 @@ export default function WalletScreen() {
 
       {billingItems.map((item, index) => (
         <Animated.View entering={enterUp(7 + index)} key={item.id}>
-          <BillingRow item={item} />
+          <BillingRow item={item} onOpenReceipt={handleOpenReceipt} receiptPending={downloadReceipt.isPending} />
         </Animated.View>
       ))}
+      {downloadReceipt.error ? (
+        <Text style={[styles.emptyCopy, { color: theme.danger }]}>{getErrorMessage(downloadReceipt.error)}</Text>
+      ) : null}
     </Screen>
   );
 }
@@ -260,6 +339,10 @@ const styles = StyleSheet.create({
   billingAmount: {
     fontFamily: fonts.bold,
     fontSize: 12,
+  },
+  billingActions: {
+    alignItems: 'flex-end',
+    gap: 6,
   },
   billingCopy: {
     flex: 1,
@@ -361,6 +444,19 @@ const styles = StyleSheet.create({
   paymentGrid: {
     gap: spacing.sm,
   },
+  receiptButton: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 5,
+    minHeight: 28,
+    paddingHorizontal: 8,
+  },
+  receiptText: {
+    fontFamily: fonts.bold,
+    fontSize: 10,
+  },
   sectionAction: {
     fontFamily: fonts.bold,
     fontSize: 12,
@@ -384,5 +480,24 @@ const styles = StyleSheet.create({
   storePayText: {
     fontFamily: fonts.bold,
     fontSize: 14,
+  },
+  usageGrid: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  usageLabel: {
+    fontFamily: fonts.semibold,
+    fontSize: 11,
+    marginTop: 3,
+  },
+  usageTile: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flex: 1,
+    padding: spacing.md,
+  },
+  usageValue: {
+    fontFamily: fonts.extraBold,
+    fontSize: 18,
   },
 });

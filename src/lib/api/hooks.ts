@@ -1,12 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { callWithMobileRefresh, trpc } from '@/lib/api/client';
+import { signInWithNativeGoogle } from '@/lib/api/google-auth';
 import type {
   BillingHistory,
+  BuilderOptions,
+  BuildTicketInput,
+  BuildTicketResult,
   CheckoutResult,
+  ConvertCodeResult,
+  DownloadReceiptResult,
   FixtureInsight,
   FixTicketResult,
   ForgotPasswordResult,
+  GenerateBookingCodeResult,
   HomeFeed,
   LeagueOption,
   MobileAuthSession,
@@ -14,13 +21,20 @@ import type {
   NotificationFeed,
   NotificationSummary,
   Plan,
+  ReferralReport,
+  ShareLinkResult,
   SubscriptionCurrent,
+  SubscriptionUsage,
   TelegramTokenResult,
   TicketDetail,
   TicketJobState,
+  TicketList,
+  TicketMatchResult,
+  TicketResult,
   UserProfile,
   VerifyPaymentResult,
 } from '@/lib/api/types';
+import type { SupportedPlatform } from '@/lib/bookmaker-platforms';
 import { signInWithMobileOAuth } from '@/lib/api/oauth';
 import { getMobileDeviceInput } from '@/lib/device';
 import { useAuthStore } from '@/store/auth-store';
@@ -32,6 +46,7 @@ const asPromise = <T>(value: Promise<unknown>) => value as Promise<T>;
 export const queryKeys = {
   activeJobs: ['ticket', 'activeJobs'] as const,
   billing: ['payment', 'billing'] as const,
+  builderOptions: (input?: unknown) => ['ticket', 'builderOptions', input] as const,
   fixtureInsight: (fixtureId?: string) => ['matchday', 'fixtureInsight', fixtureId] as const,
   homeFeed: (input?: unknown) => ['matchday', 'homeFeed', input] as const,
   leagues: (input?: unknown) => ['matchday', 'leagues', input] as const,
@@ -40,7 +55,11 @@ export const queryKeys = {
   notificationSummary: ['ticket', 'notificationSummary'] as const,
   plans: ['subscription', 'plans'] as const,
   recentActivity: ['ticket', 'recentActivity'] as const,
+  referralLookup: (code?: string) => ['referral', 'lookup', code] as const,
+  myReferral: ['referral', 'mine'] as const,
   subscription: ['subscription', 'current'] as const,
+  subscriptionUsage: ['subscription', 'usage'] as const,
+  ticketList: (input?: unknown) => ['ticket', 'list', input] as const,
   ticketStats: ['ticket', 'stats'] as const,
   ticket: (ticketId?: string | null) => ['ticket', 'detail', ticketId] as const,
 };
@@ -135,6 +154,15 @@ export function useSubscriptionCurrent() {
   });
 }
 
+export function useSubscriptionUsage() {
+  const status = useAuthStore((state) => state.status);
+  return useQuery<SubscriptionUsage>({
+    enabled: status === 'authenticated',
+    queryKey: queryKeys.subscriptionUsage,
+    queryFn: () => callWithMobileRefresh(() => asPromise<SubscriptionUsage>(trpc.subscription.getUsage.query())),
+  });
+}
+
 export function usePlans() {
   const status = useAuthStore((state) => state.status);
   return useQuery<Plan[]>({
@@ -150,6 +178,24 @@ export function useBillingHistory(limit = 20) {
     enabled: status === 'authenticated',
     queryKey: queryKeys.billing,
     queryFn: () => callWithMobileRefresh(() => asPromise<BillingHistory>(trpc.payment.getBillingHistory.query({ limit }))),
+  });
+}
+
+export function useBuilderOptions(input?: Partial<BuildTicketInput>) {
+  const status = useAuthStore((state) => state.status);
+  return useQuery<BuilderOptions>({
+    enabled: status === 'authenticated',
+    queryKey: queryKeys.builderOptions(input),
+    queryFn: () => callWithMobileRefresh(() => asPromise<BuilderOptions>(trpc.ticket.getBuilderOptions.query(input))),
+  });
+}
+
+export function useTicketList(input: { cursor?: string; limit?: number; search?: string; status?: TicketResult }) {
+  const status = useAuthStore((state) => state.status);
+  return useQuery<TicketList>({
+    enabled: status === 'authenticated',
+    queryKey: queryKeys.ticketList(input),
+    queryFn: () => callWithMobileRefresh(() => asPromise<TicketList>(trpc.ticket.list.query(input))),
   });
 }
 
@@ -203,7 +249,8 @@ export function useOAuthLoginMutation() {
   const setSession = useAuthStore((state) => state.setSession);
 
   return useMutation<MobileAuthSession, Error, MobileOAuthProvider>({
-    mutationFn: (provider) => signInWithMobileOAuth(provider),
+    mutationFn: (provider) =>
+      provider === 'google' ? signInWithNativeGoogle() : signInWithMobileOAuth(provider),
     onSuccess: async (session) => {
       await setSession(session);
       await queryClient.invalidateQueries();
@@ -322,6 +369,55 @@ export function useFixTicketMutation() {
   });
 }
 
+export function useBuildTicketMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<BuildTicketResult, Error, BuildTicketInput>({
+    mutationFn: (input: BuildTicketInput) =>
+      callWithMobileRefresh(() => asPromise<BuildTicketResult>(trpc.ticket.buildTicket.mutate(input))),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeJobs });
+    },
+  });
+}
+
+export function useConvertBookingCodeMutation() {
+  return useMutation<ConvertCodeResult, Error, { code: string; fromPlatform: SupportedPlatform; toPlatform: SupportedPlatform }>({
+    mutationFn: (input: { code: string; fromPlatform: SupportedPlatform; toPlatform: SupportedPlatform }) =>
+      callWithMobileRefresh(() => asPromise<ConvertCodeResult>(trpc.ticket.convertBookingCode.mutate(input))),
+  });
+}
+
+export function useGenerateBookingCodeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<GenerateBookingCodeResult, Error, { platform: SupportedPlatform; ticketId: string }>({
+    mutationFn: (input: { platform: SupportedPlatform; ticketId: string }) =>
+      callWithMobileRefresh(() => asPromise<GenerateBookingCodeResult>(trpc.ticket.generateBookingCode.mutate(input))),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.ticket(variables.ticketId) });
+      queryClient.invalidateQueries({ queryKey: ['ticket', 'list'] });
+    },
+  });
+}
+
+export function useCreateShareLinkMutation() {
+  return useMutation<ShareLinkResult, Error, { ticketId: string }>({
+    mutationFn: (input: { ticketId: string }) =>
+      callWithMobileRefresh(() => asPromise<ShareLinkResult>(trpc.ticket.createShareLink.mutate(input))),
+  });
+}
+
+export function useSetMatchResultMutation(ticketId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation<unknown, Error, { matchId: string; result: TicketMatchResult }>({
+    mutationFn: (input: { matchId: string; result: TicketMatchResult }) =>
+      callWithMobileRefresh(() => asPromise<unknown>(trpc.ticket.setMatchResult.mutate(input))),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.ticket(ticketId) });
+      queryClient.invalidateQueries({ queryKey: ['ticket', 'list'] });
+    },
+  });
+}
+
 export function useCreateCheckoutMutation() {
   return useMutation<CheckoutResult, Error, { durationDays: 1 | 7; returnUrl?: string }>({
     mutationFn: (input: { durationDays: 1 | 7; returnUrl?: string }) =>
@@ -333,6 +429,13 @@ export function useCreateCheckoutMutation() {
           }),
         ),
       ),
+  });
+}
+
+export function useDownloadReceiptMutation() {
+  return useMutation<DownloadReceiptResult, Error, { paymentId: string }>({
+    mutationFn: (input: { paymentId: string }) =>
+      callWithMobileRefresh(() => asPromise<DownloadReceiptResult>(trpc.payment.downloadReceipt.mutate(input))),
   });
 }
 
@@ -367,6 +470,34 @@ export function useMarkAllNotificationsReadMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
       queryClient.invalidateQueries({ queryKey: queryKeys.notificationSummary });
+    },
+  });
+}
+
+export function useMyReferral() {
+  const status = useAuthStore((state) => state.status);
+  return useQuery<ReferralReport | null>({
+    enabled: status === 'authenticated',
+    queryKey: queryKeys.myReferral,
+    queryFn: () => callWithMobileRefresh(() => asPromise<ReferralReport | null>(trpc.referral.myReferral.query())),
+  });
+}
+
+export function useReferralLookup(code?: string) {
+  const status = useAuthStore((state) => state.status);
+  return useQuery<ReferralReport | null>({
+    enabled: status === 'authenticated' && Boolean(code?.trim()),
+    queryKey: queryKeys.referralLookup(code),
+    queryFn: () => callWithMobileRefresh(() => asPromise<ReferralReport | null>(trpc.referral.lookupByCode.query({ code }))),
+  });
+}
+
+export function useGenerateReferralMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ReferralReport | null, Error, void>({
+    mutationFn: () => callWithMobileRefresh(() => asPromise<ReferralReport | null>(trpc.referral.generate.mutate())),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.myReferral });
     },
   });
 }

@@ -1,12 +1,13 @@
 import type { BottomTabBarProps } from 'expo-router/tabs';
 import { Home, Ticket, UserRound, WalletCards } from 'lucide-react-native';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useDerivedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale } from '@/components/ui/PressableScale';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
+import { fonts } from '@/theme/typography';
 
 type IconComponent = React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
 
@@ -29,10 +30,6 @@ function TabItem({
     transform: [{ scale: 0.55 + progress.value * 0.45 }],
   }));
 
-  const iconStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -1 * progress.value }],
-  }));
-
   return (
     <PressableScale
       accessibilityLabel={label}
@@ -41,10 +38,13 @@ function TabItem({
       onPress={onPress}
       scaleTo={0.9}
       style={styles.item}>
-      <Animated.View style={[styles.halo, { backgroundColor: theme.primarySoft }, haloStyle]} />
-      <Animated.View style={iconStyle}>
-        <Icon color={focused ? theme.primaryDark : theme.muted} size={21} strokeWidth={2.4} />
-      </Animated.View>
+      <View style={styles.iconSlot}>
+        <Animated.View style={[styles.halo, { backgroundColor: theme.primarySoft }, haloStyle]} />
+        <Icon color={focused ? theme.primaryDark : theme.muted} size={20} strokeWidth={2.4} />
+      </View>
+      <Text numberOfLines={1} style={[styles.label, { color: focused ? theme.primarySoft : theme.muted }]}>
+        {label}
+      </Text>
     </PressableScale>
   );
 }
@@ -71,12 +71,10 @@ export function TabBar({
           label="Home"
           onPress={() => handleNavigate('index')}
         />
-
-        {/* Tab 2: Explore */}
         <TabItem
           focused={activeRoute === 'fix-ticket'}
           icon={Ticket}
-          label="Fix Ticket"
+          label="Fix"
           onPress={() => handleNavigate('fix-ticket')}
         />
         <TabItem
@@ -103,27 +101,41 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     elevation: 12,
     flexDirection: 'row',
-        height: 56,
+    height: 68,
     justifyContent: 'space-between',
-    maxWidth: 380,
-    paddingHorizontal: spacing.sm,
+    maxWidth: 300,
+    paddingHorizontal: spacing.xs,
     shadowOffset: { height: 8, width: 0 },
     shadowOpacity: 0.18,
     shadowRadius: 18,
-    width: '100%',
+    width: '82%',
   },
   halo: {
     borderRadius: radius.pill,
-    height: 34,
+    height: 32,
+    left: 1,
     position: 'absolute',
+    top: 1,
+    width: 32,
+  },
+  iconSlot: {
+    alignItems: 'center',
+    height: 34,
+    justifyContent: 'center',
     width: 34,
   },
   item: {
     alignItems: 'center',
     borderRadius: radius.pill,
-    height: 44,
+    gap: 3,
+    height: 58,
     justifyContent: 'center',
-    width: 44,
+    width: 58,
+  },
+  label: {
+    fontFamily: fonts.extraBold,
+    fontSize: 10,
+    lineHeight: 12,
   },
   wrap: {
     alignItems: 'center',

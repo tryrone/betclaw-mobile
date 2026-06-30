@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Bell, CalendarDays, ChevronRight, Search } from 'lucide-react-native';
+import { ArrowRightLeft, Bell, Bot, CalendarDays, ChevronRight, Gift, History, Search } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -225,6 +225,40 @@ function MatchFeedCard({ match }: { match: MatchCardData }) {
   );
 }
 
+const shortcuts = [
+  { href: '/build-ticket', icon: Bot, label: 'Build', meta: 'AI slip' },
+  { href: '/convert-ticket', icon: ArrowRightLeft, label: 'Convert', meta: 'Codes' },
+  { href: '/history', icon: History, label: 'History', meta: 'Saved' },
+  { href: '/referrals', icon: Gift, label: 'Referrals', meta: 'Earn' },
+] as const;
+
+function ShortcutGrid() {
+  const router = useRouter();
+  const theme = useAppTheme();
+
+  return (
+    <View style={styles.shortcutGrid}>
+      {shortcuts.map((item) => (
+        <PressableScale
+          accessibilityLabel={item.label}
+          accessibilityRole="button"
+          key={item.href}
+          onPress={() => router.push(item.href as any)}
+          style={[styles.shortcutCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={[styles.shortcutIcon, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
+            <item.icon color={theme.primarySoft} size={17} />
+          </View>
+          <View style={styles.shortcutCopy}>
+            <Text numberOfLines={1} style={[styles.shortcutLabel, { color: theme.foregroundStrong }]}>{item.label}</Text>
+            <Text numberOfLines={1} style={[styles.shortcutMeta, { color: theme.muted }]}>{item.meta}</Text>
+          </View>
+          <ChevronRight color={theme.mutedLight} size={15} />
+        </PressableScale>
+      ))}
+    </View>
+  );
+}
+
 export default function DashboardScreen() {
   const router = useRouter();
   const theme = useAppTheme();
@@ -283,14 +317,18 @@ export default function DashboardScreen() {
       </Animated.View>
 
       <Animated.View entering={enterUp(2)}>
-        <SportPills onSelect={handleSportSelect} selected={selectedSport} />
+        <ShortcutGrid />
       </Animated.View>
 
       <Animated.View entering={enterUp(3)}>
-        <LeaguePills onSelect={setSelectedLeague} options={leagueOptions} selected={activeLeague} />
+        <SportPills onSelect={handleSportSelect} selected={selectedSport} />
       </Animated.View>
 
       <Animated.View entering={enterUp(4)}>
+        <LeaguePills onSelect={setSelectedLeague} options={leagueOptions} selected={activeLeague} />
+      </Animated.View>
+
+      <Animated.View entering={enterUp(5)}>
         {liveMatch ? (
           <LiveMatchHero match={liveMatch} />
         ) : (
@@ -305,7 +343,7 @@ export default function DashboardScreen() {
         )}
       </Animated.View>
 
-      <Animated.View entering={enterUp(5)} style={styles.sectionHeader}>
+      <Animated.View entering={enterUp(6)} style={styles.sectionHeader}>
         <View>
           <Text style={[styles.sectionTitle, { color: theme.foregroundStrong }]}>Matches</Text>
           <Text style={[styles.sectionCaption, { color: theme.muted }]}>{sectionCaption}</Text>
@@ -317,7 +355,7 @@ export default function DashboardScreen() {
       </Animated.View>
 
       {feedMatches.length === 0 ? (
-        <Animated.View entering={enterUp(6)}>
+        <Animated.View entering={enterUp(7)}>
           <GlassCard style={styles.emptyState}>
             <Text style={[styles.emptyTitle, { color: theme.foregroundStrong }]}>No fixtures found</Text>
             <Text style={[styles.emptyCopy, { color: theme.muted }]}>Switch sport or league for another slate.</Text>
@@ -326,7 +364,7 @@ export default function DashboardScreen() {
       ) : null}
 
       {feedMatches.map((match, index) => (
-        <Animated.View entering={enterUp(6 + index)} key={match.id}>
+        <Animated.View entering={enterUp(7 + index)} key={match.id}>
           <MatchFeedCard match={match} />
         </Animated.View>
       ))}
@@ -570,6 +608,43 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontFamily: fonts.extraBold,
     fontSize: 34,
+  },
+  shortcutCard: {
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexBasis: '47%',
+    flexDirection: 'row',
+    flexGrow: 1,
+    gap: spacing.sm,
+    minHeight: 62,
+    padding: spacing.sm,
+  },
+  shortcutCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  shortcutGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  shortcutIcon: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  shortcutLabel: {
+    fontFamily: fonts.extraBold,
+    fontSize: 13,
+  },
+  shortcutMeta: {
+    fontFamily: fonts.medium,
+    fontSize: 11,
+    marginTop: 2,
   },
   sectionAction: {
     fontFamily: fonts.bold,

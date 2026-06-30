@@ -1,4 +1,5 @@
 import type { MobileUser } from '@/store/auth-store';
+import type { SupportedPlatform } from '@/lib/bookmaker-platforms';
 
 export type MobileAuthSession = {
   accessToken: string;
@@ -35,13 +36,80 @@ export type LeagueOption = {
 };
 
 export type FixtureInsight = {
-  averageStats?: unknown;
-  apiFootballContext?: unknown;
-  h2h?: unknown;
+  averageStats?: {
+    away?: Record<string, number | null | undefined>;
+    home?: Record<string, number | null | undefined>;
+    referee?: Record<string, number | null | undefined>;
+  } | null;
+  apiFootballContext?: {
+    predictionSummary?: string | null;
+    standingsSummary?: string | null;
+    prediction?: {
+      awayPercent?: number | null;
+      drawPercent?: number | null;
+      homePercent?: number | null;
+    } | null;
+  } | null;
+  dataReadiness?: {
+    missingFields?: string[];
+    score?: number | null;
+    status?: string | null;
+  } | null;
+  evidence?: {
+    evidenceType?: string | null;
+    snippet?: string | null;
+    title?: string | null;
+    url?: string | null;
+  }[];
+  h2h?: {
+    awayWins?: number;
+    draws?: number;
+    homeWins?: number;
+    meetings?: {
+      awayScore?: number | null;
+      awayTeam?: string | null;
+      date?: string | Date | null;
+      homeScore?: number | null;
+      homeTeam?: string | null;
+      winnerForCurrentFixture?: 'home' | 'away' | 'draw' | null;
+    }[];
+    sampleSize?: number;
+    summary?: string | null;
+  } | null;
+  providerLinks?: { fetchedAt?: string | Date | null; provider?: string | null }[];
+  recentMatches?: {
+    away?: RecentMatchTeam | null;
+    home?: RecentMatchTeam | null;
+  } | null;
   recommendation?: {
     label?: string | null;
     summary?: string | null;
   } | null;
+  sourceCoverage?: Record<string, unknown> | null;
+  standings?: {
+    away?: StandingsRow[];
+    home?: StandingsRow[];
+  } | null;
+};
+
+export type RecentMatchTeam = {
+  matches?: {
+    awayScore?: number | null;
+    awayTeam?: string | null;
+    date?: string | Date | null;
+    homeScore?: number | null;
+    homeTeam?: string | null;
+    result?: string | null;
+  }[];
+  summary?: string | null;
+};
+
+export type StandingsRow = {
+  all?: { draw?: number | null; lose?: number | null; played?: number | null; win?: number | null };
+  description?: string | null;
+  points?: number | null;
+  rank?: number | null;
+  team?: { id?: number | null; name?: string | null };
 };
 
 export type NotificationSummary = {
@@ -64,8 +132,26 @@ export type NotificationFeed = {
 
 export type SubscriptionCurrent = {
   accessTier?: string;
+  isPremiumExhausted?: boolean;
   isBelowMinimumTokenBalance?: boolean;
   minimumActiveResearchTokens?: number;
+  researchTokensRemaining?: number;
+};
+
+export type SubscriptionUsage = {
+  accessDurationDays?: number | null;
+  accessTier?: string;
+  creditsRemaining?: number;
+  creditsUsed?: number;
+  creditsPerMonth?: number;
+  expiresAt?: string | Date | null;
+  isBelowMinimumTokenBalance?: boolean;
+  isPremiumExhausted?: boolean;
+  minimumActiveResearchTokens?: number;
+  percentUsed?: number;
+  premiumPreviewRemaining?: number;
+  requestsRemaining?: number;
+  requestsUsed?: number;
   researchTokensRemaining?: number;
 };
 
@@ -90,6 +176,8 @@ export type BillingHistory = {
     currency?: string;
     description?: string | null;
     id: string;
+    providerReference?: string | null;
+    receiptUrl?: string | null;
     status: string;
   }[];
   nextCursor?: string | null;
@@ -108,21 +196,112 @@ export type TicketJobState =
     };
 
 export type TicketDetail = {
+  avgConfidence?: number | null;
+  bookingCode?: string | null;
+  createdAt?: string | Date;
   id: string;
   matches: {
     awayTeam: string;
+    citations?: { snippet?: string | null; title?: string | null; url: string }[] | null;
     confidence?: number | null;
+    confidenceReason?: string | null;
+    dataReadiness?: { missingFields?: string[]; score?: number; status?: string } | null;
+    fixtureId?: string | null;
+    h2hSummary?: string | null;
     homeTeam: string;
     id: string;
+    keyFactors?: string | null;
+    matchResult?: TicketMatchResult;
     market: string;
+    odds?: number | null;
+    platformEventId?: string | null;
     reason?: string | null;
     selectionReason?: string | null;
+    selectionLabel?: string | null;
+    selectionTeam?: string | null;
     status: string;
   }[];
+  optimizedOdds?: number | null;
+  originalCode?: string | null;
+  originalOdds?: number | null;
+  result?: TicketResult;
+  shareToken?: string | null;
+};
+
+export type TicketResult = 'WON' | 'LOST' | 'PENDING';
+export type TicketMatchResult = 'WON' | 'LOST' | 'VOID' | 'PENDING';
+
+export type TicketList = {
+  items: TicketDetail[];
+  nextCursor?: string | null;
 };
 
 export type FixTicketResult = {
   jobId: string;
+};
+
+export type BuildTicketInput = {
+  date?: string;
+  fixtureWindowDays?: 1 | 7 | 30;
+  gameCount?: number;
+  leagueKeys?: string[];
+  marketPresetIds?: string[];
+  notes?: string;
+  oddsProfile?: 'SAFE' | 'BALANCED' | 'VALUE';
+  prompt?: string;
+  targetTotalOdds?: number;
+  timeWindow?: 'all_day' | 'early' | 'afternoon' | 'late';
+  useRecommendedLeagues?: boolean;
+};
+
+export type BuilderOptions = {
+  defaults?: Partial<BuildTicketInput>;
+  leagues: {
+    country?: string | null;
+    fixtureCount?: number;
+    key: string;
+    league?: string;
+    name?: string;
+    recommended?: boolean;
+  }[];
+  marketPresets: {
+    description?: string;
+    fixtureCount?: number;
+    id: string;
+    label: string;
+  }[];
+  recommendedLeagueKeys?: string[];
+};
+
+export type BuildTicketResult = {
+  jobId: string;
+};
+
+export type ConvertCodeResult = {
+  convertedCode?: string | null;
+  destinationPlatform?: string;
+  error?: string;
+  sourcePlatform?: string;
+  success: boolean;
+};
+
+export type GenerateBookingCodeResult = {
+  bookingCode: string | null;
+  canRegenerate?: boolean;
+  error?: string;
+  platform: SupportedPlatform;
+  previewUrl?: string;
+  regenerationError?: string;
+  shareSource?: string;
+  success: boolean;
+};
+
+export type ShareLinkResult = {
+  previewUrl: string;
+};
+
+export type DownloadReceiptResult = {
+  receiptUrl?: string | null;
 };
 
 export type CheckoutResult = {
@@ -139,6 +318,31 @@ export type VerifyPaymentResult = {
   reference: string;
   status: string;
   tier?: string | null;
+};
+
+export type ReferralReport = {
+  commissionRate: number;
+  partner: {
+    code: string;
+    isActive?: boolean;
+    name: string;
+  };
+  referrals: {
+    earnings: number;
+    firstPaidAt?: string | Date | null;
+    firstPaymentRevenue?: number;
+    id: string;
+    signedUpAt: string | Date;
+    status: 'qualified' | 'pending';
+    user: { email: string; name: string };
+  }[];
+  stats: {
+    earnings: number;
+    firstPaymentRevenue: number;
+    pendingSignups: number;
+    qualifiedSignups: number;
+    totalSignups: number;
+  };
 };
 
 export type ForgotPasswordResult = {

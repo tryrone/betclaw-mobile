@@ -1,5 +1,4 @@
 import { createTRPCClient, httpBatchLink, TRPCClientError } from '@trpc/client';
-import superjson from 'superjson';
 
 import { apiBaseUrl } from '@/lib/config';
 import { getMobileDeviceInput } from '@/lib/device';
@@ -8,7 +7,6 @@ import { useAuthStore } from '@/store/auth-store';
 export const trpc = createTRPCClient<any>({
   links: [
     httpBatchLink({
-      transformer: superjson,
       url: `${apiBaseUrl}/api/trpc`,
       headers() {
         const token = useAuthStore.getState().accessToken;

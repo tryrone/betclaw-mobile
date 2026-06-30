@@ -6,16 +6,19 @@ import { fonts } from '@/theme/typography';
 export function ScreenHeader({
   action,
   eyebrow,
+  leadingAction,
   title,
 }: {
   action?: React.ReactNode;
   eyebrow: string;
+  leadingAction?: React.ReactNode;
   title: string;
 }) {
   const theme = useAppTheme();
 
   return (
     <View style={styles.row}>
+      {leadingAction}
       <View style={styles.copy}>
         <Text style={[styles.eyebrow, { color: theme.muted }]}>{eyebrow}</Text>
         <Text numberOfLines={1} style={[styles.title, { color: theme.foregroundStrong }]}>
