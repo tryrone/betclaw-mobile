@@ -399,6 +399,11 @@ export type TicketDetail = {
   createdAt?: string | Date;
   id: string;
   matches: {
+    alternativeConfidence?: number | null;
+    alternativeMarket?: string | null;
+    alternativeOdds?: number | null;
+    alternativeReason?: string | null;
+    awayForm?: string | null;
     awayTeam: string;
     citations?: { snippet?: string | null; title?: string | null; url: string }[] | null;
     confidence?: number | null;
@@ -406,6 +411,7 @@ export type TicketDetail = {
     dataReadiness?: { missingFields?: string[]; score?: number; status?: string } | null;
     fixtureId?: string | null;
     h2hSummary?: string | null;
+    homeForm?: string | null;
     homeTeam: string;
     id: string;
     keyFactors?: string | null;

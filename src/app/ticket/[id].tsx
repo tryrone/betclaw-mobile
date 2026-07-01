@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Copy, ExternalLink, Share2, ShieldCheck, Trophy } from 'lucide-react-native';
+import { ArrowLeft, ChevronRight, Copy, ExternalLink, PencilLine, Share2, ShieldCheck, Sparkles, Trophy } from 'lucide-react-native';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -23,12 +23,18 @@ const resultActions: { label: string; value: TicketMatchResult }[] = [
   { label: 'Pending', value: 'PENDING' },
   { label: 'Won', value: 'WON' },
   { label: 'Lost', value: 'LOST' },
+  { label: 'Void', value: 'VOID' },
 ];
 
 function matchTone(status?: string) {
   if (status === 'KEPT') return 'success' as const;
   if (status === 'REMOVED') return 'danger' as const;
   return 'neutral' as const;
+}
+
+function matchStatusLabel(status?: string) {
+  if (status === 'NO_BET') return 'Not picked';
+  return status ?? 'Match';
 }
 
 function resultTone(result?: string | null) {
@@ -72,19 +78,40 @@ function MatchDetailRow({
   match: any;
   onSetResult: (matchId: string, result: TicketMatchResult) => void;
 }) {
+  const router = useRouter();
   const theme = useAppTheme();
   const confidence = Math.round(match.confidence ?? 0);
+  const canOpenMatch = Boolean(match.fixtureId);
   const evidence = [
     match.selectionReason,
     match.confidenceReason,
-    match.h2hSummary,
     match.keyFactors,
     match.reason,
   ].filter(Boolean);
+  const readiness = match.dataReadiness;
+  const labeledInsights = [
+    match.homeForm ? { label: 'Home form', value: String(match.homeForm) } : null,
+    match.awayForm ? { label: 'Away form', value: String(match.awayForm) } : null,
+    match.h2hSummary ? { label: 'H2H', value: String(match.h2hSummary).replace(/^H2H:\s*/i, '') } : null,
+    readiness?.status
+      ? { label: 'Data readiness', value: `${readiness.status}${typeof readiness.score === 'number' ? ` (${Math.round(readiness.score)}%)` : ''}` }
+      : null,
+  ].filter((line): line is { label: string; value: string } => Boolean(line));
+
+  const openMatch = () => {
+    if (!match.fixtureId) return;
+    router.push(`/match/${match.fixtureId}` as any);
+  };
 
   return (
     <GlassCard style={styles.matchCard}>
-      <View style={styles.matchTop}>
+      <PressableScale
+        accessibilityHint={canOpenMatch ? 'Opens the match detail page' : undefined}
+        accessibilityLabel={`${match.homeTeam} vs ${match.awayTeam}`}
+        accessibilityRole="button"
+        onPress={canOpenMatch ? openMatch : undefined}
+        scaleTo={canOpenMatch ? 0.98 : 1}
+        style={styles.matchTop}>
         <View style={styles.matchCopy}>
           <Text numberOfLines={1} style={[styles.matchTeams, { color: theme.foregroundStrong }]}>
             {match.homeTeam} vs {match.awayTeam}
@@ -93,8 +120,9 @@ function MatchDetailRow({
             {match.selectionLabel ?? match.market}
           </Text>
         </View>
-        <StatusBadge label={match.status ?? 'Match'} tone={matchTone(match.status)} />
-      </View>
+        <StatusBadge label={matchStatusLabel(match.status)} tone={matchTone(match.status)} />
+        {canOpenMatch ? <ChevronRight color={theme.mutedLight} size={16} /> : null}
+      </PressableScale>
 
       <View style={styles.metricRow}>
         <Text style={[styles.metric, { color: theme.primarySoft }]}>Odds {Number(match.odds ?? 0).toFixed(2)}</Text>
@@ -109,6 +137,34 @@ function MatchDetailRow({
           <Text style={[styles.evidenceText, { color: theme.mutedLight }]}>{String(item)}</Text>
         </View>
       ))}
+
+      {match.alternativeMarket && match.alternativeReason ? (
+        <View style={[styles.altBlock, { backgroundColor: theme.warningSoft, borderColor: theme.warningSoft }]}>
+          <View style={styles.altHeader}>
+            <Sparkles color={theme.warning} size={13} />
+            <Text style={[styles.altTitle, { color: theme.warning }]}>Better researched angle</Text>
+            {typeof match.alternativeConfidence === 'number' ? (
+              <Text style={[styles.altMeta, { color: theme.warning }]}>{Math.round(match.alternativeConfidence)}%</Text>
+            ) : null}
+            {typeof match.alternativeOdds === 'number' ? (
+              <Text style={[styles.altMeta, { color: theme.warning }]}>Odds {match.alternativeOdds.toFixed(2)}</Text>
+            ) : null}
+          </View>
+          <Text style={[styles.altMarket, { color: theme.foregroundStrong }]}>{match.alternativeMarket}</Text>
+          <Text style={[styles.altReason, { color: theme.mutedLight }]}>{match.alternativeReason}</Text>
+        </View>
+      ) : null}
+
+      {labeledInsights.length > 0 ? (
+        <View style={[styles.insightBox, { backgroundColor: theme.field, borderColor: theme.border }]}>
+          {labeledInsights.map((line) => (
+            <Text key={line.label} style={[styles.insightLine, { color: theme.mutedLight }]}>
+              <Text style={[styles.insightLabel, { color: theme.muted }]}>{line.label}: </Text>
+              {line.value}
+            </Text>
+          ))}
+        </View>
+      ) : null}
 
       {Array.isArray(match.citations) && match.citations.length > 0 ? (
         <View style={styles.citationList}>
@@ -164,6 +220,7 @@ export default function TicketDetailScreen() {
   const setMatchResult = useSetMatchResultMutation(ticketId);
   const [platform, setPlatform] = useState<SupportedPlatform>(DEFAULT_BOOKMAKER_PLATFORM);
   const [message, setMessage] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const data = ticket.data;
   const kept = data?.matches?.filter((match) => match.status === 'KEPT').length ?? 0;
   const total = data?.matches?.length ?? 0;
@@ -178,11 +235,21 @@ export default function TicketDetailScreen() {
     if (!ticketId || createShareLink.isPending) return;
     try {
       const result = await createShareLink.mutateAsync({ ticketId });
+      setPreviewUrl(result.previewUrl);
       await copyOrShareText(result.previewUrl, 'BetClaw ticket');
       setMessage('Share link ready');
     } catch {
       setMessage('Could not create share link');
     }
+  };
+
+  const handleEditAgain = () => {
+    const code = data?.originalCode ?? data?.bookingCode;
+    if (!code) {
+      setMessage('No booking code available to edit');
+      return;
+    }
+    router.push({ pathname: '/(tabs)/fix-ticket', params: { code } } as any);
   };
 
   const handleCopyCode = async (code?: string | null) => {
@@ -242,8 +309,12 @@ export default function TicketDetailScreen() {
                   <Text style={[styles.tileLabel, { color: theme.muted }]}>Avg conf.</Text>
                 </View>
                 <View style={[styles.metricTile, { backgroundColor: theme.field, borderColor: theme.border }]}>
+                  <Text style={[styles.tileValue, { color: theme.mutedLight }]}>{data.originalOdds?.toFixed(2) ?? '-'}</Text>
+                  <Text style={[styles.tileLabel, { color: theme.muted }]}>Original</Text>
+                </View>
+                <View style={[styles.metricTile, { backgroundColor: theme.field, borderColor: theme.border }]}>
                   <Text style={[styles.tileValue, { color: theme.foregroundStrong }]}>{data.optimizedOdds?.toFixed(2) ?? '-'}</Text>
-                  <Text style={[styles.tileLabel, { color: theme.muted }]}>Odds</Text>
+                  <Text style={[styles.tileLabel, { color: theme.muted }]}>Optimized</Text>
                 </View>
               </View>
             </GlassCard>
@@ -274,7 +345,17 @@ export default function TicketDetailScreen() {
                   <Share2 color={theme.primarySoft} size={16} />
                   <Text style={[styles.actionText, { color: theme.foreground }]}>{createShareLink.isPending ? 'Sharing...' : 'Share'}</Text>
                 </PressableScale>
+                <PressableScale accessibilityLabel="Edit ticket again" accessibilityRole="button" onPress={handleEditAgain} style={[styles.actionButton, { backgroundColor: theme.field, borderColor: theme.border }]}>
+                  <PencilLine color={theme.primarySoft} size={16} />
+                  <Text style={[styles.actionText, { color: theme.foreground }]}>Edit again</Text>
+                </PressableScale>
               </View>
+              {previewUrl ? (
+                <PressableScale accessibilityLabel="Open share preview" accessibilityRole="link" onPress={() => void openExternalUrl(previewUrl)} style={[styles.codeBox, { backgroundColor: theme.field, borderColor: theme.border }]}>
+                  <ExternalLink color={theme.primarySoft} size={15} />
+                  <Text numberOfLines={1} style={[styles.previewText, { color: theme.foreground }]}>Open share preview</Text>
+                </PressableScale>
+              ) : null}
               {generateCode.data?.bookingCode ? (
                 <PressableScale accessibilityLabel="Copy booking code" accessibilityRole="button" onPress={() => handleCopyCode(generateCode.data?.bookingCode)} style={[styles.codeBox, { backgroundColor: theme.field, borderColor: theme.selectionBorder }]}>
                   <Text style={[styles.codeText, { color: theme.primarySoft }]}>{generateCode.data.bookingCode}</Text>
@@ -321,6 +402,37 @@ const styles = StyleSheet.create({
   actionText: {
     fontFamily: fonts.bold,
     fontSize: 12,
+  },
+  altBlock: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: 4,
+    padding: spacing.md,
+  },
+  altHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  altMarket: {
+    fontFamily: fonts.bold,
+    fontSize: 12,
+  },
+  altMeta: {
+    fontFamily: fonts.bold,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+  },
+  altReason: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  altTitle: {
+    fontFamily: fonts.bold,
+    fontSize: 11,
+    textTransform: 'uppercase',
   },
   cardHeader: {
     alignItems: 'center',
@@ -399,6 +511,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
+  insightBox: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: 4,
+    padding: spacing.md,
+  },
+  insightLabel: {
+    fontFamily: fonts.bold,
+    fontSize: 11,
+    textTransform: 'uppercase',
+  },
+  insightLine: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    lineHeight: 18,
+  },
   matchCard: {
     gap: spacing.sm,
   },
@@ -459,6 +587,11 @@ const styles = StyleSheet.create({
   platformText: {
     fontFamily: fonts.bold,
     fontSize: 12,
+  },
+  previewText: {
+    flex: 1,
+    fontFamily: fonts.semibold,
+    fontSize: 13,
   },
   resultButton: {
     alignItems: 'center',

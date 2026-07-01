@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from 'expo-router';
 import { Check, Clock3, Copy, SlidersHorizontal, Target, Wand2 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -91,8 +92,17 @@ function TicketRow({ row }: { row: TicketRowData }) {
 }
 
 export default function FixTicketScreen() {
+  const params = useLocalSearchParams<{ code?: string }>();
   const [bookingCode, setBookingCode] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
+
+  // Adjust state when the route param changes (React "derived state" pattern).
+  const seededCode = Array.isArray(params.code) ? params.code[0] : params.code;
+  const [appliedSeed, setAppliedSeed] = useState<string | undefined>();
+  if (seededCode && seededCode !== appliedSeed) {
+    setAppliedSeed(seededCode);
+    setBookingCode(seededCode);
+  }
   const [risk, setRisk] = useState('Balanced');
   const theme = useAppTheme();
   const fixTicket = useFixTicketMutation();

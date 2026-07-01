@@ -662,6 +662,9 @@ function MatchHero({
         <HeroMetaPill icon={CalendarDays} label={match.date} tone="accent" />
         <HeroMetaPill icon={Clock3} label={match.time} />
         <HeroMetaPill icon={MapPin} label={match.venue} />
+        {insight?.apiFootballContext?.standingsSummary ? (
+          <HeroMetaPill icon={Trophy} label={insight.apiFootballContext.standingsSummary} />
+        ) : null}
       </View>
     </GlassCard>
   );
@@ -703,7 +706,34 @@ function resultLetter(value?: string | null) {
   return letter === 'W' || letter === 'D' || letter === 'L' ? letter : null;
 }
 
-function RecentMatchRows({ rows }: { rows: NonNullable<RecentMatchTeam['matches']> }) {
+function formTally(rows: NonNullable<RecentMatchTeam['matches']>) {
+  let wins = 0;
+  let draws = 0;
+  let losses = 0;
+  rows.forEach((row) => {
+    const letter = resultLetter(row.result);
+    if (letter === 'W') wins += 1;
+    else if (letter === 'D') draws += 1;
+    else if (letter === 'L') losses += 1;
+  });
+  return `${wins}W ${draws}D ${losses}L`;
+}
+
+function ProbabilityBar({ label, value }: { label: string; value: number }) {
+  const theme = useAppTheme();
+  const clamped = Math.min(100, Math.max(0, value));
+  return (
+    <View style={styles.probRow}>
+      <Text numberOfLines={1} style={[styles.probLabel, { color: theme.mutedLight }]}>{label}</Text>
+      <View style={[styles.probTrack, { backgroundColor: theme.statTrack }]}>
+        <View style={[styles.probFill, { backgroundColor: theme.primary, width: `${clamped}%` as DimensionValue }]} />
+      </View>
+      <Text style={[styles.probValue, { color: theme.foregroundStrong }]}>{Math.round(value)}%</Text>
+    </View>
+  );
+}
+
+function RecentMatchRows({ accent, rows }: { accent?: string; rows: NonNullable<RecentMatchTeam['matches']> }) {
   const theme = useAppTheme();
   return (
     <View style={styles.recentList}>
@@ -711,7 +741,13 @@ function RecentMatchRows({ rows }: { rows: NonNullable<RecentMatchTeam['matches'
         const letter = resultLetter(row.result);
         const color = letter === 'W' ? theme.success : letter === 'D' ? theme.warning : letter === 'L' ? theme.danger : theme.muted;
         return (
-          <View key={`${row.date ?? index}-${index}`} style={[styles.recentRow, { borderColor: theme.border }]}>
+          <View
+            key={`${row.date ?? index}-${index}`}
+            style={[
+              styles.recentRow,
+              { borderColor: theme.border },
+              accent ? { borderLeftColor: accent, borderLeftWidth: 3, paddingLeft: spacing.sm } : null,
+            ]}>
             <Text style={[styles.recentDate, { color: theme.muted }]}>{row.date ? formatDate(row.date) : '--'}</Text>
             <Text numberOfLines={1} style={[styles.recentTeams, { color: theme.foreground }]}>
               {row.homeTeam ?? 'Home'} <Text style={{ color: theme.foregroundStrong }}>{row.homeScore ?? '-'}–{row.awayScore ?? '-'}</Text> {row.awayTeam ?? 'Away'}
@@ -726,28 +762,57 @@ function RecentMatchRows({ rows }: { rows: NonNullable<RecentMatchTeam['matches'
   );
 }
 
-function StandingsMiniTable({ highlightTeams, rows }: { highlightTeams: string[]; rows: StandingsRow[] }) {
+function miniForm(value?: string | null) {
+  return (value ?? '').replace(/[^WDL]/gi, '').toUpperCase().slice(-3).split('');
+}
+
+function StandingsMiniTable({ highlightTeams, rows, title }: { highlightTeams: string[]; rows: StandingsRow[]; title?: string }) {
   const theme = useAppTheme();
   const highlights = highlightTeams.map((team) => team.toLowerCase());
   return (
     <View style={styles.standingsTable}>
+      {title ? <Text style={[styles.standingsTitle, { color: theme.muted }]}>{title}</Text> : null}
       <View style={styles.standingsHeadRow}>
         <Text style={[styles.standingsRank, styles.standingsHead, { color: theme.muted }]}>#</Text>
         <Text style={[styles.standingsTeam, styles.standingsHead, { color: theme.muted }]}>Team</Text>
         <Text style={[styles.standingsNum, styles.standingsHead, { color: theme.muted }]}>P</Text>
+        <Text style={[styles.standingsWdl, styles.standingsHead, { color: theme.muted }]}>W-D-L</Text>
         <Text style={[styles.standingsNum, styles.standingsHead, { color: theme.muted }]}>Pts</Text>
+        <Text style={[styles.standingsFormCol, styles.standingsHead, { color: theme.muted }]}>Form</Text>
       </View>
       {rows.map((row, index) => {
         const name = row.teamName ?? row.team?.name ?? '--';
         const active = highlights.some((team) => name.toLowerCase().includes(team) || team.includes(name.toLowerCase()));
+        const record = row.all ? `${row.all.win ?? '-'}-${row.all.draw ?? '-'}-${row.all.lose ?? '-'}` : '-';
+        const formLetters = miniForm(row.form);
         return (
           <View
             key={`${name}-${index}`}
             style={[styles.standingsRow, active ? { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder } : { borderColor: 'transparent' }]}>
             <Text style={[styles.standingsRank, { color: theme.muted }]}>{row.rank ?? '-'}</Text>
-            <Text numberOfLines={1} style={[styles.standingsTeam, { color: active ? theme.primary : theme.foreground }]}>{name}</Text>
+            <View style={styles.standingsTeamCell}>
+              {row.description ? <View style={[styles.standingsDot, { backgroundColor: theme.primary }]} /> : null}
+              <Text numberOfLines={1} style={[styles.standingsTeam, { color: active ? theme.primary : theme.foreground }]}>{name}</Text>
+            </View>
             <Text style={[styles.standingsNum, { color: theme.mutedLight }]}>{row.played ?? row.all?.played ?? '-'}</Text>
+            <Text style={[styles.standingsWdl, { color: theme.mutedLight }]}>{record}</Text>
             <Text style={[styles.standingsNum, { color: theme.foregroundStrong }]}>{row.points ?? '-'}</Text>
+            <View style={styles.standingsFormCol}>
+              {formLetters.length > 0 ? (
+                formLetters.map((letter, letterIndex) => (
+                  <Text
+                    key={`${letter}-${letterIndex}`}
+                    style={[
+                      styles.standingsFormLetter,
+                      { color: letter === 'W' ? theme.success : letter === 'D' ? theme.warning : theme.danger },
+                    ]}>
+                    {letter}
+                  </Text>
+                ))
+              ) : (
+                <Text style={[styles.standingsFormLetter, { color: theme.muted }]}>-</Text>
+              )}
+            </View>
           </View>
         );
       })}
@@ -768,6 +833,7 @@ function OverviewSection({
   homeStandings,
   match,
   predictionItems,
+  probabilities,
 }: {
   awayForm: string[];
   awayRecentMatches?: RecentMatchTeam | null;
@@ -775,12 +841,14 @@ function OverviewSection({
   awayStandings?: StandingsRow[];
   displayStatus: string;
   h2h?: FixtureInsight['h2h'];
+
   homeForm: string[];
   homeRecentMatches?: RecentMatchTeam | null;
   homeStanding?: StandingsRow;
   homeStandings?: StandingsRow[];
   match: MatchCardData;
   predictionItems: string[];
+  probabilities: { label: string; value: number }[];
 }) {
   const theme = useAppTheme();
   const h2hSample = h2h?.sampleSize ?? 0;
@@ -788,7 +856,7 @@ function OverviewSection({
   const homePct = ((h2h?.homeWins ?? 0) / total) * 100;
   const drawPct = ((h2h?.draws ?? 0) / total) * 100;
   const awayPct = ((h2h?.awayWins ?? 0) / total) * 100;
-  const meetings = (h2h?.meetings ?? []).slice(0, 5);
+  const meetings = (h2h?.meetings ?? []).slice(0, 10);
   const homeRecentRows = (homeRecentMatches?.matches ?? []).slice(0, 5);
   const awayRecentRows = (awayRecentMatches?.matches ?? []).slice(0, 5);
   const homeTable = (homeStandings ?? []).slice(0, 6);
@@ -806,6 +874,14 @@ function OverviewSection({
           <MetricTile label="Status" tone={match.status === 'Live' ? 'warning' : 'accent'} value={displayStatus} />
           <MetricTile label="Venue" value={match.venue} />
         </View>
+        {probabilities.length > 0 ? (
+          <View style={styles.probList}>
+            <Text style={[styles.probHeading, { color: theme.muted }]}>Provider outcome probabilities</Text>
+            {probabilities.map((item) => (
+              <ProbabilityBar key={item.label} label={item.label} value={item.value} />
+            ))}
+          </View>
+        ) : null}
       </GlassCard>
 
       <GlassCard style={styles.listCard}>
@@ -825,9 +901,9 @@ function OverviewSection({
       <GlassCard style={styles.listCard}>
         <SectionHeader icon={Trophy} title="Head to head and table" />
         <View style={styles.h2hBarHeader}>
-          <Text numberOfLines={1} style={[styles.h2hLabel, { color: theme.primary }]}>{match.home}</Text>
+          <Text numberOfLines={1} style={[styles.h2hLabel, { color: theme.primary }]}>{match.home} ({h2h?.homeWins ?? 0}W)</Text>
           <Text style={[styles.h2hLabel, { color: theme.warning }]}>{h2h?.draws ?? 0}D</Text>
-          <Text numberOfLines={1} style={[styles.h2hLabel, styles.h2hAwayLabel, { color: theme.accent }]}>{match.away}</Text>
+          <Text numberOfLines={1} style={[styles.h2hLabel, styles.h2hAwayLabel, { color: theme.accent }]}>({h2h?.awayWins ?? 0}W) {match.away}</Text>
         </View>
         <View style={[styles.h2hTrack, { backgroundColor: theme.statTrack }]}>
           <View style={[styles.h2hSegment, { backgroundColor: theme.primary, width: `${homePct}%` as DimensionValue }]} />
@@ -852,6 +928,9 @@ function OverviewSection({
                 </View>
               );
             })}
+            <Text style={[styles.mutedLine, { color: theme.muted }]}>
+              Showing {meetings.length} of {Math.max(h2hSample, meetings.length)} meetings
+            </Text>
           </View>
         ) : null}
       </GlassCard>
@@ -861,10 +940,11 @@ function OverviewSection({
         <View style={styles.formBlock}>
           <View style={styles.formTeamRow}>
             <Text numberOfLines={1} style={[styles.formTeamName, { color: theme.primary }]}>{match.home}</Text>
-            <FormPills values={homeForm} alignRight />
+            {homeRecentRows.length > 0 ? <Text style={[styles.formTally, { color: theme.mutedLight }]}>{formTally(homeRecentRows)}</Text> : null}
           </View>
+          <FormPills values={homeForm} />
           {homeRecentRows.length > 0 ? (
-            <RecentMatchRows rows={homeRecentRows} />
+            <RecentMatchRows accent={theme.primary} rows={homeRecentRows} />
           ) : (
             <Text style={[styles.emptyText, { color: theme.muted }]}>Recent matches pending for {match.home}.</Text>
           )}
@@ -873,10 +953,11 @@ function OverviewSection({
         <View style={styles.formBlock}>
           <View style={styles.formTeamRow}>
             <Text numberOfLines={1} style={[styles.formTeamName, { color: theme.accent }]}>{match.away}</Text>
-            <FormPills values={awayForm} alignRight />
+            {awayRecentRows.length > 0 ? <Text style={[styles.formTally, { color: theme.mutedLight }]}>{formTally(awayRecentRows)}</Text> : null}
           </View>
+          <FormPills values={awayForm} />
           {awayRecentRows.length > 0 ? (
-            <RecentMatchRows rows={awayRecentRows} />
+            <RecentMatchRows accent={theme.accent} rows={awayRecentRows} />
           ) : (
             <Text style={[styles.emptyText, { color: theme.muted }]}>Recent matches pending for {match.away}.</Text>
           )}
@@ -890,11 +971,11 @@ function OverviewSection({
             <StandingsMiniTable highlightTeams={[match.home, match.away]} rows={homeTable} />
           ) : (
             <>
-              {homeTable.length > 0 ? <StandingsMiniTable highlightTeams={[match.home]} rows={homeTable} /> : null}
+              {homeTable.length > 0 ? <StandingsMiniTable highlightTeams={[match.home]} rows={homeTable} title={`${match.home} group`} /> : null}
               {awayTable.length > 0 ? (
                 <>
                   <View style={[styles.formDivider, { backgroundColor: theme.border }]} />
-                  <StandingsMiniTable highlightTeams={[match.away]} rows={awayTable} />
+                  <StandingsMiniTable highlightTeams={[match.away]} rows={awayTable} title={`${match.away} group`} />
                 </>
               ) : null}
             </>
@@ -968,7 +1049,12 @@ function LineupsSection({
       <GlassCard style={styles.listCard}>
         <View style={styles.lineupHeader}>
           <SectionHeader icon={Users} title="Lineups" />
-          <StatusBadge label={players?.lineupStatus ?? (players?.hasLineups ? 'Available' : 'Pending')} tone={players?.hasLineups ? 'success' : 'neutral'} />
+          <View style={styles.headerBadges}>
+            <StatusBadge label={players?.lineupStatus ?? (players?.hasLineups ? 'Available' : 'Pending')} tone={players?.hasLineups ? 'success' : 'neutral'} />
+            {players?.lineupUnavailableCount ? (
+              <StatusBadge label={`${players.lineupUnavailableCount} unavailable`} tone="warning" />
+            ) : null}
+          </View>
         </View>
         <View style={[styles.teamSwitch, { backgroundColor: theme.cardMuted, borderColor: theme.border }]}>
           {(['home', 'away'] as const).map((side) => {
@@ -997,7 +1083,18 @@ function LineupsSection({
           <SectionHeader icon={Sparkles} title="Players to watch" />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.playerRail}>
             {keyPlayers.slice(0, 12).map((player, index) => (
-              <View key={`${player.name}-${index}`} style={[styles.playerCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View
+                key={`${player.name}-${index}`}
+                style={[
+                  styles.playerCard,
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.border,
+                    borderTopColor: player.team === 'away' ? theme.accent : theme.primary,
+                    borderTopWidth: 2,
+                  },
+                ]}>
+                <TeamLogo logoUrl={player.photoUrl} name={player.name} size={40} />
                 <Text numberOfLines={1} style={[styles.playerCardName, { color: theme.foregroundStrong }]}>{player.name}</Text>
                 <Text numberOfLines={1} style={[styles.playerCardMeta, { color: theme.muted }]}>{player.position ?? player.role ?? player.team ?? 'Player'}</Text>
                 {player.statLine ? <Text numberOfLines={2} style={[styles.playerCardStat, { color: theme.primary }]}>{player.statLine}</Text> : null}
@@ -1168,6 +1265,12 @@ export default function MatchDetailScreen() {
   const live = isLiveMatch(match, fixtureInsight);
   const headerTitle = live ? 'Live Match' : isFinished(fixtureInsight) ? 'Match Recap' : 'Match Details';
   const ctaLabel = live ? 'Watch Live' : 'Open Match Center';
+  const apiPrediction = fixtureInsight?.apiFootballContext?.prediction ?? null;
+  const probabilities = [
+    { label: match.home, value: apiPrediction?.homePercent ?? null },
+    { label: 'Draw', value: apiPrediction?.drawPercent ?? null },
+    { label: match.away, value: apiPrediction?.awayPercent ?? null },
+  ].filter((item): item is { label: string; value: number } => typeof item.value === 'number');
 
   return (
     <Screen>
@@ -1227,6 +1330,7 @@ export default function MatchDetailScreen() {
           homeStandings={fixtureInsight?.standings?.home}
           match={match}
           predictionItems={predictionItems}
+          probabilities={probabilities}
         />
       ) : null}
 
@@ -1398,6 +1502,11 @@ const styles = StyleSheet.create({
   },
   formRowRight: {
     justifyContent: 'flex-end',
+  },
+  formTally: {
+    fontFamily: fonts.bold,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
   },
   formTeamName: {
     flex: 1,
@@ -1745,6 +1854,43 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingRight: spacing.md,
   },
+  probFill: {
+    borderRadius: radius.pill,
+    height: '100%',
+  },
+  probHeading: {
+    fontFamily: fonts.bold,
+    fontSize: 10,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  probLabel: {
+    fontFamily: fonts.semibold,
+    fontSize: 11,
+    width: 82,
+  },
+  probList: {
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  probRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  probTrack: {
+    borderRadius: radius.pill,
+    flex: 1,
+    height: 6,
+    overflow: 'hidden',
+  },
+  probValue: {
+    fontFamily: fonts.extraBold,
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
+    textAlign: 'right',
+    width: 38,
+  },
   providerDate: {
     fontFamily: fonts.medium,
     fontSize: 10,
@@ -1903,6 +2049,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textTransform: 'uppercase',
   },
+  standingsDot: {
+    borderRadius: radius.pill,
+    height: 5,
+    width: 5,
+  },
+  standingsFormCol: {
+    flexDirection: 'row',
+    gap: 2,
+    justifyContent: 'flex-end',
+    width: 34,
+  },
+  standingsFormLetter: {
+    fontFamily: fonts.extraBold,
+    fontSize: 10,
+  },
   standingsHead: {
     fontFamily: fonts.bold,
     fontSize: 10,
@@ -1941,6 +2102,26 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: fonts.semibold,
     fontSize: 12,
+  },
+  standingsTeamCell: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 5,
+    minWidth: 0,
+  },
+  standingsTitle: {
+    fontFamily: fonts.bold,
+    fontSize: 10,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  standingsWdl: {
+    fontFamily: fonts.semibold,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+    textAlign: 'center',
+    width: 44,
   },
   statAwayValue: {
     textAlign: 'right',
