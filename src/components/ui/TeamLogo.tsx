@@ -1,4 +1,5 @@
 import React from 'react';
+import { Image } from 'expo-image';
 import { View, StyleSheet, Text } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
@@ -6,9 +7,32 @@ import { useAppTheme } from '@/theme/colors';
 
 export type TeamName = 'Barcelona' | 'Chelsea' | 'Borussia D' | 'Man United' | string;
 
-export function TeamLogo({ name, size = 40 }: { name: TeamName; size?: number }) {
+export function TeamLogo({ logoUrl, name, size = 40 }: { logoUrl?: string | null; name: TeamName; size?: number }) {
   const theme = useAppTheme();
   const normalized = name.toLowerCase().trim();
+
+  if (logoUrl) {
+    return (
+      <View
+        style={[
+          styles.imageWrap,
+          {
+            backgroundColor: 'rgba(255,255,255,0.16)',
+            borderColor: theme.borderStrong,
+            borderRadius: size / 2,
+            height: size,
+            width: size,
+          },
+        ]}>
+        <Image
+          source={{ uri: logoUrl }}
+          style={{ height: size * 0.78, width: size * 0.78 }}
+          contentFit="contain"
+          transition={180}
+        />
+      </View>
+    );
+  }
 
   if (normalized.includes('barcelona') || normalized.includes('bar')) {
     // Barcelona Crest: Shield with red and blue vertical stripes, gold upper section, yellow ball
@@ -134,5 +158,11 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontWeight: 'bold',
+  },
+  imageWrap: {
+    alignItems: 'center',
+    borderWidth: 1,
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
 });

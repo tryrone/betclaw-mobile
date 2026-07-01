@@ -25,6 +25,8 @@ import type {
   ShareLinkResult,
   SubscriptionCurrent,
   SubscriptionUsage,
+  TelegramCommunityInvite,
+  TelegramCommunityStatus,
   TelegramTokenResult,
   TicketDetail,
   TicketJobState,
@@ -59,6 +61,7 @@ export const queryKeys = {
   myReferral: ['referral', 'mine'] as const,
   subscription: ['subscription', 'current'] as const,
   subscriptionUsage: ['subscription', 'usage'] as const,
+  telegramCommunityStatus: ['user', 'telegramCommunityStatus'] as const,
   ticketList: (input?: unknown) => ['ticket', 'list', input] as const,
   ticketStats: ['ticket', 'stats'] as const,
   ticket: (ticketId?: string | null) => ['ticket', 'detail', ticketId] as const,
@@ -97,6 +100,15 @@ export function useFixtureInsight(fixtureId?: string) {
     enabled: status === 'authenticated' && Boolean(fixtureId),
     queryKey: queryKeys.fixtureInsight(fixtureId),
     queryFn: () => callWithMobileRefresh(() => asPromise<FixtureInsight>(trpc.matchday.getFixtureInsight.query({ fixtureId }))),
+  });
+}
+
+export function useTelegramCommunityStatus() {
+  const status = useAuthStore((state) => state.status);
+  return useQuery<TelegramCommunityStatus>({
+    enabled: status === 'authenticated',
+    queryKey: queryKeys.telegramCommunityStatus,
+    queryFn: () => callWithMobileRefresh(() => asPromise<TelegramCommunityStatus>(trpc.user.getTelegramCommunityStatus.query())),
   });
 }
 
@@ -347,6 +359,16 @@ export function useCreateTelegramTokenMutation() {
     mutationFn: () => callWithMobileRefresh(() => asPromise<TelegramTokenResult>(trpc.user.createTelegramLinkToken.mutate())),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.me });
+    },
+  });
+}
+
+export function useCreateTelegramCommunityInviteMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<TelegramCommunityInvite, Error, void>({
+    mutationFn: () => callWithMobileRefresh(() => asPromise<TelegramCommunityInvite>(trpc.user.createTelegramCommunityInvite.mutate())),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.telegramCommunityStatus });
     },
   });
 }

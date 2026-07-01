@@ -18,8 +18,11 @@ export type MatchCardData = {
   id: string;
   home: string;
   away: string;
+  homeLogoUrl?: string | null;
+  awayLogoUrl?: string | null;
   league: string;
   leagueId: string;
+  leagueLogoUrl?: string | null;
   sportId: string;
   venue: string;
   date: string;

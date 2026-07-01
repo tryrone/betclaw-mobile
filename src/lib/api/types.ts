@@ -35,12 +35,70 @@ export type LeagueOption = {
   name: string;
 };
 
+export type TeamReference = {
+  id?: string | number | null;
+  logoUrl?: string | null;
+  name: string;
+};
+
+export type LeagueReference = {
+  country?: string | null;
+  id?: string | number | null;
+  key?: string | null;
+  logoUrl?: string | null;
+  name: string;
+};
+
+export type MatchStatRow = {
+  awayDisplay?: string | null;
+  awayValue?: number | null;
+  homeDisplay?: string | null;
+  homeValue?: number | null;
+  key: string;
+  label: string;
+  suffix?: string | null;
+};
+
+export type MatchPlayersContext = {
+  fixturePlayerStatsStatus?: string | null;
+  hasFixturePlayerStats?: boolean;
+  hasLineups?: boolean;
+  hasSeasonStats?: boolean;
+  keyPlayers?: MatchPlayerSummary[];
+  lineupStatus?: string | null;
+  lineupUnavailableCount?: number;
+  lineups?: {
+    away?: MatchLineupSide;
+    home?: MatchLineupSide;
+  };
+  seasonStatsStatus?: string | null;
+};
+
+export type MatchLineupSide = {
+  confirmed?: boolean;
+  formation?: string | null;
+  players?: MatchPlayerSummary[];
+  teamName: string;
+  unavailableCount?: number;
+};
+
+export type MatchPlayerSummary = {
+  name: string;
+  number?: number | null;
+  photoUrl?: string | null;
+  position?: string | null;
+  role?: string | null;
+  statLine?: string | null;
+  team?: 'home' | 'away' | string | null;
+};
+
 export type FixtureInsight = {
   averageStats?: {
     away?: Record<string, number | null | undefined>;
     home?: Record<string, number | null | undefined>;
     referee?: Record<string, number | null | undefined>;
   } | null;
+  awayTeam?: TeamReference | null;
   apiFootballContext?: {
     predictionSummary?: string | null;
     standingsSummary?: string | null;
@@ -55,12 +113,14 @@ export type FixtureInsight = {
     score?: number | null;
     status?: string | null;
   } | null;
+  elapsedMinute?: number | null;
   evidence?: {
     evidenceType?: string | null;
     snippet?: string | null;
     title?: string | null;
     url?: string | null;
   }[];
+  fixtureId?: string;
   h2h?: {
     awayWins?: number;
     draws?: number;
@@ -76,6 +136,15 @@ export type FixtureInsight = {
     sampleSize?: number;
     summary?: string | null;
   } | null;
+  homeTeam?: TeamReference | null;
+  kickoffTime?: string | Date | null;
+  league?: LeagueReference | null;
+  matchStats?: {
+    fetchedAt?: string | Date | null;
+    rows?: MatchStatRow[];
+    status?: 'available' | 'pending' | 'unavailable' | string;
+  } | null;
+  players?: MatchPlayersContext | null;
   providerLinks?: { fetchedAt?: string | Date | null; provider?: string | null }[];
   recentMatches?: {
     away?: RecentMatchTeam | null;
@@ -85,11 +154,16 @@ export type FixtureInsight = {
     label?: string | null;
     summary?: string | null;
   } | null;
+  round?: string | null;
+  score?: string | null;
   sourceCoverage?: Record<string, unknown> | null;
+  sourceStatus?: string | null;
   standings?: {
     away?: StandingsRow[];
     home?: StandingsRow[];
   } | null;
+  status?: string | null;
+  venue?: string | null;
 };
 
 export type RecentMatchTeam = {
@@ -107,9 +181,26 @@ export type RecentMatchTeam = {
 export type StandingsRow = {
   all?: { draw?: number | null; lose?: number | null; played?: number | null; win?: number | null };
   description?: string | null;
+  form?: string | null;
+  logoUrl?: string | null;
   points?: number | null;
+  played?: number | null;
   rank?: number | null;
+  teamName?: string | null;
   team?: { id?: number | null; name?: string | null };
+};
+
+export type TelegramCommunityStatus = {
+  accessPolicy?: 'ALL_USERS' | string;
+  communityName: string;
+  configured: boolean;
+  enabled: boolean;
+};
+
+export type TelegramCommunityInvite = {
+  communityName: string;
+  expiresAt: string | Date;
+  inviteLink: string;
 };
 
 export type NotificationSummary = {
