@@ -61,13 +61,9 @@ function RootLayoutContent() {
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="oauth/callback" />
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="build-ticket" />
-          <Stack.Screen name="convert-ticket" />
-          <Stack.Screen name="history" />
           <Stack.Screen name="matches" />
           <Stack.Screen name="match/[id]" />
           <Stack.Screen name="notifications" />
-          <Stack.Screen name="referrals" />
           <Stack.Screen name="ticket/[id]" />
           <Stack.Screen name="live-match" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
           <Stack.Screen name="+not-found" />

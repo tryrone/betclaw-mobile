@@ -94,7 +94,7 @@ export default function HistoryScreen() {
   };
 
   return (
-    <Screen>
+    <Screen hasTabs>
       <Animated.View entering={enterUp(0)}>
         <ScreenHeader
           eyebrow="Ticket archive"

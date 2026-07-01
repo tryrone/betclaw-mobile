@@ -1,188 +1,353 @@
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
-import { useRouter } from 'expo-router';
-import { ArrowRightLeft, Bell, Bot, ChevronRight, ExternalLink, Gift, History, LoaderCircle, MessageCircle, Search, UsersRound, Video } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { Link, useRouter } from 'expo-router';
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Bell,
+  CalendarDays,
+  CircleAlert,
+  Gift,
+  LoaderCircle,
+  LockKeyhole,
+  MessageCircle,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  Trophy,
+  UsersRound,
+  Wallet,
+} from 'lucide-react-native';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
 
-import { enterUp, GlassCard, PressableScale, Screen, SPRING_LAYOUT, StatusBadge, TeamLogo } from '@/components/ui';
-import { getSportLabel, sports, type MatchCardData } from '@/data/mock';
-import { useCreateTelegramCommunityInviteMutation, useHomeFeed, useLeagues, useMe, useNotificationSummary, useSubscriptionCurrent, useTelegramCommunityStatus } from '@/lib/api/hooks';
-import type { TelegramCommunityInvite, TelegramCommunityStatus } from '@/lib/api/types';
-import { flattenHomeFeed } from '@/lib/mobile-mappers';
+import {
+  DashboardButton,
+  DashboardChip,
+  DashboardGlassCard,
+  DashboardMetric,
+  DashboardPillField,
+  DashboardSectionHeader,
+  DashboardStatePanel,
+  PressableScale,
+  Screen,
+  StatusBadge,
+  TeamLogo,
+} from '@/components/ui';
+import {
+  useCreateTelegramCommunityInviteMutation,
+  useDailyTicket,
+  useInfiniteHomeFeed,
+  useLeagues,
+  useMe,
+  useNotificationSummary,
+  useSubscriptionCurrent,
+  useTelegramCommunityStatus,
+} from '@/lib/api/hooks';
+import type {
+  DailyTicketBookmakerPlatform,
+  DailyTicketData,
+  DailyTicketLeg,
+  FeedMatch,
+  HomeFeed,
+  LeagueOption,
+  TelegramCommunityInvite,
+  TelegramCommunityStatus,
+} from '@/lib/api/types';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
 const userAvatar = require('@/../assets/images/user_avatar.png');
+const ALL_LEAGUES_KEY = '__all_leagues__';
+const DAILY_TICKET_BOOKMAKER_PLATFORM = 'SPORTYBET' satisfies DailyTicketBookmakerPlatform;
 
-type LeaguePillOption = {
-  id: string;
-  label: string;
-  logoUrl?: string | null;
+type DateOption = {
+  main: string;
+  sub: string;
+  value: string;
 };
 
-function scoreLabel(match: MatchCardData) {
-  if (match.homeScore != null && match.awayScore != null) return `${match.homeScore} : ${match.awayScore}`;
-  return match.status === 'Live' ? 'Live' : match.time;
+type LeagueSection = LeagueOption & {
+  matches: FeedMatch[];
+};
+
+function dateKeyFromDate(date: Date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
-function HomeHeader({ name, tokenBalance, unreadCount = 0 }: { name?: string | null; tokenBalance: number; unreadCount?: number }) {
+function dateKey(offset: number) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + offset);
+  return dateKeyFromDate(date);
+}
+
+function dateFromKey(key: string) {
+  const [year, month, day] = key.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function shiftDateKey(key: string, offset: number) {
+  const date = dateFromKey(key);
+  date.setUTCDate(date.getUTCDate() + offset);
+  return dateKeyFromDate(date);
+}
+
+function dateStripKeys(todayKey: string) {
+  return Array.from({ length: 7 }, (_, index) => shiftDateKey(todayKey, index - 3));
+}
+
+function formatDateStripMain(date: Date, todayKey = dateKey(0)) {
+  const value = dateKeyFromDate(date);
+  if (value === todayKey) return 'Today';
+  if (value === shiftDateKey(todayKey, -1)) return 'Yesterday';
+  if (value === shiftDateKey(todayKey, 1)) return 'Tomorrow';
+  return date.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short' });
+}
+
+function formatDateStripSub(date: Date) {
+  return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
+function formatSelectedDateLabel(key: string) {
+  return dateFromKey(key).toLocaleDateString('en-US', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+    weekday: 'short',
+    year: 'numeric',
+  });
+}
+
+function formatMatchDate(value: string | Date) {
+  return new Date(value).toLocaleDateString('en-US', { day: 'numeric', month: 'short', weekday: 'short' });
+}
+
+function formatMatchTime(value: string | Date) {
+  return new Date(value).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatCompact(value?: number | null) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return 'Wallet';
+  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 1, notation: 'compact' }).format(value)} tokens`;
+}
+
+function formatOdds(value?: number | null) {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : '--';
+}
+
+function formatDailyTicketProvider(platform: DailyTicketBookmakerPlatform | string) {
+  return platform === 'SPORTYBET' ? 'SportyBet' : 'API-Football';
+}
+
+function matchKickoffTime(match: FeedMatch) {
+  const time = new Date(match.kickoffTime).getTime();
+  return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
+}
+
+function normalizedStatus(match: FeedMatch) {
+  return String(match.status ?? '').toUpperCase();
+}
+
+function isFinished(match: FeedMatch) {
+  return ['FT', 'AET', 'PEN', 'FINISHED'].includes(normalizedStatus(match));
+}
+
+function isLive(match: FeedMatch) {
+  const status = normalizedStatus(match);
+  return !isFinished(match) && (['LIVE', '1H', '2H', 'HT', 'ET', 'BT', 'P', 'SUSP', 'INT'].includes(status) || Boolean(match.elapsedMinute));
+}
+
+function scoreLabel(match: FeedMatch) {
+  return match.score ?? match.status;
+}
+
+function centerLabel(match: FeedMatch) {
+  if (isFinished(match)) return normalizedStatus(match);
+  if (isLive(match)) return match.elapsedMinute ? `${match.elapsedMinute}'` : match.status;
+  return formatMatchTime(match.kickoffTime);
+}
+
+function getConfidence(match: FeedMatch) {
+  return Math.max(
+    0,
+    Math.min(
+      99,
+      Math.round(
+        match.predictionView?.confidence ??
+          match.bestMarket?.confidence ??
+          match.predictionView?.edgeScore ??
+          match.bestMarket?.edgeScore ??
+          match.dataReadiness?.score ??
+          match.dataSnapshot?.readiness?.score ??
+          62,
+      ),
+    ),
+  );
+}
+
+function getReadinessLabel(match: FeedMatch) {
+  const status = match.dataSnapshot?.readiness?.status ?? match.dataReadiness?.status ?? 'partial';
+  if (/ready|verified/i.test(status)) return 'Verified';
+  if (/insufficient|limited/i.test(status)) return 'Limited data';
+  return 'Partial data';
+}
+
+function getPredictionLabel(match: FeedMatch) {
+  return match.predictionView?.label ?? match.bestMarket?.label ?? 'Analysis pending';
+}
+
+function getPredictionMeta(match: FeedMatch) {
+  const view = match.predictionView;
+  if (!view) return getReadinessLabel(match);
+  if (typeof view.odds === 'number') return `Odds ${view.odds.toFixed(2)}`;
+  if (typeof view.confidence === 'number') return `${Math.round(view.confidence)}%`;
+  return view.kind === 'lean' ? 'Market signal' : 'Prediction';
+}
+
+function matchSummary(match: FeedMatch) {
+  if (isFinished(match)) return `Final result: ${scoreLabel(match)}. Past match data is available in details.`;
+  if (isLive(match)) return `Live match: ${scoreLabel(match)}. Details update with available match data.`;
+  return match.predictionView?.summary ?? match.bestMarket?.summary ?? getReadinessLabel(match);
+}
+
+function compareLeagues(left: LeagueOption, right: LeagueOption) {
+  return (right.matchCount ?? 0) - (left.matchCount ?? 0) || left.name.localeCompare(right.name);
+}
+
+function buildLeagueSections(feedPages: HomeFeed[]) {
+  const sections = new Map<string, LeagueSection>();
+  const seenMatches = new Map<string, Set<string>>();
+
+  for (const page of feedPages) {
+    for (const league of page.leagues ?? []) {
+      const key = league.key;
+      const existing =
+        sections.get(key) ?? ({
+          country: league.country ?? null,
+          key,
+          logoUrl: league.logoUrl ?? null,
+          matchCount: league.matchCount ?? 0,
+          matches: [],
+          name: league.name,
+        } satisfies LeagueSection);
+      const seen = seenMatches.get(key) ?? new Set<string>();
+
+      existing.matchCount = Math.max(existing.matchCount ?? 0, league.matchCount ?? 0);
+      existing.logoUrl ??= league.logoUrl ?? null;
+
+      for (const match of league.matches ?? []) {
+        if (seen.has(match.fixtureId)) continue;
+        seen.add(match.fixtureId);
+        existing.matches.push(match);
+      }
+
+      existing.matches.sort((left, right) => matchKickoffTime(left) - matchKickoffTime(right));
+      sections.set(key, existing);
+      seenMatches.set(key, seen);
+    }
+  }
+
+  return Array.from(sections.values()).filter((section) => section.matches.length > 0).sort(compareLeagues);
+}
+
+function DashboardUtilityBar({
+  image,
+  name,
+  query,
+  tokenBalance,
+  unreadCount,
+  onQueryChange,
+}: {
+  image?: string | null;
+  name?: string | null;
+  query: string;
+  tokenBalance?: number | null;
+  unreadCount: number;
+  onQueryChange: (value: string) => void;
+}) {
   const router = useRouter();
   const theme = useAppTheme();
 
   return (
-    <View style={styles.headerRow}>
-      <View style={styles.headerLeft}>
-        <Image source={userAvatar} style={styles.profileAvatar} contentFit="cover" />
-        <View>
-          <Text style={[styles.kicker, { color: theme.primarySoft }]}>{name ? `Hi, ${name.split(' ')[0]}` : 'Matchday'}</Text>
-          <Text style={styles.brandTitle}>BETSCLAW</Text>
-        </View>
-      </View>
-      <View style={styles.headerActions}>
-        <View style={[styles.tokenPill, { borderColor: theme.border, backgroundColor: theme.field }]}>
-          <Text style={[styles.tokenValue, { color: theme.foregroundStrong }]}>{Number(tokenBalance).toLocaleString()}</Text>
-          <Text style={[styles.tokenLabel, { color: theme.muted }]}>tokens</Text>
-        </View>
-        <PressableScale accessibilityLabel="Search" accessibilityRole="button" style={[styles.circleButton, { backgroundColor: theme.field, borderColor: theme.borderStrong }]}>
-          <Search color={theme.foregroundStrong} size={18} strokeWidth={2.4} />
-        </PressableScale>
-        <PressableScale accessibilityLabel="Notifications" accessibilityRole="button" onPress={() => router.push('/notifications' as any)} style={[styles.circleButton, { backgroundColor: theme.field, borderColor: theme.borderStrong }]}>
-          <Bell color={theme.foregroundStrong} size={18} strokeWidth={2.4} />
+    <View style={styles.utility}>
+      <DashboardPillField icon={Search} placeholder="Search teams or leagues" value={query} onChangeText={onQueryChange} />
+      <View style={styles.utilityActions}>
+        <Link href="/(tabs)/wallet" asChild>
+          <PressableScale
+            accessibilityRole="button"
+            style={StyleSheet.flatten([styles.walletPill, { backgroundColor: theme.surface, borderColor: theme.border }])}>
+            <Text numberOfLines={1} style={[styles.walletText, { color: theme.foregroundStrong }]}>
+              {formatCompact(tokenBalance)}
+            </Text>
+            <Wallet color={theme.primary} size={15} />
+          </PressableScale>
+        </Link>
+        <PressableScale
+          accessibilityLabel="Notifications"
+          accessibilityRole="button"
+          onPress={() => router.push('/notifications' as any)}
+          style={[styles.iconPill, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Bell color={theme.foregroundStrong} size={17} />
           {unreadCount > 0 ? <View style={[styles.unreadDot, { backgroundColor: theme.live }]} /> : null}
         </PressableScale>
+        {image ? (
+          <Image source={{ uri: image }} style={[styles.avatar, { borderColor: theme.border }]} contentFit="cover" />
+        ) : (
+          <Image source={userAvatar} style={[styles.avatar, { borderColor: theme.border }]} contentFit="cover" />
+        )}
+        <Text numberOfLines={1} style={[styles.userName, { color: theme.mutedLight }]}>
+          {name?.split(' ')[0] ?? 'there'}
+        </Text>
       </View>
     </View>
   );
 }
 
-function SportPills({ onSelect, selected }: { onSelect: (sportId: string) => void; selected: string }) {
-  const theme = useAppTheme();
-
-  return (
-    <ScrollView contentContainerStyle={styles.pillRow} horizontal showsHorizontalScrollIndicator={false} style={styles.horizontal}>
-      {sports.map((sport) => {
-        const active = sport.id === selected;
-        return (
-          <Animated.View key={sport.id} layout={SPRING_LAYOUT}>
-            <PressableScale
-              accessibilityLabel={sport.label}
-              accessibilityRole="button"
-              onPress={() => onSelect(sport.id)}
-              style={[
-                styles.sportPill,
-                {
-                  backgroundColor: active ? 'transparent' : theme.field,
-                  borderColor: active ? 'transparent' : theme.border,
-                },
-              ]}>
-              {active ? <LinearGradient colors={['#bdf14a', '#93D51F']} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={StyleSheet.absoluteFill} /> : null}
-              <Text style={[styles.sportLabel, { color: active ? theme.primaryDark : theme.mutedLight }]}>{sport.label}</Text>
-            </PressableScale>
-          </Animated.View>
-        );
-      })}
-    </ScrollView>
-  );
-}
-
-function LeagueRail({ onSelect, options, selected }: { onSelect: (leagueId: string) => void; options: LeaguePillOption[]; selected: string }) {
-  const theme = useAppTheme();
-
-  return (
-    <ScrollView contentContainerStyle={styles.leagueRail} horizontal showsHorizontalScrollIndicator={false} style={styles.horizontal}>
-      {options.map((league) => {
-        const active = league.id === selected;
-        return (
-          <PressableScale
-            accessibilityLabel={league.label}
-            accessibilityRole="button"
-            key={league.id}
-            onPress={() => onSelect(league.id)}
-            style={styles.leagueItem}>
-            <View style={[styles.leagueLogoWrap, { backgroundColor: theme.field, borderColor: active ? theme.selectionBorder : theme.border }]}>
-              {league.logoUrl ? (
-                <Image source={{ uri: league.logoUrl }} style={styles.leagueLogoImage} contentFit="contain" />
-              ) : (
-                <Text style={[styles.leagueInitials, { color: active ? theme.primarySoft : theme.mutedLight }]}>
-                  {league.label.slice(0, 3).toUpperCase()}
-                </Text>
-              )}
-            </View>
-            <Text numberOfLines={1} style={[styles.leagueLabel, { color: active ? theme.foregroundStrong : theme.mutedLight }]}>
-              {league.label}
-            </Text>
-          </PressableScale>
-        );
-      })}
-    </ScrollView>
-  );
-}
-
-function LiveMatchHero({ match }: { match: MatchCardData }) {
+function PredictionHero({
+  bestAccuracy,
+  isLoading,
+  matchCount,
+  selectedDateLabel,
+}: {
+  bestAccuracy: number;
+  isLoading: boolean;
+  matchCount: number;
+  selectedDateLabel: string;
+}) {
   const router = useRouter();
   const theme = useAppTheme();
 
   return (
-    <GlassCard gradient="matchHero" style={styles.heroCard}>
-      <View style={styles.heroTop}>
-        <View>
-          <Text style={styles.heroSectionTitle}>Live Match</Text>
-          <Text numberOfLines={1} style={styles.heroLeague}>{match.league}</Text>
-        </View>
-        <StatusBadge label={match.clock ?? match.status} tone={match.status === 'Live' ? 'danger' : 'accent'} />
-      </View>
-
-      <PressableScale accessibilityLabel="Open live match details" accessibilityRole="button" onPress={() => router.push(`/match/${match.id}` as any)} scaleTo={0.98}>
-        <View style={styles.heroScorePanel}>
-          <View style={styles.heroVenuePill}>
-            <Text numberOfLines={1} style={styles.heroVenue}>{match.venue}</Text>
-          </View>
-          <Text style={styles.heroWeek}>{match.date}</Text>
-
-          <View style={styles.heroTeamsContainer}>
-            <View style={styles.heroTeamSide}>
-              <TeamLogo logoUrl={match.homeLogoUrl} name={match.home} size={58} />
-              <Text numberOfLines={1} style={styles.heroTeamName}>{match.home}</Text>
-              <Text style={styles.heroSideLabel}>Home</Text>
-            </View>
-
-            <View style={styles.heroCenterBlock}>
-              <Text adjustsFontSizeToFit numberOfLines={1} style={styles.scoreText}>{scoreLabel(match)}</Text>
-              <View style={styles.liveTimeRow}>
-                <View style={[styles.liveDot, { backgroundColor: theme.live }]} />
-                <Text style={styles.liveTimeText}>{match.clock ?? match.time}</Text>
-              </View>
-            </View>
-
-            <View style={styles.heroTeamSide}>
-              <TeamLogo logoUrl={match.awayLogoUrl} name={match.away} size={58} />
-              <Text numberOfLines={1} style={styles.heroTeamName}>{match.away}</Text>
-              <Text style={styles.heroSideLabel}>Away</Text>
-            </View>
+    <DashboardGlassCard gradient="hero" style={styles.hero}>
+      <View style={styles.heroGlow} pointerEvents="none" />
+      <View style={styles.heroContent}>
+        <Text style={[styles.heroTitle, { color: theme.foregroundStrong }]}>
+          <Text style={{ color: theme.primary }}>AI</Text> Matchday Agent
+        </Text>
+        <Text style={[styles.heroCopy, { color: theme.mutedLight }]}>
+          Browse every verified fixture for the selected day, including live scores, final results, and available match context.
+        </Text>
+        <View style={styles.heroActions}>
+          <DashboardButton icon={ArrowRight} iconChip onPress={() => router.push('/(tabs)/build-ticket' as any)}>
+            Build Slip
+          </DashboardButton>
+          <View style={[styles.datePill, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <CalendarDays color={theme.primary} size={16} />
+            <Text style={[styles.datePillText, { color: theme.foregroundStrong }]}>{selectedDateLabel}</Text>
           </View>
         </View>
-      </PressableScale>
-
-      <View style={styles.heroActions}>
-        <PressableScale
-          accessibilityLabel="Watch live match center"
-          accessibilityRole="button"
-          onPress={() => router.push({ pathname: '/live-match', params: { fixtureId: match.id } } as any)}
-          style={[styles.watchButton, { borderColor: theme.selectionBorder, backgroundColor: 'rgba(255,255,255,0.10)' }]}>
-          <Video color={theme.accent} size={17} />
-          <Text style={styles.watchButtonText}>Watch Live</Text>
-        </PressableScale>
-        <View style={styles.heroDots}>
-          <View style={[styles.dot, { backgroundColor: theme.muted }]} />
-          <View style={[styles.dotActive, { backgroundColor: theme.accent }]} />
-          <View style={[styles.dot, { backgroundColor: theme.muted }]} />
-        </View>
       </View>
-    </GlassCard>
+      <View style={styles.metricsRow}>
+        <DashboardMetric icon={CalendarDays} label="Matches" value={isLoading ? '...' : String(matchCount)} />
+        <DashboardMetric icon={ShieldCheck} label="Top Accuracy" value={bestAccuracy ? `${bestAccuracy}%` : 'Pending'} />
+        <DashboardMetric icon={Trophy} label="Mode" value="Live + results" />
+      </View>
+    </DashboardGlassCard>
   );
 }
 
@@ -202,165 +367,464 @@ function TelegramCommunityCard({
   status?: TelegramCommunityStatus;
 }) {
   const theme = useAppTheme();
-  const communityName = status?.communityName ?? 'BetsClaw Community';
   const ready = Boolean(status?.enabled && status.configured);
+  const communityName = status?.communityName ?? 'BetsClaw Community';
   const inviteExpiry = invite
     ? new Date(invite.expiresAt).toLocaleString(undefined, { day: 'numeric', hour: 'numeric', minute: '2-digit', month: 'short' })
     : null;
 
   return (
-    <GlassCard gradient="hero" style={styles.communityCard}>
+    <DashboardGlassCard gradient="matchHero" style={styles.communityCard}>
       <View style={styles.communityTop}>
-        <View style={[styles.communityIcon, { borderColor: theme.borderStrong, backgroundColor: theme.primarySubtle }]}>
-          <MessageCircle color={theme.primarySoft} size={22} />
+        <View style={[styles.communityIcon, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
+          <MessageCircle color={theme.primary} size={22} />
         </View>
         <View style={styles.communityCopy}>
           <View style={styles.communityTitleRow}>
-            <Text numberOfLines={1} style={styles.communityTitle}>{communityName}</Text>
-            <View style={[styles.communityBadge, { borderColor: theme.border }]}>
+            <Text numberOfLines={1} style={[styles.communityTitle, { color: theme.foregroundStrong }]}>
+              {communityName}
+            </Text>
+            <View style={[styles.privateBadge, { borderColor: theme.border, backgroundColor: theme.surface }]}>
               <UsersRound color={theme.mutedLight} size={12} />
-              <Text style={[styles.communityBadgeText, { color: theme.mutedLight }]}>Private</Text>
+              <Text style={[styles.privateBadgeText, { color: theme.mutedLight }]}>Community</Text>
             </View>
           </View>
-          <Text numberOfLines={2} style={[styles.communityText, { color: theme.mutedLight }]}>
-            Talk match context, live reactions, and analysis with other BetClaw users.
-          </Text>
+          <Text style={[styles.communityText, { color: theme.mutedLight }]}>Talk slips, match context, and live reactions with other BetsClaw users.</Text>
         </View>
       </View>
-
       <View style={styles.communityFooter}>
-        <PressableScale
-          accessibilityLabel="Join Telegram community"
-          accessibilityRole="button"
-          disabled={!ready || isLoading || isCreating}
-          onPress={onJoin}
-          style={[styles.communityButton, { opacity: !ready || isLoading || isCreating ? 0.55 : 1 }]}>
-          <LinearGradient colors={['#bdf14a', '#93D51F']} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={StyleSheet.absoluteFill} />
-          {isCreating || isLoading ? <LoaderCircle color={theme.primaryDark} size={16} /> : <MessageCircle color={theme.primaryDark} size={16} />}
-          <Text style={[styles.communityButtonText, { color: theme.primaryDark }]}>{ready ? 'Join Community' : 'Setup Pending'}</Text>
-          {invite ? <ExternalLink color={theme.primaryDark} size={14} /> : null}
-        </PressableScale>
+        <DashboardButton icon={isCreating || isLoading ? LoaderCircle : MessageCircle} onPress={onJoin} style={styles.communityButton}>
+          {ready ? 'Join Community' : 'Setup Pending'}
+        </DashboardButton>
         {message ? (
-          <Text numberOfLines={1} style={[styles.communityStatus, { color: message.type === 'error' ? theme.danger : theme.success }]}>
+          <Text numberOfLines={2} style={[styles.communityStatus, { color: message.type === 'error' ? theme.danger : theme.success }]}>
             {message.text}
           </Text>
         ) : inviteExpiry ? (
           <Text numberOfLines={1} style={[styles.communityStatus, { color: theme.muted }]}>Expires {inviteExpiry}</Text>
         ) : null}
       </View>
-    </GlassCard>
+    </DashboardGlassCard>
   );
 }
 
-function MatchFeedCard({ match }: { match: MatchCardData }) {
-  const router = useRouter();
+function ReferralPrompt() {
   const theme = useAppTheme();
 
   return (
-    <PressableScale accessibilityLabel={`${match.home} versus ${match.away}`} accessibilityRole="button" onPress={() => router.push(`/match/${match.id}` as any)} scaleTo={0.98}>
-      <GlassCard style={styles.matchFeedCard}>
-        <View style={styles.matchTeamsRow}>
-          <View style={styles.matchTeamSide}>
-            <Text numberOfLines={1} style={[styles.matchTeamLabel, { color: theme.foregroundStrong }]}>{match.home}</Text>
-            <TeamLogo logoUrl={match.homeLogoUrl} name={match.home} size={28} />
+    <Link href="/referrals" asChild>
+      <PressableScale
+        accessibilityRole="button"
+        style={StyleSheet.flatten([styles.referralCard, { backgroundColor: theme.surface, borderColor: theme.border }])}>
+        <View style={styles.referralLeft}>
+          <View style={[styles.referralIcon, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
+            <Gift color={theme.primary} size={17} />
           </View>
-          <View style={styles.matchCenter}>
-            <Text style={[styles.matchTimeText, { color: match.status === 'Live' ? theme.live : theme.primarySoft }]}>{match.clock ?? match.time}</Text>
-            <Text style={[styles.matchDateText, { color: theme.muted }]}>{match.date}</Text>
-          </View>
-          <View style={[styles.matchTeamSide, styles.matchAwaySide]}>
-            <TeamLogo logoUrl={match.awayLogoUrl} name={match.away} size={28} />
-            <Text numberOfLines={1} style={[styles.matchTeamLabel, { color: theme.foregroundStrong }]}>{match.away}</Text>
+          <Text numberOfLines={2} style={[styles.referralText, { color: theme.mutedLight }]}>
+            <Text style={{ color: theme.foregroundStrong, fontFamily: fonts.extraBold }}>Invite friends, earn 20%</Text> commission on every first payment.
+          </Text>
+        </View>
+        <View style={styles.referralAction}>
+          <Text style={[styles.referralActionText, { color: theme.primary }]}>Get link</Text>
+          <ArrowRight color={theme.primary} size={15} />
+        </View>
+      </PressableScale>
+    </Link>
+  );
+}
+
+function DateStrip({ dates, selectedDate, onSelect }: { dates: DateOption[]; selectedDate: string; onSelect: (date: string) => void }) {
+  const theme = useAppTheme();
+
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateStripContent} style={styles.horizontalBleed}>
+      {dates.map((date) => {
+        const active = selectedDate === date.value;
+        return (
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            key={date.value}
+            onPress={() => onSelect(date.value)}
+            style={[
+              styles.dateChip,
+              {
+                backgroundColor: active ? theme.primary : theme.surface,
+                borderColor: active ? theme.primary : theme.border,
+              },
+            ]}>
+            <Text style={[styles.dateChipMain, { color: active ? theme.primaryDark : theme.foregroundStrong }]}>{date.main}</Text>
+            <Text style={[styles.dateChipSub, { color: active ? theme.primaryDark : theme.muted }]}>{date.sub}</Text>
+          </PressableScale>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+function DailyTicketCard({
+  dailyTicket,
+  error,
+  isAccessLoading,
+  isLoading,
+  isLocked,
+  selectedDateLabel,
+}: {
+  dailyTicket?: DailyTicketData;
+  error?: string;
+  isAccessLoading: boolean;
+  isLoading: boolean;
+  isLocked: boolean;
+  selectedDateLabel: string;
+}) {
+  const router = useRouter();
+  const theme = useAppTheme();
+  const provider = formatDailyTicketProvider(dailyTicket?.bookmakerPlatform ?? DAILY_TICKET_BOOKMAKER_PLATFORM);
+
+  if (isAccessLoading) {
+    return (
+      <DashboardGlassCard>
+        <DashboardStatePanel icon={LoaderCircle} title="Loading access" />
+      </DashboardGlassCard>
+    );
+  }
+
+  if (isLocked) {
+    return (
+      <DashboardGlassCard gradient="amberCard">
+        <StatusBadge label="Premium" tone="warning" />
+        <Text style={[styles.ticketTitle, { color: theme.foregroundStrong }]}>Verified ticket odds of the day</Text>
+        <Text style={[styles.ticketCopy, { color: theme.mutedLight }]}>Verified legs targeting around 2.00 total odds for {selectedDateLabel}.</Text>
+        <View style={[styles.lockPreview, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <LockKeyhole color={theme.warning} size={18} />
+          <Text style={[styles.lockPreviewText, { color: theme.foregroundStrong }]}>Premium locked</Text>
+        </View>
+        <DashboardButton icon={Wallet} onPress={() => router.push('/(tabs)/wallet' as any)}>
+          Open Wallet
+        </DashboardButton>
+      </DashboardGlassCard>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <DashboardGlassCard>
+        <DashboardStatePanel icon={LoaderCircle} title="Building verified ticket">
+          Verifying the best available legs for {selectedDateLabel}.
+        </DashboardStatePanel>
+      </DashboardGlassCard>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardGlassCard style={{ borderColor: theme.dangerSoft }}>
+        <DashboardStatePanel icon={CircleAlert} title="Daily ticket unavailable" tone="danger">
+          {error}
+        </DashboardStatePanel>
+      </DashboardGlassCard>
+    );
+  }
+
+  if (!dailyTicket || dailyTicket.legs.length === 0) {
+    return (
+      <DashboardGlassCard>
+        <DashboardStatePanel icon={Target} title={`No verified 2.00 ${provider} ticket yet`} tone="warning">
+          {provider}-ready predictions for {selectedDateLabel} are still being verified.
+        </DashboardStatePanel>
+      </DashboardGlassCard>
+    );
+  }
+
+  return (
+    <DashboardGlassCard gradient="matchHero">
+      <View style={styles.ticketHeader}>
+        <StatusBadge label={`Verified ${provider}`} tone="accent" />
+        <StatusBadge label={`Target ${formatOdds(dailyTicket.targetOdds)}`} tone="warning" />
+      </View>
+      <Text style={[styles.ticketTitle, { color: theme.foregroundStrong }]}>Ticket odds of the day</Text>
+      <Text style={[styles.ticketCopy, { color: theme.mutedLight }]}>{selectedDateLabel} selections verified through {provider}.</Text>
+      <View style={styles.ticketMetrics}>
+        <DashboardMetric label="Total odds" value={formatOdds(dailyTicket.totalOdds)} />
+        <DashboardMetric label="Legs" value={String(dailyTicket.legCount)} />
+        <DashboardMetric label="Avg confidence" value={dailyTicket.avgConfidence !== null ? `${dailyTicket.avgConfidence}%` : '--'} />
+      </View>
+      {dailyTicket.bookingCode ? (
+        <View style={[styles.bookingCode, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
+          <Text style={[styles.bookingLabel, { color: theme.muted }]}>SportyBet booking code</Text>
+          <Text numberOfLines={1} style={[styles.bookingValue, { color: theme.primary }]}>{dailyTicket.bookingCode}</Text>
+        </View>
+      ) : null}
+      <View style={styles.legsList}>
+        {dailyTicket.legs.map((leg) => (
+          <DailyTicketLegRow key={leg.id} leg={leg} />
+        ))}
+      </View>
+    </DashboardGlassCard>
+  );
+}
+
+function DailyTicketLegRow({ leg }: { leg: DailyTicketLeg }) {
+  const theme = useAppTheme();
+  const reason = leg.edgeSummary ?? leg.modelSummary ?? `Verified ${formatDailyTicketProvider(leg.bookmakerPlatform)} market with priced odds and active prediction lineage.`;
+
+  return (
+    <View style={[styles.legRow, { backgroundColor: 'rgba(0,0,0,0.20)', borderColor: theme.border }]}>
+      <View style={styles.legCopy}>
+        <Text numberOfLines={1} style={[styles.legTeams, { color: theme.foregroundStrong }]}>
+          {leg.homeTeam} vs {leg.awayTeam}
+        </Text>
+        <Text numberOfLines={1} style={[styles.legMeta, { color: theme.muted }]}>
+          {leg.league}
+          {leg.kickoffTime ? `  ${formatMatchTime(leg.kickoffTime)}` : ''}
+        </Text>
+        <Text numberOfLines={1} style={[styles.legMarket, { color: theme.foregroundStrong }]}>{leg.selectionLabel ?? leg.verdict}</Text>
+        <Text numberOfLines={2} style={[styles.legReason, { color: theme.mutedLight }]}>{reason}</Text>
+      </View>
+      <View style={styles.legStats}>
+        <View style={[styles.legStat, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
+          <Text style={[styles.legStatLabel, { color: theme.primary }]}>Odds</Text>
+          <Text style={[styles.legStatValue, { color: theme.primary }]}>{formatOdds(leg.odds)}</Text>
+        </View>
+        <View style={[styles.legStat, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.legStatLabel, { color: theme.muted }]}>Conf.</Text>
+          <Text style={[styles.legStatValue, { color: theme.foregroundStrong }]}>{Math.round(leg.confidence)}%</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function LeagueFilterBar({
+  isLoading,
+  leagues,
+  selectedLeagueKey,
+  totalMatches,
+  onSelect,
+}: {
+  isLoading: boolean;
+  leagues: LeagueOption[];
+  selectedLeagueKey: string;
+  totalMatches: number;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <View style={styles.filterBlock}>
+      <DashboardSectionHeader eyebrow="Leagues" title="Fixture slate" description={`${leagues.length} leagues available`} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.leagueRail} style={styles.horizontalBleed}>
+        <DashboardChip active={selectedLeagueKey === ALL_LEAGUES_KEY} count={totalMatches} icon={Trophy} label="All leagues" onPress={() => onSelect(ALL_LEAGUES_KEY)} />
+        {isLoading
+          ? Array.from({ length: 4 }).map((_, index) => <View key={index} style={styles.leagueSkeleton} />)
+          : leagues.map((league) => (
+              <DashboardChip
+                active={selectedLeagueKey === league.key}
+                count={league.matchCount ?? 0}
+                key={league.key}
+                label={league.name}
+                onPress={() => onSelect(league.key)}
+              />
+            ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function LeagueLogoMark({ league }: { league: LeagueOption }) {
+  const theme = useAppTheme();
+
+  if (league.logoUrl) {
+    return (
+      <View style={[styles.leagueLogo, { backgroundColor: theme.white, borderColor: theme.border }]}>
+        <Image source={{ uri: league.logoUrl }} contentFit="contain" style={styles.leagueLogoImage} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.leagueLogo, { backgroundColor: theme.primarySubtle, borderColor: theme.border }]}>
+      <Text style={[styles.leagueInitials, { color: theme.primary }]}>{league.name.slice(0, 2).toUpperCase()}</Text>
+    </View>
+  );
+}
+
+function MatchCard({ match, league }: { match: FeedMatch; league: LeagueSection }) {
+  const theme = useAppTheme();
+  const accuracy = getConfidence(match);
+  const live = isLive(match);
+  const finished = isFinished(match);
+
+  return (
+    <DashboardGlassCard gradient="matchHero" style={styles.matchCard}>
+      <View style={styles.matchTop}>
+        <View style={styles.matchLeagueCopy}>
+          <Text numberOfLines={1} style={[styles.matchLeague, { color: theme.foregroundStrong }]}>{league.name}</Text>
+          <Text style={[styles.matchDate, { color: theme.mutedLight }]}>{formatMatchDate(match.kickoffTime)}</Text>
+        </View>
+        <View style={[styles.accuracyPill, { backgroundColor: 'rgba(79,141,130,0.32)' }]}>
+          <Sparkles color={theme.primary} size={13} />
+          <Text style={[styles.accuracyText, { color: theme.foregroundStrong }]}>
+            {finished ? 'Final' : live ? 'Live' : `${accuracy}% Accuracy`}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.matchTeams}>
+        <TeamSide name={match.homeTeam.name} logoUrl={match.homeTeam.logoUrl} />
+        <View style={styles.matchCenter}>
+          <Text style={[styles.matchCenterText, { color: theme.primary }]}>{centerLabel(match)}</Text>
+          <View style={[styles.scoreBadge, { backgroundColor: 'rgba(0,0,0,0.20)', borderColor: theme.border }]}>
+            <Text style={[styles.scoreBadgeText, { color: theme.mutedLight }]}>{scoreLabel(match)}</Text>
           </View>
         </View>
-      </GlassCard>
-    </PressableScale>
+        <TeamSide alignRight name={match.awayTeam.name} logoUrl={match.awayTeam.logoUrl} />
+      </View>
+
+      <View style={styles.pickGrid}>
+        <PredictionPick label={finished || live ? (finished ? 'Result' : 'Score') : match.predictionView ? 'Prediction' : 'Market'} value={finished || live ? scoreLabel(match) : getPredictionLabel(match)} />
+        <PredictionPick label={finished || live ? 'Status' : match.predictionView ? 'Signal' : 'Coverage'} value={finished || live ? match.status : getPredictionMeta(match)} />
+      </View>
+
+      <Text numberOfLines={3} style={[styles.matchSummary, { color: theme.mutedLight }]}>{matchSummary(match)}</Text>
+
+      <Link href={`/match/${match.fixtureId}` as any} asChild>
+        <PressableScale
+          accessibilityRole="button"
+          style={StyleSheet.flatten([styles.matchDetailsButton, { backgroundColor: theme.surface, borderColor: theme.border }])}>
+          <Text style={[styles.matchDetailsText, { color: theme.foregroundStrong }]}>Match Details</Text>
+          <View style={[styles.matchDetailsIcon, { backgroundColor: theme.primarySubtle }]}>
+            <ArrowUpRight color={theme.primary} size={15} />
+          </View>
+        </PressableScale>
+      </Link>
+    </DashboardGlassCard>
   );
 }
 
-const shortcuts = [
-  { href: '/build-ticket', icon: Bot, label: 'Build', meta: 'AI slip' },
-  { href: '/convert-ticket', icon: ArrowRightLeft, label: 'Convert', meta: 'Codes' },
-  { href: '/history', icon: History, label: 'History', meta: 'Saved' },
-  { href: '/referrals', icon: Gift, label: 'Referrals', meta: 'Earn' },
-] as const;
-
-function ShortcutGrid() {
-  const router = useRouter();
+function TeamSide({ alignRight, logoUrl, name }: { alignRight?: boolean; logoUrl?: string | null; name: string }) {
   const theme = useAppTheme();
 
   return (
-    <View style={styles.shortcutGrid}>
-      {shortcuts.map((item) => (
-        <PressableScale
-          accessibilityLabel={item.label}
-          accessibilityRole="button"
-          key={item.href}
-          onPress={() => router.push(item.href as any)}
-          style={[styles.shortcutCard, { backgroundColor: theme.field, borderColor: theme.border }]}>
-          <View style={[styles.shortcutIcon, { backgroundColor: theme.primarySubtle, borderColor: theme.borderAccent }]}>
-            <item.icon color={theme.primarySoft} size={17} />
+    <View style={[styles.teamSide, alignRight ? styles.teamSideRight : null]}>
+      <TeamLogo logoUrl={logoUrl} name={name} size={44} />
+      <Text numberOfLines={2} style={[styles.teamName, alignRight ? styles.teamNameRight : null, { color: theme.foregroundStrong }]}>
+        {name}
+      </Text>
+    </View>
+  );
+}
+
+function PredictionPick({ label, value }: { label: string; value: string }) {
+  const theme = useAppTheme();
+
+  return (
+    <View style={[styles.pick, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+      <Text style={[styles.pickLabel, { color: theme.muted }]}>{label}</Text>
+      <Text numberOfLines={2} style={[styles.pickValue, { color: theme.foregroundStrong }]}>{value}</Text>
+    </View>
+  );
+}
+
+function LeagueMatchSection({ league }: { league: LeagueSection }) {
+  const theme = useAppTheme();
+
+  return (
+    <View style={styles.leagueSection}>
+      <View style={[styles.leagueHeader, { borderColor: theme.border }]}>
+        <View style={styles.leagueHeaderLeft}>
+          <LeagueLogoMark league={league} />
+          <View style={styles.leagueTitleCopy}>
+            <Text numberOfLines={1} style={[styles.leagueTitle, { color: theme.foregroundStrong }]}>{league.name}</Text>
+            {league.country ? <Text style={[styles.leagueCountry, { color: theme.muted }]}>{league.country}</Text> : null}
           </View>
-          <View style={styles.shortcutCopy}>
-            <Text numberOfLines={1} style={[styles.shortcutLabel, { color: theme.foregroundStrong }]}>{item.label}</Text>
-            <Text numberOfLines={1} style={[styles.shortcutMeta, { color: theme.muted }]}>{item.meta}</Text>
-          </View>
-          <ChevronRight color={theme.mutedLight} size={15} />
-        </PressableScale>
-      ))}
+        </View>
+        <View style={[styles.leagueCount, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.leagueCountText, { color: theme.mutedLight }]}>{league.matches.length} matches</Text>
+        </View>
+      </View>
+      <View style={styles.matchList}>
+        {league.matches.map((match) => (
+          <MatchCard key={`${league.key}-${match.fixtureId}`} league={league} match={match} />
+        ))}
+      </View>
     </View>
   );
 }
 
 export default function DashboardScreen() {
-  const router = useRouter();
   const theme = useAppTheme();
-  const [selectedSport, setSelectedSport] = useState('football');
-  const [selectedLeague, setSelectedLeague] = useState('all');
+  const initialDate = dateKey(0);
+  const [todayKey, setTodayKey] = useState(initialDate);
+  const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [selectedLeagueKey, setSelectedLeagueKey] = useState(ALL_LEAGUES_KEY);
+  const [query, setQuery] = useState('');
   const [communityInvite, setCommunityInvite] = useState<TelegramCommunityInvite | null>(null);
   const [communityMessage, setCommunityMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const nextToday = dateKey(0);
+      setTodayKey(nextToday);
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const dateOptions = useMemo(
+    () =>
+      dateStripKeys(todayKey).map((value) => {
+        const date = dateFromKey(value);
+        return { main: formatDateStripMain(date, todayKey), sub: formatDateStripSub(date), value };
+      }),
+    [todayKey],
+  );
+  const selectedDateLabel = useMemo(() => formatSelectedDateLabel(selectedDate), [selectedDate]);
+  const debouncedQuery = query.trim();
+  const activeLeagueKey = selectedLeagueKey === ALL_LEAGUES_KEY ? undefined : selectedLeagueKey;
+
   const me = useMe();
   const subscription = useSubscriptionCurrent();
   const notificationSummary = useNotificationSummary();
   const communityStatus = useTelegramCommunityStatus();
   const createCommunityInvite = useCreateTelegramCommunityInviteMutation();
-  const leagueList = useLeagues({ dateRange: 'today', windowDays: 1 });
-  const leagueOptions = useMemo<LeaguePillOption[]>(
-    () => [
-      { id: 'all', label: 'All' },
-      ...(leagueList.data ?? []).map((league) => ({
-        id: league.key,
-        label: league.name,
-        logoUrl: league.logoUrl,
-      })),
-    ],
-    [leagueList.data],
+  const leagues = useLeagues({ date: selectedDate, windowDays: 1 });
+  const hasDailyTicketAccess =
+    subscription.data?.accessTier === 'PREMIUM' &&
+    !subscription.data?.isPremiumExhausted &&
+    !subscription.data?.isBelowMinimumTokenBalance;
+  const dailyTicket = useDailyTicket(
+    {
+      bookmakerPlatform: DAILY_TICKET_BOOKMAKER_PLATFORM,
+      date: selectedDate,
+      maxLegs: 4,
+      sport: 'FOOTBALL',
+      targetOdds: 2,
+    },
+    { enabled: hasDailyTicketAccess },
   );
-  const activeLeague = leagueOptions.some((league) => league.id === selectedLeague) ? selectedLeague : 'all';
-  const homeFeed = useHomeFeed({
-    leagueKey: activeLeague !== 'all' ? activeLeague : undefined,
+  const feed = useInfiniteHomeFeed({
+    date: selectedDate,
+    leagueKey: activeLeagueKey,
     limit: 24,
+    query: debouncedQuery || undefined,
     windowDays: 1,
   });
-  const matches = useMemo(() => flattenHomeFeed(homeFeed.data), [homeFeed.data]);
-  const liveMatch = matches.find((match) => match.status === 'Live') ?? matches[0];
-  const feedMatches = matches.filter((match) => match.id !== liveMatch?.id).slice(0, 3);
-  const sectionCaption = `${getSportLabel(selectedSport)} analysis-ready fixtures`;
+
+  const leagueOptions = useMemo(() => ((leagues.data ?? []).slice().sort(compareLeagues)), [leagues.data]);
+  const feedPages = useMemo(() => feed.data?.pages ?? [], [feed.data?.pages]);
+  const leagueSections = useMemo(() => buildLeagueSections(feedPages), [feedPages]);
+  const flatMatches = useMemo(() => leagueSections.flatMap((league) => league.matches), [leagueSections]);
+  const totalMatches = feedPages[0]?.totalMatches ?? flatMatches.length;
+  const bestAccuracy = flatMatches.reduce((max, match) => Math.max(max, getConfidence(match)), 0);
   const tokenBalance = subscription.data?.researchTokensRemaining ?? me.data?.researchTokensRemaining ?? 0;
 
-  const handleSportSelect = (sportId: string) => {
-    setSelectedSport(sportId);
-    if (sportId !== 'football') {
-      setSelectedLeague('all');
-    }
+  const handleDateSelect = (value: string) => {
+    setSelectedDate(value);
+    setSelectedLeagueKey(ALL_LEAGUES_KEY);
   };
 
   const handleTelegramJoin = () => {
     setCommunityMessage(null);
     createCommunityInvite.mutate(undefined, {
-      onError: (error) => {
-        setCommunityMessage({ type: 'error', text: error.message });
-      },
+      onError: (error) => setCommunityMessage({ type: 'error', text: error.message }),
       onSuccess: (invite) => {
         setCommunityInvite(invite);
         setCommunityMessage({ type: 'success', text: 'Invite ready. Opening Telegram.' });
@@ -373,123 +837,132 @@ export default function DashboardScreen() {
 
   return (
     <Screen hasTabs>
-      <Animated.View entering={enterUp(0)}>
-        <HomeHeader name={me.data?.name} tokenBalance={tokenBalance} unreadCount={notificationSummary.data?.unreadCount ?? 0} />
-      </Animated.View>
+      <DashboardUtilityBar
+        image={me.data?.image}
+        name={me.data?.name}
+        query={query}
+        tokenBalance={tokenBalance}
+        unreadCount={notificationSummary.data?.unreadCount ?? 0}
+        onQueryChange={setQuery}
+      />
 
-      <Animated.View entering={enterUp(1)}>
-        <SportPills onSelect={handleSportSelect} selected={selectedSport} />
-      </Animated.View>
+      <PredictionHero
+        bestAccuracy={bestAccuracy}
+        isLoading={feed.isLoading && feedPages.length === 0}
+        matchCount={totalMatches}
+        selectedDateLabel={selectedDateLabel}
+      />
 
-      <Animated.View entering={enterUp(2)}>
-        <LeagueRail onSelect={setSelectedLeague} options={leagueOptions} selected={activeLeague} />
-      </Animated.View>
+      <TelegramCommunityCard
+        invite={communityInvite}
+        isCreating={createCommunityInvite.isPending}
+        isLoading={communityStatus.isLoading}
+        message={communityMessage}
+        status={communityStatus.data}
+        onJoin={handleTelegramJoin}
+      />
 
-      <Animated.View entering={enterUp(3)}>
-        {liveMatch ? (
-          <LiveMatchHero match={liveMatch} />
-        ) : (
-          <GlassCard style={styles.emptyState}>
-            <Text style={[styles.emptyTitle, { color: theme.foregroundStrong }]}>
-              {homeFeed.isLoading ? 'Loading fixtures' : 'No live fixture yet'}
-            </Text>
-            <Text style={[styles.emptyCopy, { color: theme.muted }]}>
-              Matchday analysis will appear here when the feed has fixtures.
-            </Text>
-          </GlassCard>
-        )}
-      </Animated.View>
+      <ReferralPrompt />
 
-      <Animated.View entering={enterUp(4)}>
-        <TelegramCommunityCard
-          invite={communityInvite}
-          isCreating={createCommunityInvite.isPending}
-          isLoading={communityStatus.isLoading}
-          message={communityMessage}
-          status={communityStatus.data}
-          onJoin={handleTelegramJoin}
-        />
-      </Animated.View>
+      <DateStrip dates={dateOptions} selectedDate={selectedDate} onSelect={handleDateSelect} />
 
-      <Animated.View entering={enterUp(5)} style={styles.sectionHeader}>
-        <View>
-          <Text style={[styles.sectionTitle, { color: theme.foregroundStrong }]}>Today Match</Text>
-          <Text style={[styles.sectionCaption, { color: theme.muted }]}>{sectionCaption}</Text>
+      <DailyTicketCard
+        dailyTicket={dailyTicket.data}
+        error={dailyTicket.error?.message}
+        isAccessLoading={subscription.isLoading}
+        isLoading={dailyTicket.isLoading || (dailyTicket.isFetching && !dailyTicket.data)}
+        isLocked={!hasDailyTicketAccess}
+        selectedDateLabel={selectedDateLabel}
+      />
+
+      <LeagueFilterBar
+        isLoading={leagues.isLoading}
+        leagues={leagueOptions}
+        selectedLeagueKey={selectedLeagueKey}
+        totalMatches={totalMatches}
+        onSelect={setSelectedLeagueKey}
+      />
+
+      {feed.isLoading && feedPages.length === 0 ? (
+        <View style={styles.loadingList}>
+          {Array.from({ length: 3 }).map((_, index) => (
+            <DashboardGlassCard key={index}>
+              <View style={[styles.skeletonLine, { backgroundColor: theme.surface }]} />
+              <View style={[styles.skeletonBlock, { backgroundColor: theme.surface }]} />
+              <View style={[styles.skeletonLineShort, { backgroundColor: theme.surface }]} />
+            </DashboardGlassCard>
+          ))}
         </View>
-        <PressableScale accessibilityLabel="See all matches" accessibilityRole="button" onPress={() => router.push('/matches' as any)} style={styles.seeAll}>
-          <Text style={[styles.sectionAction, { color: theme.primarySoft }]}>View all</Text>
-          <ChevronRight color={theme.primarySoft} size={16} strokeWidth={2.6} />
-        </PressableScale>
-      </Animated.View>
-
-      {feedMatches.length === 0 ? (
-        <Animated.View entering={enterUp(6)}>
-          <GlassCard style={styles.emptyState}>
-            <Text style={[styles.emptyTitle, { color: theme.foregroundStrong }]}>No fixtures found</Text>
-            <Text style={[styles.emptyCopy, { color: theme.muted }]}>Switch sport or league for another slate.</Text>
-          </GlassCard>
-        </Animated.View>
-      ) : null}
-
-      {feedMatches.map((match, index) => (
-        <Animated.View entering={enterUp(6 + index)} key={match.id}>
-          <MatchFeedCard match={match} />
-        </Animated.View>
-      ))}
-
-      <Animated.View entering={FadeIn.delay(280).duration(220)}>
-        <ShortcutGrid />
-      </Animated.View>
+      ) : flatMatches.length > 0 ? (
+        <View style={styles.sections}>
+          {leagueSections.map((league) => (
+            <LeagueMatchSection key={league.key} league={league} />
+          ))}
+          <View style={styles.loadMoreWrap}>
+            <View style={[styles.loadMorePill, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              {feed.isFetchingNextPage ? <LoaderCircle color={theme.primary} size={15} /> : null}
+              <Text style={[styles.loadMoreText, { color: theme.mutedLight }]}>
+                Showing {Math.min(flatMatches.length, totalMatches)} of {totalMatches} matches
+              </Text>
+              {feed.hasNextPage ? (
+                <PressableScale accessibilityRole="button" disabled={feed.isFetchingNextPage} onPress={() => feed.fetchNextPage()} style={styles.loadMoreButton}>
+                  <Text style={[styles.loadMoreButtonText, { color: theme.primary }]}>Load more</Text>
+                </PressableScale>
+              ) : (
+                <Text style={[styles.loadMoreButtonText, { color: theme.muted }]}>All loaded</Text>
+              )}
+            </View>
+          </View>
+        </View>
+      ) : (
+        <DashboardStatePanel icon={Search} title="No fixtures found">
+          {debouncedQuery ? `No fixtures match ${debouncedQuery}.` : 'Try another date or league for the next slate.'}
+        </DashboardStatePanel>
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  brandTitle: {
-    color: '#ffffff',
-    fontFamily: fonts.extraBold,
-    fontSize: 27,
-    letterSpacing: 0,
-    lineHeight: 31,
-  },
-  circleButton: {
+  accuracyPill: {
     alignItems: 'center',
     borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 42,
-    justifyContent: 'center',
-    width: 42,
-  },
-  communityBadge: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
   },
-  communityBadgeText: {
+  accuracyText: {
+    fontFamily: fonts.bold,
+    fontSize: 12,
+  },
+  avatar: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    height: 34,
+    width: 34,
+  },
+  bookingCode: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: spacing.md,
+  },
+  bookingLabel: {
     fontFamily: fonts.bold,
     fontSize: 10,
+    textTransform: 'uppercase',
+  },
+  bookingValue: {
+    fontFamily: fonts.extraBold,
+    fontSize: 20,
+    letterSpacing: 0,
+    marginTop: 4,
   },
   communityButton: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    flexDirection: 'row',
-    gap: 7,
-    height: 42,
-    justifyContent: 'center',
-    minWidth: 160,
-    overflow: 'hidden',
-    paddingHorizontal: spacing.md,
-  },
-  communityButtonText: {
-    fontFamily: fonts.extraBold,
-    fontSize: 13,
+    minWidth: 170,
   },
   communityCard: {
-    gap: spacing.md,
+    gap: spacing.lg,
   },
   communityCopy: {
     flex: 1,
@@ -506,27 +979,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
-    height: 46,
+    height: 48,
     justifyContent: 'center',
-    width: 46,
+    width: 48,
   },
   communityStatus: {
     flex: 1,
     fontFamily: fonts.bold,
-    fontSize: 11,
-    minWidth: 120,
+    fontSize: 12,
+    minWidth: 110,
   },
   communityText: {
     fontFamily: fonts.medium,
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: 5,
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 6,
   },
   communityTitle: {
-    color: '#ffffff',
     flex: 1,
     fontFamily: fonts.extraBold,
-    fontSize: 16,
+    fontSize: 18,
   },
   communityTitleRow: {
     alignItems: 'center',
@@ -536,361 +1008,499 @@ const styles = StyleSheet.create({
   communityTop: {
     alignItems: 'flex-start',
     flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  dot: {
-    borderRadius: radius.pill,
-    height: 6,
-    opacity: 0.45,
-    width: 6,
-  },
-  dotActive: {
-    borderRadius: radius.pill,
-    height: 6,
-    width: 28,
-  },
-  emptyCopy: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-  },
-  emptyState: {
-    gap: 4,
-    padding: spacing.md,
-  },
-  emptyTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 15,
-  },
-  headerActions: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  headerLeft: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    minWidth: 0,
-  },
-  headerRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-    justifyContent: 'space-between',
-  },
-  heroActions: {
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  heroCard: {
     gap: spacing.md,
-    overflow: 'hidden',
-    padding: spacing.md,
   },
-  heroCenterBlock: {
+  dateChip: {
     alignItems: 'center',
-    flex: 1,
-    minWidth: 92,
-  },
-  heroDots: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 7,
-  },
-  heroLeague: {
-    color: 'rgba(255,255,255,0.70)',
-    fontFamily: fonts.bold,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  heroScorePanel: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 22,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    gap: spacing.sm,
-    padding: spacing.md,
+    height: 62,
+    justifyContent: 'center',
+    minWidth: 118,
+    paddingHorizontal: spacing.lg,
   },
-  heroSectionTitle: {
-    color: '#ffffff',
-    fontFamily: fonts.extraBold,
-    fontSize: 20,
-  },
-  heroSideLabel: {
-    color: 'rgba(255,255,255,0.64)',
-    fontFamily: fonts.medium,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  heroTeamName: {
-    color: '#ffffff',
+  dateChipMain: {
     fontFamily: fonts.extraBold,
     fontSize: 14,
-    marginTop: spacing.xs,
-    textAlign: 'center',
   },
-  heroTeamSide: {
-    alignItems: 'center',
-    flex: 1,
-    minWidth: 0,
-  },
-  heroTeamsContainer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-    justifyContent: 'space-between',
-  },
-  heroTop: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  heroVenue: {
-    color: '#ffffff',
-    fontFamily: fonts.extraBold,
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  heroVenuePill: {
-    alignSelf: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: radius.pill,
-    maxWidth: '78%',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 7,
-  },
-  heroWeek: {
-    color: 'rgba(255,255,255,0.70)',
+  dateChipSub: {
     fontFamily: fonts.medium,
     fontSize: 12,
-    textAlign: 'center',
+    marginTop: 2,
   },
-  horizontal: {
+  datePill: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    height: 44,
+    paddingHorizontal: spacing.lg,
+  },
+  datePillText: {
+    fontFamily: fonts.bold,
+    fontSize: 13,
+  },
+  dateStripContent: {
+    gap: spacing.sm,
+    paddingRight: spacing.md,
+  },
+  filterBlock: {
+    gap: spacing.md,
+  },
+  hero: {
+    gap: spacing.xl,
+    paddingVertical: spacing.xl,
+  },
+  heroActions: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  heroContent: {
+    gap: spacing.sm,
+  },
+  heroCopy: {
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    lineHeight: 23,
+  },
+  heroGlow: {
+    backgroundColor: 'rgba(46,242,208,0.04)',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  heroTitle: {
+    fontFamily: fonts.extraBold,
+    fontSize: 32,
+    lineHeight: 38,
+  },
+  horizontalBleed: {
     marginRight: -spacing.md,
   },
-  kicker: {
+  iconPill: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  leagueCount: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+  },
+  leagueCountText: {
     fontFamily: fonts.bold,
-    fontSize: 11,
-    textTransform: 'uppercase',
+    fontSize: 12,
+  },
+  leagueCountry: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  leagueHeader: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    justifyContent: 'space-between',
+    paddingBottom: spacing.md,
+  },
+  leagueHeaderLeft: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    minWidth: 0,
   },
   leagueInitials: {
     fontFamily: fonts.extraBold,
     fontSize: 12,
   },
-  leagueItem: {
-    alignItems: 'center',
-    gap: spacing.xs,
-    width: 78,
-  },
-  leagueLabel: {
-    fontFamily: fonts.bold,
-    fontSize: 11,
-    maxWidth: 74,
-    textAlign: 'center',
-  },
-  leagueLogoImage: {
-    height: 38,
-    width: 38,
-  },
-  leagueLogoWrap: {
+  leagueLogo: {
     alignItems: 'center',
     borderRadius: radius.pill,
-    borderWidth: 2,
-    height: 62,
+    borderWidth: 1,
+    height: 44,
     justifyContent: 'center',
     overflow: 'hidden',
-    width: 62,
+    width: 44,
+  },
+  leagueLogoImage: {
+    height: 32,
+    width: 32,
   },
   leagueRail: {
     gap: spacing.sm,
     paddingRight: spacing.md,
   },
-  liveDot: {
+  leagueSection: {
+    gap: spacing.md,
+  },
+  leagueSkeleton: {
     borderRadius: radius.pill,
-    height: 8,
-    width: 8,
+    height: 46,
+    opacity: 0.5,
+    width: 150,
   },
-  liveTimeRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 2,
+  leagueTitle: {
+    fontFamily: fonts.extraBold,
+    fontSize: 18,
   },
-  liveTimeText: {
-    color: 'rgba(255,255,255,0.78)',
+  leagueTitleCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  legCopy: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
+  },
+  legMarket: {
     fontFamily: fonts.bold,
     fontSize: 12,
+    marginTop: 5,
   },
-  matchAwaySide: {
-    justifyContent: 'flex-end',
+  legMeta: {
+    fontFamily: fonts.semibold,
+    fontSize: 11,
   },
-  matchCenter: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 72,
-  },
-  matchDateText: {
+  legReason: {
     fontFamily: fonts.medium,
-    fontSize: 10,
-    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 18,
   },
-  matchFeedCard: {
+  legRow: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
     padding: spacing.md,
   },
-  matchTeamLabel: {
-    flexShrink: 1,
+  legStat: {
+    alignItems: 'center',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    minWidth: 62,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  legStatLabel: {
+    fontFamily: fonts.bold,
+    fontSize: 10,
+    textTransform: 'uppercase',
+  },
+  legStatValue: {
+    fontFamily: fonts.extraBold,
+    fontSize: 16,
+    marginTop: 2,
+  },
+  legStats: {
+    gap: spacing.sm,
+  },
+  legTeams: {
     fontFamily: fonts.extraBold,
     fontSize: 14,
   },
-  matchTeamSide: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    minWidth: 0,
-  },
-  matchTeamsRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
+  legsList: {
     gap: spacing.sm,
   },
-  matchTimeText: {
+  loadMoreButton: {
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  loadMoreButtonText: {
     fontFamily: fonts.extraBold,
-    fontSize: 13,
+    fontSize: 12,
   },
-  pillRow: {
-    gap: spacing.sm,
-    paddingRight: spacing.md,
-  },
-  profileAvatar: {
-    borderColor: 'rgba(255,255,255,0.24)',
+  loadMorePill: {
+    alignItems: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
-    height: 40,
-    width: 40,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
-  scoreText: {
-    color: '#ffffff',
-    fontFamily: fonts.extraBold,
-    fontSize: 40,
-    lineHeight: 44,
-    textAlign: 'center',
-  },
-  sectionAction: {
+  loadMoreText: {
     fontFamily: fonts.bold,
     fontSize: 12,
   },
-  sectionCaption: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  sectionHeader: {
+  loadMoreWrap: {
     alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing.xs,
+    paddingBottom: spacing.sm,
   },
-  sectionTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 21,
+  loadingList: {
+    gap: spacing.md,
   },
-  seeAll: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 2,
-  },
-  shortcutCard: {
+  lockPreview: {
     alignItems: 'center',
     borderRadius: radius.lg,
     borderWidth: 1,
-    flexBasis: '47%',
     flexDirection: 'row',
-    flexGrow: 1,
     gap: spacing.sm,
-    minHeight: 60,
-    padding: spacing.sm,
+    justifyContent: 'center',
+    minHeight: 92,
   },
-  shortcutCopy: {
+  lockPreviewText: {
+    fontFamily: fonts.extraBold,
+    fontSize: 13,
+  },
+  matchCard: {
+    gap: spacing.lg,
+  },
+  matchCenter: {
+    alignItems: 'center',
+    flex: 0.72,
+    gap: spacing.sm,
+    minWidth: 72,
+  },
+  matchCenterText: {
+    fontFamily: fonts.extraBold,
+    fontSize: 18,
+  },
+  matchDate: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    marginTop: 3,
+  },
+  matchDetailsButton: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    height: 44,
+    justifyContent: 'center',
+    minWidth: 190,
+    paddingHorizontal: spacing.lg,
+  },
+  matchDetailsIcon: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  matchDetailsText: {
+    fontFamily: fonts.extraBold,
+    fontSize: 13,
+  },
+  matchLeague: {
+    fontFamily: fonts.extraBold,
+    fontSize: 14,
+  },
+  matchLeagueCopy: {
     flex: 1,
     minWidth: 0,
   },
-  shortcutGrid: {
+  matchList: {
+    gap: spacing.md,
+  },
+  matchSummary: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    lineHeight: 19,
+  },
+  matchTeams: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  matchTop: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: spacing.md,
+    justifyContent: 'space-between',
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  pick: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 72,
+    padding: spacing.md,
+  },
+  pickGrid: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  pickLabel: {
+    fontFamily: fonts.bold,
+    fontSize: 10,
+    textTransform: 'uppercase',
+  },
+  pickValue: {
+    fontFamily: fonts.extraBold,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 5,
+  },
+  privateBadge: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  privateBadgeText: {
+    fontFamily: fonts.bold,
+    fontSize: 10,
+  },
+  referralAction: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+  },
+  referralActionText: {
+    fontFamily: fonts.extraBold,
+    fontSize: 12,
+  },
+  referralCard: {
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    justifyContent: 'space-between',
+    padding: spacing.md,
+  },
+  referralIcon: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  referralLeft: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    minWidth: 0,
+  },
+  referralText: {
+    flex: 1,
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  scoreBadge: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  scoreBadgeText: {
+    fontFamily: fonts.bold,
+    fontSize: 10,
+    textTransform: 'uppercase',
+  },
+  sections: {
+    gap: spacing.xl,
+  },
+  skeletonBlock: {
+    borderRadius: radius.lg,
+    height: 110,
+  },
+  skeletonLine: {
+    borderRadius: radius.pill,
+    height: 18,
+    width: '64%',
+  },
+  skeletonLineShort: {
+    borderRadius: radius.pill,
+    height: 14,
+    width: '44%',
+  },
+  teamName: {
+    fontFamily: fonts.extraBold,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: spacing.sm,
+    textAlign: 'left',
+  },
+  teamNameRight: {
+    textAlign: 'right',
+  },
+  teamSide: {
+    flex: 1,
+    minWidth: 0,
+  },
+  teamSideRight: {
+    alignItems: 'flex-end',
+  },
+  ticketCopy: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  ticketHeader: {
+    alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  shortcutIcon: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 34,
-    justifyContent: 'center',
-    width: 34,
+  ticketMetrics: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
-  shortcutLabel: {
+  ticketTitle: {
     fontFamily: fonts.extraBold,
-    fontSize: 13,
-  },
-  shortcutMeta: {
-    fontFamily: fonts.medium,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  sportLabel: {
-    fontFamily: fonts.extraBold,
-    fontSize: 14,
-  },
-  sportPill: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 42,
-    justifyContent: 'center',
-    minWidth: 122,
-    overflow: 'hidden',
-    paddingHorizontal: spacing.lg,
-  },
-  tokenLabel: {
-    fontFamily: fonts.bold,
-    fontSize: 9,
-    marginTop: -1,
-  },
-  tokenPill: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 42,
-    justifyContent: 'center',
-    minWidth: 58,
-    paddingHorizontal: 9,
-  },
-  tokenValue: {
-    fontFamily: fonts.extraBold,
-    fontSize: 12,
+    fontSize: 24,
+    lineHeight: 30,
   },
   unreadDot: {
     borderRadius: radius.pill,
     height: 8,
     position: 'absolute',
-    right: 9,
-    top: 9,
+    right: 8,
+    top: 8,
     width: 8,
   },
-  watchButton: {
+  userName: {
+    display: 'none',
+    fontFamily: fonts.bold,
+    fontSize: 12,
+  },
+  utility: {
+    gap: spacing.md,
+  },
+  utilityActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  walletPill: {
     alignItems: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
+    flex: 1,
     flexDirection: 'row',
-    gap: 8,
-    height: 48,
+    gap: spacing.sm,
+    height: 40,
     justifyContent: 'center',
-    width: '100%',
+    paddingHorizontal: spacing.md,
   },
-  watchButtonText: {
-    color: '#ffffff',
+  walletText: {
     fontFamily: fonts.extraBold,
-    fontSize: 15,
+    fontSize: 13,
   },
 });

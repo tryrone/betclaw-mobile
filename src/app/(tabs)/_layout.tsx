@@ -20,7 +20,11 @@ export default function TabLayout() {
       tabBar={(props) => <TabBar {...props} />}>
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       <Tabs.Screen name="fix-ticket" options={{ title: 'Fix' }} />
+      <Tabs.Screen name="build-ticket" options={{ title: 'Build' }} />
+      <Tabs.Screen name="convert-ticket" options={{ title: 'Convert' }} />
+      <Tabs.Screen name="history" options={{ title: 'History' }} />
       <Tabs.Screen name="wallet" options={{ title: 'Wallet' }} />
+      <Tabs.Screen name="referrals" options={{ title: 'Referrals' }} />
       <Tabs.Screen name="settings" options={{ title: 'Me' }} />
     </Tabs>
   );

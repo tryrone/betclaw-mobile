@@ -8,10 +8,15 @@ export const spacing = {
   xxxl: 32,
 } as const;
 
+export const layout = {
+  /** Outer horizontal/top gutter applied by Screen (was spacing.md = 12). */
+  screenGutter: 6,
+} as const;
+
 export const radius = {
   sm: 8,
-  md: 14,
+  md: 12,
   lg: 18,
-  xl: 22,
+  xl: 24,
   pill: 999,
 } as const;

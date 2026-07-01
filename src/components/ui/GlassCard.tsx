@@ -39,13 +39,13 @@ export function GlassCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
     elevation: 5,
     gap: spacing.sm,
-    padding: spacing.md,
+    padding: spacing.lg,
     shadowOffset: { height: 12, width: 0 },
-    shadowOpacity: 0.09,
-    shadowRadius: 22,
+    shadowOpacity: 0.26,
+    shadowRadius: 28,
   },
 });

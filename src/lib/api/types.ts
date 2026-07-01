@@ -24,7 +24,10 @@ export type UserProfile = MobileUser & {
 };
 
 export type HomeFeed = {
-  leagues?: unknown[];
+  date?: string;
+  leagues?: LeagueGroup[];
+  nextCursor?: string | null;
+  totalMatches?: number;
 };
 
 export type LeagueOption = {
@@ -33,6 +36,110 @@ export type LeagueOption = {
   logoUrl?: string | null;
   matchCount?: number;
   name: string;
+};
+
+export type PredictionView = {
+  confidence?: number | null;
+  edgeScore?: number | null;
+  fallbackType?: 'predictionPick' | 'apiFootball' | 'marketFavorite' | string;
+  kind?: 'prediction' | 'lean' | string;
+  label?: string | null;
+  marketLabel?: string | null;
+  odds?: number | null;
+  source?: 'betclaw' | 'apiFootball' | 'marketLean' | string;
+  sourceLabel?: string | null;
+  summary?: string | null;
+};
+
+export type MatchDataSnapshotPayload = {
+  available?: {
+    lineups?: boolean;
+    odds?: boolean;
+    players?: boolean;
+    prediction?: boolean;
+    stats?: boolean;
+  };
+  elapsedMinute?: number | null;
+  phase?: 'prematch' | 'live' | 'finished' | string;
+  readiness?: {
+    label?: string;
+    score?: number | null;
+    status?: string;
+  };
+  score?: string | null;
+  status?: string;
+  updatedAt?: string | Date | null;
+};
+
+export type FeedMatch = {
+  awayTeam: TeamReference;
+  bestMarket?: {
+    confidence?: number | null;
+    edgeScore?: number | null;
+    label?: string | null;
+    odds?: number | null;
+    summary?: string | null;
+  } | null;
+  dataReadiness?: {
+    score?: number | null;
+    status?: string | null;
+  } | null;
+  dataSnapshot?: MatchDataSnapshotPayload | null;
+  elapsedMinute?: number | null;
+  fixtureId: string;
+  homeTeam: TeamReference;
+  kickoffTime: string | Date;
+  leagueKey?: string;
+  predictionView?: PredictionView | null;
+  score?: string | null;
+  sourceKind?: 'canonical' | 'bookmakerFallback' | string;
+  status: string;
+};
+
+export type LeagueGroup = LeagueOption & {
+  matches?: FeedMatch[];
+};
+
+export type DailyTicketBookmakerPlatform = 'API_FOOTBALL' | 'SPORTYBET';
+
+export type DailyTicketLeg = {
+  awayTeam: string;
+  bookmakerPlatform: DailyTicketBookmakerPlatform;
+  confidence: number;
+  edgeScore?: number | null;
+  edgeSummary?: string | null;
+  eventId: string;
+  expectedValue?: number | null;
+  homeTeam: string;
+  id: string;
+  isVipPick: boolean;
+  kickoffTime?: string | Date | null;
+  league: string;
+  marketId: string;
+  modelSummary?: string | null;
+  odds: number;
+  selectionId: string;
+  selectionLabel?: string | null;
+  selectionTeam?: string | null;
+  specifier?: string | null;
+  verdict: string;
+};
+
+export type DailyTicketData = {
+  avgConfidence: number | null;
+  bookmakerPlatform: DailyTicketBookmakerPlatform;
+  bookingCode?: string | null;
+  date: string;
+  emptyReason?: string | null;
+  generatedAt: string | Date;
+  idealMaxOdds?: number;
+  idealMinOdds?: number;
+  legCount: number;
+  legs: DailyTicketLeg[];
+  sport: string;
+  targetOdds: number;
+  ticketId?: string | null;
+  totalOdds: number | null;
 };
 
 export type TeamReference = {

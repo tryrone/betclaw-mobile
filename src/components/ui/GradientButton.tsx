@@ -46,12 +46,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     flexDirection: 'row',
     gap: 8,
-    height: 48,
+    height: 44,
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
   label: {
     fontFamily: fonts.extraBold,
-    fontSize: 15,
+    fontSize: 14,
   },
 });

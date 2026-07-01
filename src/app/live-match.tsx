@@ -41,7 +41,7 @@ export default function LiveMatchScreen() {
             <ChevronLeft color="#ffffff" size={23} />
           </PressableScale>
           <View style={styles.livePill}>
-            <LinearGradient colors={['#bdf14a', '#93D51F']} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={StyleSheet.absoluteFill} />
+            <LinearGradient colors={[theme.primary, theme.primary]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={StyleSheet.absoluteFill} />
             <Video color={theme.primaryDark} size={15} />
             <Text style={[styles.livePillText, { color: theme.primaryDark }]}>Live</Text>
           </View>
@@ -51,7 +51,7 @@ export default function LiveMatchScreen() {
         </View>
 
         <View style={styles.pauseWrap}>
-          <View style={styles.pauseButton}>
+          <View style={[styles.pauseButton, { backgroundColor: theme.primaryGlowStrong }]}>
             <Pause color="#ffffff" fill="#ffffff" size={34} />
           </View>
         </View>
@@ -74,8 +74,8 @@ export default function LiveMatchScreen() {
           </View>
           <Text style={styles.clock}>{match?.clock ?? match?.time ?? '00:43:43'}</Text>
           <View style={styles.progressTrack}>
-            <LinearGradient colors={['#bdf14a', '#93D51F']} end={{ x: 1, y: 0 }} start={{ x: 0, y: 0 }} style={styles.progressFill} />
-            <View style={styles.progressThumb} />
+            <LinearGradient colors={[theme.primary, theme.primary]} end={{ x: 1, y: 0 }} start={{ x: 0, y: 0 }} style={styles.progressFill} />
+            <View style={[styles.progressThumb, { borderColor: theme.primary }]} />
           </View>
         </View>
       </SafeAreaView>
@@ -117,6 +117,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontFamily: fonts.extraBold,
     fontSize: 20,
+    fontVariant: ['tabular-nums'],
   },
   competition: {
     color: '#ffffff',
@@ -159,7 +160,6 @@ const styles = StyleSheet.create({
   },
   pauseButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(169,232,40,0.28)',
     borderColor: 'rgba(255,255,255,0.32)',
     borderRadius: 46,
     borderWidth: 1,
@@ -179,7 +179,6 @@ const styles = StyleSheet.create({
   },
   progressThumb: {
     backgroundColor: '#ffffff',
-    borderColor: '#93D51F',
     borderRadius: radius.pill,
     borderWidth: 3,
     height: 22,

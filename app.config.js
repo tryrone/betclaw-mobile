@@ -40,7 +40,7 @@ module.exports = {
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: 'betclaw',
-    userInterfaceStyle: 'automatic',
+    userInterfaceStyle: 'dark',
     ios: {
       bundleIdentifier: 'com.betclaw.app',
       icon: './assets/images/ios-icon.png',

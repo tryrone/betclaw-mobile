@@ -2,7 +2,10 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Background } from '@/components/ui/Background';
-import { spacing } from '@/theme/spacing';
+import { layout, spacing } from '@/theme/spacing';
+
+/** Clearance for content above the floating bottom dock (dock 68 + glow + breathing room). */
+const NAV_CLEARANCE = 124;
 
 export function Screen({
   children,
@@ -14,7 +17,7 @@ export function Screen({
   scroll?: boolean;
 }) {
   const insets = useSafeAreaInsets();
-  const bottomPadding = (hasTabs ? 88 : 24) + insets.bottom;
+  const bottomPadding = (hasTabs ? NAV_CLEARANCE : 24) + insets.bottom;
 
   return (
     <Background>
@@ -38,10 +41,10 @@ export function Screen({
 
 const styles = StyleSheet.create({
   content: {
-    gap: spacing.md,
+    gap: spacing.lg,
     maxWidth: 390,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
+    paddingHorizontal: layout.screenGutter,
+    paddingTop: layout.screenGutter,
     width: '100%',
   },
   fill: {

@@ -37,7 +37,9 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: fonts.semibold,
-    fontSize: 12,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
   row: {
     alignItems: 'center',
@@ -47,8 +49,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: fonts.extraBold,
-    fontSize: 26,
+    fontSize: 24,
     letterSpacing: 0,
-    lineHeight: 31,
+    lineHeight: 29,
   },
 });

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { callWithMobileRefresh, trpc } from '@/lib/api/client';
 import { signInWithNativeGoogle } from '@/lib/api/google-auth';
@@ -9,6 +9,8 @@ import type {
   BuildTicketResult,
   CheckoutResult,
   ConvertCodeResult,
+  DailyTicketBookmakerPlatform,
+  DailyTicketData,
   DownloadReceiptResult,
   FixtureInsight,
   FixTicketResult,
@@ -49,8 +51,10 @@ export const queryKeys = {
   activeJobs: ['ticket', 'activeJobs'] as const,
   billing: ['payment', 'billing'] as const,
   builderOptions: (input?: unknown) => ['ticket', 'builderOptions', input] as const,
+  dailyTicket: (input?: unknown) => ['prediction', 'dailyTicket', input] as const,
   fixtureInsight: (fixtureId?: string) => ['matchday', 'fixtureInsight', fixtureId] as const,
   homeFeed: (input?: unknown) => ['matchday', 'homeFeed', input] as const,
+  infiniteHomeFeed: (input?: unknown) => ['matchday', 'homeFeedInfinite', input] as const,
   leagues: (input?: unknown) => ['matchday', 'leagues', input] as const,
   me: ['user', 'me'] as const,
   notifications: ['ticket', 'notifications'] as const,
@@ -76,7 +80,7 @@ export function useMe() {
   });
 }
 
-export function useHomeFeed(input?: { date?: string; leagueKey?: string; limit?: number; windowDays?: 1 | 3 }) {
+export function useHomeFeed(input?: { cursor?: string; date?: string; leagueKey?: string; limit?: number; query?: string; windowDays?: 1 | 3 }) {
   const status = useAuthStore((state) => state.status);
   return useQuery<HomeFeed>({
     enabled: status === 'authenticated',
@@ -85,12 +89,47 @@ export function useHomeFeed(input?: { date?: string; leagueKey?: string; limit?:
   });
 }
 
-export function useLeagues(input?: { dateRange?: 'today' | 'tomorrow' | 'week'; windowDays?: 1 | 3 }) {
+export function useInfiniteHomeFeed(input?: { date?: string; leagueKey?: string; limit?: number; query?: string; windowDays?: 1 | 3 }) {
+  const status = useAuthStore((state) => state.status);
+  return useInfiniteQuery<HomeFeed>({
+    enabled: status === 'authenticated',
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    initialPageParam: undefined as string | undefined,
+    queryKey: queryKeys.infiniteHomeFeed(input),
+    queryFn: ({ pageParam }) =>
+      callWithMobileRefresh(() =>
+        asPromise<HomeFeed>(
+          trpc.matchday.getHomeFeed.query({
+            ...(input ?? { limit: 24 }),
+            cursor: pageParam,
+          }),
+        ),
+      ),
+  });
+}
+
+export function useLeagues(input?: { date?: string; dateRange?: 'today' | 'tomorrow' | 'week'; windowDays?: 1 | 3 }) {
   const status = useAuthStore((state) => state.status);
   return useQuery<LeagueOption[]>({
     enabled: status === 'authenticated',
     queryKey: queryKeys.leagues(input),
     queryFn: () => callWithMobileRefresh(() => asPromise<LeagueOption[]>(trpc.matchday.getLeagues.query(input ?? { dateRange: 'today' }))),
+  });
+}
+
+export function useDailyTicket(input?: {
+  bookmakerPlatform?: DailyTicketBookmakerPlatform;
+  date?: string;
+  maxLegs?: number;
+  sport?: 'FOOTBALL';
+  targetOdds?: number;
+}, options?: { enabled?: boolean }) {
+  const status = useAuthStore((state) => state.status);
+  return useQuery<DailyTicketData>({
+    enabled: status === 'authenticated' && (options?.enabled ?? true),
+    queryKey: queryKeys.dailyTicket(input),
+    retry: false,
+    queryFn: () => callWithMobileRefresh(() => asPromise<DailyTicketData>(trpc.prediction.getDailyTicket.query(input ?? { sport: 'FOOTBALL' }))),
   });
 }
 

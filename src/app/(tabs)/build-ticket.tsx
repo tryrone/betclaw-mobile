@@ -210,7 +210,7 @@ export default function BuildTicketScreen() {
   };
 
   return (
-    <Screen>
+    <Screen hasTabs>
       <Animated.View entering={enterUp(0)}>
         <ScreenHeader
           eyebrow="AI builder"

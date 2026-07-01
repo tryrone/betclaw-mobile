@@ -80,7 +80,7 @@ export default function ConvertTicketScreen() {
     convertCode.error ? getErrorMessage(convertCode.error) : convertCode.data && !convertCode.data.success ? convertCode.data.error : null;
 
   return (
-    <Screen>
+    <Screen hasTabs>
       <Animated.View entering={enterUp(0)}>
         <ScreenHeader
           eyebrow="Code converter"
