@@ -450,6 +450,9 @@ export type TicketDetail = {
     market: string;
     odds?: number | null;
     platformEventId?: string | null;
+    platformMarketId?: string | null;
+    platformSelectionId?: string | null;
+    platformSpecifier?: string | null;
     reason?: string | null;
     selectionReason?: string | null;
     selectionLabel?: string | null;

@@ -16,6 +16,7 @@ import {
 import type { TicketMatchResult } from '@/lib/api/types';
 import { BOOKMAKER_PLATFORM_OPTIONS, DEFAULT_BOOKMAKER_PLATFORM, type SupportedPlatform } from '@/lib/bookmaker-platforms';
 import { copyOrShareText, formatDateTime, isRealUrl, openExternalUrl } from '@/lib/mobile-format';
+import { formatTicketMarketLabel } from '@/lib/ticket-market-label';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
@@ -90,6 +91,16 @@ function MatchDetailRow({
   const confidence = Math.round(match.confidence ?? 0);
   const canOpenMatch = Boolean(match.fixtureId);
   const isInactive = isInactiveMatchStatus(match.status);
+  const recommendedPick = formatTicketMarketLabel({
+    awayTeam: match.awayTeam,
+    homeTeam: match.homeTeam,
+    market: match.market,
+    platformSelectionId: match.platformSelectionId,
+    platformSpecifier: match.platformSpecifier,
+    selectionLabel: match.selectionLabel,
+    selectionReason: match.selectionReason ?? match.reason,
+    selectionTeam: match.selectionTeam,
+  });
   const evidence = [
     match.selectionReason,
     match.confidenceReason,
@@ -115,7 +126,7 @@ function MatchDetailRow({
     <GlassCard style={[styles.matchCard, isInactive ? styles.inactiveMatchCard : null, isInactive ? { shadowColor: theme.danger } : null]}>
       <PressableScale
         accessibilityHint={canOpenMatch ? 'Opens the match detail page' : undefined}
-        accessibilityLabel={`${match.homeTeam} vs ${match.awayTeam}`}
+        accessibilityLabel={`${match.homeTeam} vs ${match.awayTeam}, ${recommendedPick}`}
         accessibilityRole="button"
         onPress={canOpenMatch ? openMatch : undefined}
         scaleTo={canOpenMatch ? 0.98 : 1}
@@ -124,8 +135,14 @@ function MatchDetailRow({
           <Text numberOfLines={1} style={[styles.matchTeams, { color: theme.foregroundStrong }]}>
             {match.homeTeam} vs {match.awayTeam}
           </Text>
-          <Text numberOfLines={1} style={[styles.matchMeta, { color: theme.mutedLight }]}>
-            {match.selectionLabel ?? match.market}
+          <Text
+            numberOfLines={2}
+            style={[
+              styles.recommendedPick,
+              { color: isInactive ? theme.danger : theme.foregroundStrong },
+              isInactive ? styles.inactivePickText : null,
+            ]}>
+            {recommendedPick}
           </Text>
           {match.kickoffTime ? (
             <Text numberOfLines={1} style={[styles.matchKickoff, { color: theme.muted }]}>
@@ -597,6 +614,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(248,113,113,0.35)',
     shadowOpacity: 0.18,
   },
+  inactivePickText: {
+    textDecorationLine: 'line-through',
+  },
   matchCard: {
     gap: spacing.sm,
   },
@@ -608,11 +628,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     fontSize: 11,
     marginTop: 2,
-  },
-  matchMeta: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    marginTop: 3,
   },
   matchTeams: {
     fontFamily: fonts.extraBold,
@@ -686,6 +701,12 @@ const styles = StyleSheet.create({
   resultText: {
     fontFamily: fonts.bold,
     fontSize: 12,
+  },
+  recommendedPick: {
+    fontFamily: fonts.extraBold,
+    fontSize: 14,
+    lineHeight: 19,
+    marginTop: 4,
   },
   root: {
     gap: spacing.lg,

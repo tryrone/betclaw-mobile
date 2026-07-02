@@ -6,6 +6,7 @@ import { FormBadges } from '@/components/ticket/FormBadges';
 import { BottomSheet, PressableScale, StatusBadge } from '@/components/ui';
 import type { TicketDetail } from '@/lib/api/types';
 import { formatDateTime, isRealUrl, openExternalUrl } from '@/lib/mobile-format';
+import { formatTicketMarketLabel } from '@/lib/ticket-market-label';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
@@ -33,6 +34,18 @@ export function LegDetailSheet({ leg, onClose }: { leg: TicketLeg | null; onClos
   const theme = useAppTheme();
   const readiness = leg?.dataReadiness;
   const citations = (leg?.citations ?? []).filter((citation) => isRealUrl(citation.url));
+  const recommendedPick = leg
+    ? formatTicketMarketLabel({
+        awayTeam: leg.awayTeam,
+        homeTeam: leg.homeTeam,
+        market: leg.market,
+        platformSelectionId: leg.platformSelectionId,
+        platformSpecifier: leg.platformSpecifier,
+        selectionLabel: leg.selectionLabel,
+        selectionReason: leg.selectionReason ?? leg.reason,
+        selectionTeam: leg.selectionTeam,
+      })
+    : null;
 
   const insights = [
     leg?.h2hSummary ? { label: 'H2H', value: String(leg.h2hSummary).replace(/^H2H:\s*/i, '') } : null,
@@ -58,7 +71,7 @@ export function LegDetailSheet({ leg, onClose }: { leg: TicketLeg | null; onClos
           </View>
           <View style={sheetStyles.marketRow}>
             <View style={[sheetStyles.marketChip, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
-              <Text numberOfLines={1} style={[sheetStyles.marketText, { color: theme.primary }]}>{leg.selectionLabel ?? leg.market}</Text>
+              <Text numberOfLines={2} style={[sheetStyles.marketText, { color: theme.foregroundStrong }]}>{recommendedPick}</Text>
             </View>
             {leg.kickoffTime ? (
               <Text style={[sheetStyles.kickoff, { color: theme.muted }]}>{formatDateTime(leg.kickoffTime)}</Text>
