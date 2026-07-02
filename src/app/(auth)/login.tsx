@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: fonts.extraBold,
-    fontSize: 30,
+    fontSize: 25,
     letterSpacing: 0,
     lineHeight: 35,
     marginTop: 10,

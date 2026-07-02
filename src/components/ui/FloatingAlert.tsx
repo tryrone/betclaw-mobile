@@ -1,6 +1,15 @@
+/* eslint-disable react-hooks/immutability -- Reanimated shared values are mutable by design. */
 import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from 'lucide-react-native';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { type AppTheme, useAppTheme } from '@/theme/colors';
@@ -30,41 +39,101 @@ type ToastContextValue = {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 function toneStyles(theme: AppTheme, tone: ToastTone) {
-  if (tone === 'success') {
-    return {
-      backgroundColor: theme.successSoft,
-      borderColor: theme.successSoft,
-      color: theme.success,
-      icon: CircleCheck,
-    };
-  }
-  if (tone === 'warning') {
-    return {
-      backgroundColor: theme.warningSoft,
-      borderColor: theme.warningSoft,
-      color: theme.warning,
-      icon: TriangleAlert,
-    };
-  }
-  if (tone === 'error') {
-    return {
-      backgroundColor: theme.dangerSoft,
-      borderColor: theme.dangerSoft,
-      color: theme.danger,
-      icon: CircleAlert,
-    };
-  }
-  return {
-    backgroundColor: theme.primarySubtle,
-    borderColor: theme.selectionBorder,
-    color: theme.primarySoft,
-    icon: Info,
-  };
+  if (tone === 'success') return { color: theme.success, icon: CircleCheck, soft: theme.successSoft };
+  if (tone === 'warning') return { color: theme.warning, icon: TriangleAlert, soft: theme.warningSoft };
+  if (tone === 'error') return { color: theme.danger, icon: CircleAlert, soft: theme.dangerSoft };
+  return { color: theme.primary, icon: Info, soft: theme.primarySubtle };
+}
+
+/**
+ * Single animated toast card: springs down from the top edge on a solid,
+ * elevated surface, auto-dismisses by floating back up, and can be dismissed
+ * by tapping anywhere on it or the close button.
+ */
+function ToastCard({ onDone, toast }: { onDone: () => void; toast: Toast }) {
+  const theme = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const translateY = useSharedValue(-140);
+  const opacity = useSharedValue(0);
+  const dismissed = useRef(false);
+  const palette = toneStyles(theme, toast.tone);
+  const Icon = palette.icon;
+
+  const animateOut = useCallback(() => {
+    if (dismissed.current) return;
+    dismissed.current = true;
+    opacity.value = withTiming(0, { duration: 200, easing: Easing.in(Easing.quad) });
+    translateY.value = withTiming(-120, { duration: 220, easing: Easing.in(Easing.quad) }, (finished) => {
+      if (finished) runOnJS(onDone)();
+    });
+  }, [onDone, opacity, translateY]);
+
+  useEffect(() => {
+    opacity.value = withTiming(1, { duration: 160 });
+    translateY.value = withSpring(0, { damping: 18, mass: 0.9, stiffness: 220 });
+
+    if (toast.durationMs > 0) {
+      const timer = setTimeout(animateOut, toast.durationMs);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [animateOut, opacity, toast.durationMs, translateY]);
+
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return (
+    <View pointerEvents="box-none" style={[toastStyles.host, { paddingTop: insets.top + spacing.sm }]}>
+      <Animated.View
+        accessibilityLiveRegion="polite"
+        accessibilityRole="alert"
+        style={[
+          toastStyles.card,
+          {
+            backgroundColor: theme.backgroundAlt,
+            borderColor: theme.borderStrong,
+            shadowColor: theme.black,
+          },
+          cardStyle,
+        ]}>
+        <View style={[toastStyles.accent, { backgroundColor: palette.color }]} />
+        <Pressable accessibilityLabel="Dismiss notification" onPress={animateOut} style={toastStyles.body}>
+          <View style={[toastStyles.iconChip, { backgroundColor: palette.soft }]}>
+            <Icon color={palette.color} size={16} />
+          </View>
+          <View style={toastStyles.copy}>
+            <Text numberOfLines={1} style={[toastStyles.title, { color: theme.foregroundStrong }]}>
+              {toast.title}
+            </Text>
+            {toast.message
+              ? toast.message
+                  .split('\n')
+                  .filter(Boolean)
+                  .slice(0, 3)
+                  .map((line, index) => (
+                    <Text key={`${line}-${index}`} numberOfLines={2} style={[toastStyles.message, { color: theme.mutedLight }]}>
+                      {line}
+                    </Text>
+                  ))
+              : null}
+          </View>
+          <Pressable
+            accessibilityLabel="Dismiss toast"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={animateOut}
+            style={[toastStyles.dismiss, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <X color={theme.mutedLight} size={14} />
+          </Pressable>
+        </Pressable>
+      </Animated.View>
+    </View>
+  );
 }
 
 export function FloatingToastProvider({ children }: { children: ReactNode }) {
-  const theme = useAppTheme();
-  const insets = useSafeAreaInsets();
   const idRef = useRef(0);
   const [toast, setToast] = useState<Toast | null>(null);
 
@@ -77,7 +146,7 @@ export function FloatingToastProvider({ children }: { children: ReactNode }) {
     if (!message && !next.title.trim()) return;
     idRef.current += 1;
     setToast({
-      durationMs: next.durationMs ?? 3600,
+      durationMs: next.durationMs ?? 4200,
       id: idRef.current,
       message,
       title: next.title.trim(),
@@ -85,43 +154,12 @@ export function FloatingToastProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  useEffect(() => {
-    if (!toast || toast.durationMs <= 0) return;
-    const timer = setTimeout(() => setToast(null), toast.durationMs);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
   const value = useMemo(() => ({ dismissToast, showToast }), [dismissToast, showToast]);
-  const palette = toast ? toneStyles(theme, toast.tone) : null;
-  const Icon = palette?.icon;
 
   return (
     <ToastContext.Provider value={value}>
       {children}
-      {toast && palette && Icon ? (
-        <View pointerEvents="box-none" style={[styles.host, { paddingTop: insets.top + spacing.sm }]}>
-          <View
-            accessibilityLiveRegion="polite"
-            accessibilityRole="alert"
-            style={[
-              styles.alert,
-              {
-                backgroundColor: palette.backgroundColor,
-                borderColor: palette.borderColor,
-                shadowColor: theme.shadow,
-              },
-            ]}>
-            <Icon color={palette.color} size={18} />
-            <View style={styles.copy}>
-              <Text style={[styles.title, { color: theme.foregroundStrong }]}>{toast.title}</Text>
-              {toast.message ? <Text style={[styles.message, { color: theme.mutedLight }]}>{toast.message}</Text> : null}
-            </View>
-            <Pressable accessibilityLabel="Dismiss toast" accessibilityRole="button" onPress={dismissToast} style={styles.dismiss}>
-              <X color={theme.mutedLight} size={16} />
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
+      {toast ? <ToastCard key={toast.id} onDone={dismissToast} toast={toast} /> : null}
     </ToastContext.Provider>
   );
 }
@@ -139,17 +177,31 @@ export type FloatingAlertInput = ToastInput;
 export const FloatingAlertProvider = FloatingToastProvider;
 export const useFloatingAlert = useToast;
 
-const styles = StyleSheet.create({
-  alert: {
+const toastStyles = StyleSheet.create({
+  accent: {
+    borderBottomLeftRadius: radius.lg,
+    borderTopLeftRadius: radius.lg,
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    top: 0,
+    width: 4,
+  },
+  body: {
     alignItems: 'flex-start',
-    borderRadius: radius.lg,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.sm,
-    marginHorizontal: spacing.md,
     padding: spacing.md,
-    shadowOffset: { height: 12, width: 0 },
-    shadowOpacity: 0.24,
+    paddingLeft: spacing.md + 4,
+  },
+  card: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    elevation: 24,
+    marginHorizontal: spacing.md,
+    overflow: 'hidden',
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.5,
     shadowRadius: 24,
   },
   copy: {
@@ -160,11 +212,10 @@ const styles = StyleSheet.create({
   dismiss: {
     alignItems: 'center',
     borderRadius: radius.pill,
-    height: 28,
+    borderWidth: 1,
+    height: 26,
     justifyContent: 'center',
-    marginRight: -spacing.xs,
-    marginTop: -spacing.xs,
-    width: 28,
+    width: 26,
   },
   host: {
     left: 0,
@@ -172,6 +223,13 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     zIndex: 1000,
+  },
+  iconChip: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    height: 30,
+    justifyContent: 'center',
+    width: 30,
   },
   message: {
     fontFamily: fonts.medium,

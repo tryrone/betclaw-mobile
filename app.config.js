@@ -65,6 +65,9 @@ module.exports = {
       googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
       googleIosUrlScheme: process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME,
       googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+      eas: {
+        projectId: 'bf4d6188-75ec-4fc9-87d0-76af5d0bf693',
+      },
     },
     plugins: [
       'expo-router',
