@@ -68,16 +68,26 @@ export default function NotificationsScreen() {
       {items.map((item: any, index: number) => (
         <Animated.View entering={enterUp(2 + index)} key={item.id}>
           <PressableScale
+            accessibilityHint={item.readAt ? undefined : 'Marks this notification as read'}
             accessibilityLabel={item.title}
             accessibilityRole="button"
             onPress={() => markRead.mutate(item.id)}
             scaleTo={0.98}>
             <GlassCard style={[styles.item, !item.readAt ? { borderColor: theme.selectionBorder } : null]}>
               <View style={styles.itemTop}>
-                <Text numberOfLines={1} style={[styles.itemTitle, { color: theme.foregroundStrong }]}>
-                  {item.title}
-                </Text>
-                <StatusBadge label={item.readAt ? 'Read' : 'New'} tone={item.readAt ? 'neutral' : 'accent'} />
+                <View style={styles.itemTitleWrap}>
+                  {!item.readAt ? <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} /> : null}
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.itemTitle, { color: item.readAt ? theme.mutedLight : theme.foregroundStrong }]}>
+                    {item.title}
+                  </Text>
+                </View>
+                {item.readAt ? (
+                  <CheckCheck color={theme.muted} size={15} />
+                ) : (
+                  <StatusBadge label="New" tone="accent" />
+                )}
               </View>
               {item.description ? (
                 <Text style={[styles.itemText, { color: theme.mutedLight }]}>{item.description}</Text>
@@ -115,7 +125,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   itemTitle: {
-    flex: 1,
+    flexShrink: 1,
     fontFamily: fonts.extraBold,
     fontSize: 15,
   },
@@ -124,6 +134,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     justifyContent: 'space-between',
+  },
+  itemTitleWrap: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    minWidth: 0,
   },
   summary: {
     alignItems: 'center',
@@ -156,5 +173,10 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: fonts.extraBold,
     fontSize: 23,
+  },
+  unreadDot: {
+    borderRadius: radius.pill,
+    height: 8,
+    width: 8,
   },
 });

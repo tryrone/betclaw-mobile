@@ -20,7 +20,7 @@ import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
-const heroImage = require('@/../assets/images/neymar_onboarding.png');
+const heroImage = require('@/../assets/images/neymar_cutout.png');
 
 const slides = [
   {
@@ -76,10 +76,11 @@ export default function WelcomeScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.black }]}>
-      <Image contentFit="cover" contentPosition="top center" source={heroImage} style={styles.hero} />
+      <View pointerEvents="none" style={[styles.heroGlow, { backgroundColor: theme.primarySubtle }]} />
+      <Image contentFit="contain" contentPosition="top center" source={heroImage} style={styles.hero} />
       <LinearGradient
-        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.55)', '#000000']}
-        locations={[0, 0.55, 0.86]}
+        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.6)', '#000000']}
+        locations={[0.35, 0.62, 0.88]}
         pointerEvents="none"
         style={StyleSheet.absoluteFill}
       />
@@ -228,11 +229,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
   },
   hero: {
-    height: '72%',
+    height: '64%',
     left: 0,
     position: 'absolute',
     right: 0,
-    top: 0,
+    top: '7%',
+  },
+  heroGlow: {
+    alignSelf: 'center',
+    borderRadius: 999,
+    height: 420,
+    opacity: 0.5,
+    position: 'absolute',
+    top: 60,
+    width: 420,
   },
   pagination: {
     alignItems: 'center',

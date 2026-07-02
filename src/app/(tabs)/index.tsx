@@ -17,8 +17,8 @@ import {
   UsersRound,
   Wallet,
 } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { FeedMatchCard } from '@/components/home/FeedMatchCard';
 import {
@@ -300,8 +300,8 @@ function PredictionHero({
       </View>
       <View style={styles.metricsRow}>
         <DashboardMetric icon={CalendarDays} label="Matches" value={isLoading ? '...' : String(matchCount)} />
-        <DashboardMetric icon={ShieldCheck} label="Top Accuracy" value={bestAccuracy ? `${bestAccuracy}%` : 'Pending'} />
-        <DashboardMetric icon={Trophy} label="Mode" value="Live + results" />
+        <DashboardMetric icon={ShieldCheck} label="Accuracy" value={bestAccuracy ? `${bestAccuracy}%` : 'Pending'} />
+        <DashboardMetric icon={Trophy} label="Mode" value="Live" />
       </View>
     </DashboardGlassCard>
   );
@@ -337,7 +337,7 @@ function TelegramCommunityCard({
         </View>
         <View style={styles.communityCopy}>
           <View style={styles.communityTitleRow}>
-            <Text numberOfLines={1} style={[styles.communityTitle, { color: theme.foregroundStrong }]}>
+            <Text numberOfLines={2} style={[styles.communityTitle, { color: theme.foregroundStrong }]}>
               {communityName}
             </Text>
             <View style={[styles.privateBadge, { borderColor: theme.border, backgroundColor: theme.surface }]}>
@@ -391,9 +391,24 @@ function ReferralPrompt() {
 
 function DateStrip({ dates, selectedDate, onSelect }: { dates: DateOption[]; selectedDate: string; onSelect: (date: string) => void }) {
   const theme = useAppTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const scrollRef = useRef<ScrollView>(null);
+  const chipLayouts = useRef<Record<string, { width: number; x: number }>>({});
+
+  const centerOn = (value: string) => {
+    const chip = chipLayouts.current[value];
+    if (!chip) return;
+    const target = Math.max(0, chip.x + chip.width / 2 - screenWidth / 2);
+    scrollRef.current?.scrollTo({ animated: true, x: target });
+  };
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateStripContent} style={styles.horizontalBleed}>
+    <ScrollView
+      contentContainerStyle={styles.dateStripContent}
+      horizontal
+      ref={scrollRef}
+      showsHorizontalScrollIndicator={false}
+      style={styles.horizontalBleed}>
       {dates.map((date) => {
         const active = selectedDate === date.value;
         return (
@@ -401,7 +416,17 @@ function DateStrip({ dates, selectedDate, onSelect }: { dates: DateOption[]; sel
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             key={date.value}
-            onPress={() => onSelect(date.value)}
+            onLayout={(event) => {
+              chipLayouts.current[date.value] = {
+                width: event.nativeEvent.layout.width,
+                x: event.nativeEvent.layout.x,
+              };
+              if (active) centerOn(date.value);
+            }}
+            onPress={() => {
+              onSelect(date.value);
+              centerOn(date.value);
+            }}
             style={[
               styles.dateChip,
               {

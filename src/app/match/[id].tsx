@@ -17,9 +17,16 @@ import {
   Video,
   Zap,
 } from 'lucide-react-native';
-import { useMemo, useState, type ComponentType } from 'react';
+import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import { ScrollView, StyleSheet, Text, View, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 
 import {
   enterUp,
@@ -39,6 +46,7 @@ import type {
   MatchLineupSide,
   MatchPlayerSummary,
   MatchStatRow,
+  PredictionView,
   RecentMatchTeam,
   StandingsRow,
 } from '@/lib/api/types';
@@ -172,7 +180,7 @@ function findStandingRow(rows?: StandingsRow[], teamName?: string | null) {
   if (!rows || !teamName) return undefined;
   const target = teamName.toLowerCase();
   return rows.find((row) => {
-    const name = (row.teamName ?? row.team?.name ?? '').toLowerCase();
+    const name = (row.teamName ?? '').toLowerCase();
     return Boolean(name) && (name.includes(target) || target.includes(name));
   });
 }
@@ -462,18 +470,26 @@ function SkeletonBlock({
   width?: DimensionValue;
 }) {
   const theme = useAppTheme();
+  const pulse = useSharedValue(0.55);
+
+  useEffect(() => {
+    pulse.value = withRepeat(withTiming(1, { duration: 850, easing: Easing.inOut(Easing.quad) }), -1, true);
+  }, [pulse]);
+
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
 
   return (
-    <View
+    <Animated.View
       style={[
         styles.skeletonBlock,
         {
-          backgroundColor: theme.surface,
-          borderColor: theme.border,
+          backgroundColor: theme.surfaceHover,
+          borderColor: theme.borderStrong,
           borderRadius: radiusValue,
           height,
           width,
         },
+        pulseStyle,
         style,
       ]}
     />
@@ -704,17 +720,27 @@ function resultLetter(value?: string | null) {
   return letter === 'W' || letter === 'D' || letter === 'L' ? letter : null;
 }
 
-function formTally(rows: NonNullable<RecentMatchTeam['matches']>) {
+function formTally(team?: RecentMatchTeam | null) {
+  if (team && team.wins != null) {
+    return `${team.wins ?? 0}W ${team.draws ?? 0}D ${team.losses ?? 0}L`;
+  }
   let wins = 0;
   let draws = 0;
   let losses = 0;
-  rows.forEach((row) => {
+  (team?.matches ?? []).forEach((row) => {
     const letter = resultLetter(row.result);
     if (letter === 'W') wins += 1;
     else if (letter === 'D') draws += 1;
     else if (letter === 'L') losses += 1;
   });
   return `${wins}W ${draws}D ${losses}L`;
+}
+
+function shortDate(value?: string | Date | null) {
+  if (!value) return '--';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '--';
+  return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
 }
 
 function ProbabilityBar({ label, value }: { label: string; value: number }) {
@@ -738,29 +764,29 @@ function RecentMatchRows({ accent, rows }: { accent?: string; rows: NonNullable<
       {rows.map((row, index) => {
         const letter = resultLetter(row.result);
         const color = letter === 'W' ? theme.success : letter === 'D' ? theme.warning : letter === 'L' ? theme.danger : theme.muted;
-        const hasTeams = Boolean(row.homeTeam || row.awayTeam);
-        const hasScore = row.homeScore != null || row.awayScore != null;
         return (
           <View
             key={`${row.date ?? index}-${index}`}
             style={[
               styles.recentRow,
-              { borderColor: theme.border },
-              accent ? { borderLeftColor: accent, borderLeftWidth: 3, paddingLeft: spacing.sm } : null,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+              accent ? { borderLeftColor: accent, borderLeftWidth: 3 } : null,
             ]}>
-            <Text style={[styles.recentDate, { color: theme.muted }]}>{row.date ? formatDate(row.date) : '--'}</Text>
-            {hasTeams || hasScore ? (
-              <Text numberOfLines={1} style={[styles.recentTeams, { color: theme.foreground }]}>
-                {row.homeTeam ?? 'Home'} <Text style={{ color: theme.foregroundStrong }}>{row.homeScore ?? '-'}–{row.awayScore ?? '-'}</Text> {row.awayTeam ?? 'Away'}
-              </Text>
-            ) : (
-              <Text numberOfLines={1} style={[styles.recentTeams, { color: theme.muted }]}>
-                Fixture details pending
-              </Text>
-            )}
             <View style={[styles.resultPill, { backgroundColor: `${color}22`, borderColor: `${color}66` }]}>
               <Text style={[styles.resultPillText, { color }]}>{letter ?? '?'}</Text>
             </View>
+            <View style={[styles.venueChip, { backgroundColor: theme.field }]}>
+              <Text style={[styles.venueChipText, { color: theme.muted }]}>{row.venue === 'home' ? 'H' : 'A'}</Text>
+            </View>
+            <Text numberOfLines={1} style={[styles.recentTeams, { color: row.opponent ? theme.foreground : theme.muted }]}>
+              {row.opponent ?? 'Opponent pending'}
+            </Text>
+            <View style={[styles.recentScoreChip, { backgroundColor: theme.field }]}>
+              <Text style={[styles.recentScoreText, { color: theme.foregroundStrong }]}>
+                {row.teamScore ?? '—'} - {row.opponentScore ?? '—'}
+              </Text>
+            </View>
+            <Text style={[styles.recentDate, { color: theme.muted }]}>{shortDate(row.date)}</Text>
           </View>
         );
       })}
@@ -772,9 +798,30 @@ function miniForm(value?: string | null) {
   return (value ?? '').replace(/[^WDL]/gi, '').toUpperCase().slice(-3).split('');
 }
 
-function StandingsMiniTable({ highlightTeams, rows, title }: { highlightTeams: string[]; rows: StandingsRow[]; title?: string }) {
+function matchesTeam(name: string, teamName?: string | null) {
+  if (!teamName) return false;
+  const target = teamName.toLowerCase();
+  const candidate = name.toLowerCase();
+  return Boolean(candidate) && (candidate.includes(target) || target.includes(candidate));
+}
+
+function formatGoalDiff(value?: number | null) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
+  return value > 0 ? `+${value}` : `${value}`;
+}
+
+function StandingsMiniTable({
+  awayTeam,
+  homeTeam,
+  rows,
+  title,
+}: {
+  awayTeam?: string | null;
+  homeTeam?: string | null;
+  rows: StandingsRow[];
+  title?: string;
+}) {
   const theme = useAppTheme();
-  const highlights = highlightTeams.map((team) => team.toLowerCase());
   return (
     <View style={styles.standingsTable}>
       {title ? <Text style={[styles.standingsTitle, { color: theme.muted }]}>{title}</Text> : null}
@@ -782,26 +829,32 @@ function StandingsMiniTable({ highlightTeams, rows, title }: { highlightTeams: s
         <Text style={[styles.standingsRank, styles.standingsHead, { color: theme.muted }]}>#</Text>
         <Text style={[styles.standingsTeam, styles.standingsHead, { color: theme.muted }]}>Team</Text>
         <Text style={[styles.standingsNum, styles.standingsHead, { color: theme.muted }]}>P</Text>
-        <Text style={[styles.standingsWdl, styles.standingsHead, { color: theme.muted }]}>W-D-L</Text>
+        <Text style={[styles.standingsWdl, styles.standingsHead, { color: theme.muted }]}>GD</Text>
         <Text style={[styles.standingsNum, styles.standingsHead, { color: theme.muted }]}>Pts</Text>
         <Text style={[styles.standingsFormCol, styles.standingsHead, { color: theme.muted }]}>Form</Text>
       </View>
-      {rows.map((row, index) => {
-        const name = row.teamName ?? row.team?.name ?? '--';
-        const active = highlights.some((team) => name.toLowerCase().includes(team) || team.includes(name.toLowerCase()));
-        const record = row.all ? `${row.all.win ?? '-'}-${row.all.draw ?? '-'}-${row.all.lose ?? '-'}` : '-';
+      <ScrollView
+        contentContainerStyle={styles.standingsBody}
+        nestedScrollEnabled
+        showsVerticalScrollIndicator={rows.length > 8}
+        style={styles.scrollableList}>
+        {rows.map((row, index) => {
+        const name = row.teamName ?? '--';
+        const isHome = matchesTeam(name, homeTeam);
+        const isAway = !isHome && matchesTeam(name, awayTeam);
+        const rowTint = isHome
+          ? { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }
+          : isAway
+            ? { backgroundColor: theme.accentMuted, borderColor: theme.warningSoft }
+            : { borderColor: 'transparent' };
+        const nameColor = isHome ? theme.primary : isAway ? theme.accent : theme.foreground;
         const formLetters = miniForm(row.form);
         return (
-          <View
-            key={`${name}-${index}`}
-            style={[styles.standingsRow, active ? { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder } : { borderColor: 'transparent' }]}>
+          <View key={`${name}-${index}`} style={[styles.standingsRow, rowTint]}>
             <Text style={[styles.standingsRank, { color: theme.muted }]}>{row.rank ?? '-'}</Text>
-            <View style={styles.standingsTeamCell}>
-              {row.description ? <View style={[styles.standingsDot, { backgroundColor: theme.primary }]} /> : null}
-              <Text numberOfLines={1} style={[styles.standingsTeam, { color: active ? theme.primary : theme.foreground }]}>{name}</Text>
-            </View>
-            <Text style={[styles.standingsNum, { color: theme.mutedLight }]}>{row.played ?? row.all?.played ?? '-'}</Text>
-            <Text style={[styles.standingsWdl, { color: theme.mutedLight }]}>{record}</Text>
+            <Text numberOfLines={1} style={[styles.standingsTeam, { color: nameColor }]}>{name}</Text>
+            <Text style={[styles.standingsNum, { color: theme.mutedLight }]}>{row.played ?? '-'}</Text>
+            <Text style={[styles.standingsWdl, { color: theme.mutedLight }]}>{formatGoalDiff(row.goalDiff)}</Text>
             <Text style={[styles.standingsNum, { color: theme.foregroundStrong }]}>{row.points ?? '-'}</Text>
             <View style={styles.standingsFormCol}>
               {formLetters.length > 0 ? (
@@ -822,6 +875,7 @@ function StandingsMiniTable({ highlightTeams, rows, title }: { highlightTeams: s
           </View>
         );
       })}
+      </ScrollView>
     </View>
   );
 }
@@ -836,8 +890,10 @@ function OverviewSection({
   homeRecentMatches,
   homeStandings,
   match,
+  prediction,
   predictionItems,
   probabilities,
+  venue,
 }: {
   awayForm: string[];
   awayRecentMatches?: RecentMatchTeam | null;
@@ -849,8 +905,10 @@ function OverviewSection({
   homeRecentMatches?: RecentMatchTeam | null;
   homeStandings?: StandingsRow[];
   match: MatchCardData;
+  prediction?: PredictionView | null;
   predictionItems: string[];
   probabilities: { label: string; value: number }[];
+  venue?: string | null;
 }) {
   const theme = useAppTheme();
   const h2hSample = h2h?.sampleSize ?? 0;
@@ -858,23 +916,38 @@ function OverviewSection({
   const homePct = ((h2h?.homeWins ?? 0) / total) * 100;
   const drawPct = ((h2h?.draws ?? 0) / total) * 100;
   const awayPct = ((h2h?.awayWins ?? 0) / total) * 100;
-  const meetings = (h2h?.meetings ?? []).slice(0, 10);
+  const meetings = h2h?.meetings ?? [];
   const homeRecentRows = (homeRecentMatches?.matches ?? []).slice(0, 5);
   const awayRecentRows = (awayRecentMatches?.matches ?? []).slice(0, 5);
-  const homeTable = (homeStandings ?? []).slice(0, 6);
-  const awayTable = (awayStandings ?? []).slice(0, 6);
+  const homeTable = homeStandings ?? [];
+  const awayTable = awayStandings ?? [];
   const sameGroup = homeTable.length > 0 && JSON.stringify(homeTable) === JSON.stringify(awayTable);
 
   return (
     <Animated.View entering={enterUp(0)} style={styles.tabContent}>
       <GlassCard gradient="hero" style={styles.outlookCard}>
-        <SectionHeader icon={Sparkles} kicker="Match Analysis Outlook" title={`Likely outcome: ${match.trend}`} />
+        <SectionHeader icon={Sparkles} kicker="Match Analysis Outlook" title={`Likely outcome: ${prediction?.label ?? match.trend}`} />
+        {prediction ? (
+          <View style={styles.outlookBadges}>
+            <StatusBadge
+              label={prediction.kind === 'lean' ? 'Market lean' : 'Analysis prediction'}
+              tone={prediction.kind === 'lean' ? 'warning' : 'accent'}
+            />
+            {prediction.sourceLabel ? <StatusBadge label={prediction.sourceLabel} tone="neutral" /> : null}
+          </View>
+        ) : null}
         <Text style={[styles.outlookText, { color: theme.foreground }]}>
-          {predictionItems[0] ?? match.signal ?? 'Analysis context is being prepared for this fixture.'}
+          {prediction?.summary ?? predictionItems[0] ?? match.signal ?? 'Analysis context is being prepared for this fixture.'}
         </Text>
         <View style={styles.outlookMetrics}>
+          {typeof prediction?.confidence === 'number' ? (
+            <MetricTile label="Confidence" tone="accent" value={`${Math.round(prediction.confidence)}%`} />
+          ) : null}
+          {typeof prediction?.odds === 'number' ? (
+            <MetricTile label="Odds" value={prediction.odds.toFixed(2)} />
+          ) : null}
           <MetricTile label="Status" tone={match.status === 'Live' ? 'warning' : 'accent'} value={displayStatus} />
-          <MetricTile label="Venue" value={match.venue} />
+          {venue ? <MetricTile label="Venue" value={venue} /> : null}
         </View>
         {probabilities.length > 0 ? (
           <View style={styles.probList}>
@@ -916,7 +989,11 @@ function OverviewSection({
           {h2hSample > 0 ? `Sample: ${h2hSample} API-Football meetings` : 'No prior meetings on record yet.'}
         </Text>
         {meetings.length > 0 ? (
-          <View style={styles.recentList}>
+          <ScrollView
+            contentContainerStyle={styles.recentList}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={meetings.length > 6}
+            style={styles.scrollableList}>
             {meetings.map((meeting, index) => {
               const winner = meeting.winnerForCurrentFixture;
               const color = winner === 'home' ? theme.primary : winner === 'away' ? theme.danger : theme.warning;
@@ -937,7 +1014,7 @@ function OverviewSection({
             <Text style={[styles.mutedLine, { color: theme.muted }]}>
               Showing {meetings.length} of {Math.max(h2hSample, meetings.length)} meetings
             </Text>
-          </View>
+          </ScrollView>
         ) : null}
       </GlassCard>
 
@@ -946,7 +1023,7 @@ function OverviewSection({
         <View style={styles.formBlock}>
           <View style={styles.formTeamRow}>
             <Text numberOfLines={1} style={[styles.formTeamName, { color: theme.primary }]}>{match.home}</Text>
-            {homeRecentRows.length > 0 ? <Text style={[styles.formTally, { color: theme.mutedLight }]}>{formTally(homeRecentRows)}</Text> : null}
+            {homeRecentRows.length > 0 ? <Text style={[styles.formTally, { color: theme.mutedLight }]}>{formTally(homeRecentMatches)}</Text> : null}
           </View>
           {homeForm.length > 0 ? <FormPills values={homeForm} /> : null}
           {homeRecentRows.length > 0 ? (
@@ -959,7 +1036,7 @@ function OverviewSection({
         <View style={styles.formBlock}>
           <View style={styles.formTeamRow}>
             <Text numberOfLines={1} style={[styles.formTeamName, { color: theme.accent }]}>{match.away}</Text>
-            {awayRecentRows.length > 0 ? <Text style={[styles.formTally, { color: theme.mutedLight }]}>{formTally(awayRecentRows)}</Text> : null}
+            {awayRecentRows.length > 0 ? <Text style={[styles.formTally, { color: theme.mutedLight }]}>{formTally(awayRecentMatches)}</Text> : null}
           </View>
           {awayForm.length > 0 ? <FormPills values={awayForm} /> : null}
           {awayRecentRows.length > 0 ? (
@@ -974,14 +1051,14 @@ function OverviewSection({
         <GlassCard style={styles.listCard}>
           <SectionHeader icon={Trophy} title="Standings" />
           {sameGroup ? (
-            <StandingsMiniTable highlightTeams={[match.home, match.away]} rows={homeTable} />
+            <StandingsMiniTable awayTeam={match.away} homeTeam={match.home} rows={homeTable} />
           ) : (
             <>
-              {homeTable.length > 0 ? <StandingsMiniTable highlightTeams={[match.home]} rows={homeTable} title={`${match.home} group`} /> : null}
+              {homeTable.length > 0 ? <StandingsMiniTable homeTeam={match.home} rows={homeTable} title={`${match.home} group`} /> : null}
               {awayTable.length > 0 ? (
                 <>
                   <View style={[styles.formDivider, { backgroundColor: theme.border }]} />
-                  <StandingsMiniTable highlightTeams={[match.away]} rows={awayTable} title={`${match.away} group`} />
+                  <StandingsMiniTable awayTeam={match.away} rows={awayTable} title={`${match.away} group`} />
                 </>
               ) : null}
             </>
@@ -1135,6 +1212,7 @@ export default function MatchDetailScreen() {
   const h2h = fixtureInsight?.h2h;
   const homeStanding = findStandingRow(fixtureInsight?.standings?.home, match?.home);
   const awayStanding = findStandingRow(fixtureInsight?.standings?.away, match?.away);
+  const standingsSummaryText = fixtureInsight?.apiFootballContext?.standingsSummary ?? null;
   const predictionItems = Array.from(
     new Set(
       [
@@ -1144,7 +1222,8 @@ export default function MatchDetailScreen() {
         ...(match?.summary ?? []),
       ].filter(Boolean) as string[],
     ),
-  );
+    // The standings line already renders as a hero meta pill — drop the duplicate bullet.
+  ).filter((item) => item !== standingsSummaryText);
   const averageRows = statListFromAverageStats(fixtureInsight);
   const activeLineup = lineupSide === 'home' ? fixtureInsight?.players?.lineups?.home : fixtureInsight?.players?.lineups?.away;
   const isLoadingMatch = !match && (homeFeed.isLoading || homeFeed.isFetching || insight.isLoading || insight.isFetching);
@@ -1262,8 +1341,10 @@ export default function MatchDetailScreen() {
             homeRecentMatches={fixtureInsight?.recentMatches?.home}
             homeStandings={fixtureInsight?.standings?.home}
             match={match}
+            prediction={fixtureInsight?.predictionView}
             predictionItems={predictionItems}
             probabilities={probabilities}
+            venue={fixtureInsight?.venue}
           />
         ) : null}
 
@@ -1587,8 +1668,8 @@ const styles = StyleSheet.create({
   },
   insightText: {
     fontFamily: fonts.medium,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
   },
   kicker: {
     fontFamily: fonts.extraBold,
@@ -1625,6 +1706,7 @@ const styles = StyleSheet.create({
   },
   listCard: {
     gap: spacing.md,
+    padding: spacing.md,
   },
   liveClock: {
     color: 'rgba(255,255,255,0.78)',
@@ -1663,7 +1745,7 @@ const styles = StyleSheet.create({
   meetingTeam: {
     flex: 1,
     fontFamily: fonts.semibold,
-    fontSize: 12,
+    fontSize: 13,
     textAlign: 'right',
   },
   meetingTeamAway: {
@@ -1688,7 +1770,7 @@ const styles = StyleSheet.create({
   },
   mutedLine: {
     fontFamily: fonts.medium,
-    fontSize: 11,
+    fontSize: 12,
     marginTop: spacing.sm,
     textAlign: 'center',
   },
@@ -1698,8 +1780,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
   },
+  outlookBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
   outlookCard: {
     gap: spacing.md,
+    padding: spacing.md,
   },
   outlookMetrics: {
     flexDirection: 'row',
@@ -1858,8 +1946,8 @@ const styles = StyleSheet.create({
   },
   probLabel: {
     fontFamily: fonts.semibold,
-    fontSize: 11,
-    width: 82,
+    fontSize: 12,
+    width: 88,
   },
   probList: {
     gap: spacing.sm,
@@ -1907,23 +1995,34 @@ const styles = StyleSheet.create({
   },
   recentDate: {
     fontFamily: fonts.medium,
-    fontSize: 10,
-    width: 56,
+    fontSize: 11,
   },
   recentList: {
-    gap: 2,
+    gap: spacing.xs,
   },
   recentRow: {
     alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.sm,
+    borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 7,
+  },
+  recentScoreChip: {
+    borderRadius: radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  recentScoreText: {
+    fontFamily: fonts.extraBold,
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
   },
   recentTeams: {
     flex: 1,
-    fontFamily: fonts.medium,
-    fontSize: 12,
+    fontFamily: fonts.semibold,
+    fontSize: 13,
   },
   resultPill: {
     alignItems: 'center',
@@ -1946,6 +2045,9 @@ const styles = StyleSheet.create({
     lineHeight: 48,
     textAlign: 'center',
   },
+  scrollableList: {
+    maxHeight: 320,
+  },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1963,21 +2065,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.xs,
-    padding: spacing.xs,
+    padding: 3,
   },
   sectionTab: {
     alignItems: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
     flex: 1,
-    height: 42,
+    height: 36,
     justifyContent: 'center',
     minWidth: 0,
     overflow: 'hidden',
   },
   sectionTabText: {
     fontFamily: fonts.extraBold,
-    fontSize: 10,
+    fontSize: 13,
   },
   sectionTitle: {
     fontFamily: fonts.extraBold,
@@ -2041,10 +2143,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textTransform: 'uppercase',
   },
-  standingsDot: {
-    borderRadius: radius.pill,
-    height: 5,
-    width: 5,
+  standingsBody: {
+    gap: 2,
   },
   standingsFormCol: {
     flexDirection: 'row',
@@ -2069,7 +2169,8 @@ const styles = StyleSheet.create({
   },
   standingsNum: {
     fontFamily: fonts.semibold,
-    fontSize: 12,
+    fontSize: 13,
+    fontVariant: ['tabular-nums'],
     textAlign: 'right',
     width: 30,
   },
@@ -2093,14 +2194,7 @@ const styles = StyleSheet.create({
   standingsTeam: {
     flex: 1,
     fontFamily: fonts.semibold,
-    fontSize: 12,
-  },
-  standingsTeamCell: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: 5,
-    minWidth: 0,
+    fontSize: 13,
   },
   standingsTitle: {
     fontFamily: fonts.bold,
@@ -2110,10 +2204,10 @@ const styles = StyleSheet.create({
   },
   standingsWdl: {
     fontFamily: fonts.semibold,
-    fontSize: 11,
+    fontSize: 12,
     fontVariant: ['tabular-nums'],
     textAlign: 'center',
-    width: 44,
+    width: 34,
   },
   statAwayValue: {
     textAlign: 'right',
@@ -2212,6 +2306,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     padding: spacing.sm,
+  },
+  venueChip: {
+    borderRadius: radius.sm,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  venueChipText: {
+    fontFamily: fonts.extraBold,
+    fontSize: 9,
+    textTransform: 'uppercase',
   },
   watchButton: {
     alignItems: 'center',

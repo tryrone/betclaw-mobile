@@ -80,28 +80,28 @@ function BillingRow({
         <FileText color={theme.primarySoft} size={15} />
       </View>
       <View style={styles.billingCopy}>
-        <Text numberOfLines={1} style={[styles.billingTitle, { color: theme.foregroundStrong }]}>
+        <Text numberOfLines={2} style={[styles.billingTitle, { color: theme.foregroundStrong }]}>
           {item.label}
         </Text>
-        <Text style={[styles.billingDate, { color: theme.muted }]}>{item.date}</Text>
+        <View style={styles.billingMetaRow}>
+          <Text style={[styles.billingDate, { color: theme.muted }]}>{item.date}</Text>
+          <StatusBadge label={item.status} tone={item.status === 'Paid' ? 'success' : 'warning'} />
+        </View>
       </View>
       <View style={styles.billingRight}>
-        <Text style={[styles.billingAmount, { color: theme.foreground }]}>{item.amount}</Text>
-        <View style={styles.billingActions}>
-          <StatusBadge label={item.status} tone={item.status === 'Paid' ? 'success' : 'warning'} />
-          {canOpenReceipt ? (
-            <PressableScale
-              accessibilityLabel={`Open receipt for ${item.label}`}
-              accessibilityRole="button"
-              onPress={() => onOpenReceipt(item)}
-              style={[styles.receiptButton, { backgroundColor: theme.field, borderColor: theme.border }]}>
-              <Download color={theme.primarySoft} size={13} />
-              <Text style={[styles.receiptText, { color: theme.primarySoft }]}>
-                {receiptPending ? 'Opening' : 'Receipt'}
-              </Text>
-            </PressableScale>
-          ) : null}
-        </View>
+        <Text style={[styles.billingAmount, { color: theme.foregroundStrong }]}>{item.amount}</Text>
+        {canOpenReceipt ? (
+          <PressableScale
+            accessibilityLabel={`Open receipt for ${item.label}`}
+            accessibilityRole="button"
+            onPress={() => onOpenReceipt(item)}
+            style={[styles.receiptButton, { backgroundColor: theme.field, borderColor: theme.border }]}>
+            <Download color={theme.primarySoft} size={13} />
+            <Text style={[styles.receiptText, { color: theme.primarySoft }]}>
+              {receiptPending ? 'Opening' : 'Receipt'}
+            </Text>
+          </PressableScale>
+        ) : null}
       </View>
     </GlassCard>
   );
@@ -340,13 +340,15 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     fontSize: 12,
   },
-  billingActions: {
-    alignItems: 'flex-end',
-    gap: 6,
-  },
   billingCopy: {
     flex: 1,
+    gap: 4,
     minWidth: 0,
+  },
+  billingMetaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   billingDate: {
     fontFamily: fonts.medium,
@@ -373,7 +375,8 @@ const styles = StyleSheet.create({
   },
   billingTitle: {
     fontFamily: fonts.extraBold,
-    fontSize: 13,
+    fontSize: 14,
+    lineHeight: 19,
   },
   cardCaption: {
     fontFamily: fonts.medium,

@@ -14,7 +14,7 @@ import {
 } from '@/lib/api/hooks';
 import type { TicketMatchResult } from '@/lib/api/types';
 import { BOOKMAKER_PLATFORM_OPTIONS, DEFAULT_BOOKMAKER_PLATFORM, type SupportedPlatform } from '@/lib/bookmaker-platforms';
-import { copyOrShareText, formatDateTime, openExternalUrl } from '@/lib/mobile-format';
+import { copyOrShareText, formatDateTime, isRealUrl, openExternalUrl } from '@/lib/mobile-format';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
@@ -122,6 +122,11 @@ function MatchDetailRow({
           <Text numberOfLines={1} style={[styles.matchMeta, { color: theme.mutedLight }]}>
             {match.selectionLabel ?? match.market}
           </Text>
+          {match.kickoffTime ? (
+            <Text numberOfLines={1} style={[styles.matchKickoff, { color: theme.muted }]}>
+              {formatDateTime(match.kickoffTime)}
+            </Text>
+          ) : null}
         </View>
         <StatusBadge label={matchStatusLabel(match.status)} tone={matchTone(match.status)} />
         {canOpenMatch ? <ChevronRight color={theme.mutedLight} size={16} /> : null}
@@ -169,9 +174,9 @@ function MatchDetailRow({
         </View>
       ) : null}
 
-      {Array.isArray(match.citations) && match.citations.length > 0 ? (
+      {Array.isArray(match.citations) && match.citations.filter((citation: any) => isRealUrl(citation?.url)).length > 0 ? (
         <View style={styles.citationList}>
-          {match.citations.slice(0, 2).map((citation: any) => (
+          {match.citations.filter((citation: any) => isRealUrl(citation?.url)).slice(0, 2).map((citation: any) => (
             <PressableScale
               accessibilityLabel={citation.title ?? 'Open source'}
               accessibilityRole="link"
@@ -541,6 +546,11 @@ const styles = StyleSheet.create({
   matchCopy: {
     flex: 1,
     minWidth: 0,
+  },
+  matchKickoff: {
+    fontFamily: fonts.medium,
+    fontSize: 11,
+    marginTop: 2,
   },
   matchMeta: {
     fontFamily: fonts.medium,

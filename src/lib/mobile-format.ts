@@ -75,3 +75,22 @@ export async function copyOrShareText(text: string, title = 'BetClaw') {
   await Share.share({ message: text, title });
   return 'shared' as const;
 }
+
+/**
+ * True when a citation/evidence URL points at a real, openable destination.
+ * Filters out placeholder hosts (example.com, localhost) the research step
+ * sometimes emits so the UI never links to a dead page.
+ */
+export function isRealUrl(url?: string | null) {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    if (!/^https?:$/.test(parsed.protocol)) return false;
+    const host = parsed.hostname.toLowerCase();
+    if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.test') || host.endsWith('.invalid')) return false;
+    if (/(^|\.)example\.(com|org|net)$/.test(host)) return false;
+    return host.includes('.');
+  } catch {
+    return false;
+  }
+}

@@ -4,13 +4,13 @@ import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
+import { JobProgressPanel } from '@/components/ticket/JobProgressPanel';
 import {
   enterUp,
   GlassCard,
   GradientButton,
   IconButton,
   PressableScale,
-  ProgressBar,
   Screen,
   ScreenHeader,
   StatusBadge,
@@ -355,7 +355,6 @@ export default function BuildTicketScreen() {
               tone={status === 'done' ? 'success' : status === 'error' ? 'danger' : status === 'processing' ? 'warning' : 'neutral'}
             />
           </View>
-          <ProgressBar value={status === 'done' ? 100 : status === 'processing' ? 64 : 0} />
           <Text style={[styles.helper, { color: theme.mutedLight }]}>
             {jobStatus.data?.status === 'error'
               ? jobStatus.data.message
@@ -365,6 +364,7 @@ export default function BuildTicketScreen() {
                   ? 'Collecting fixtures, scoring markets, and saving the strongest slip.'
                   : 'Start a build to track the research pipeline here.'}
           </Text>
+          <JobProgressPanel pending={buildTicket.isPending} state={jobStatus.data ?? null} />
         </GlassCard>
       </Animated.View>
 

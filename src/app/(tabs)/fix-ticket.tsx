@@ -1,16 +1,17 @@
 import { useLocalSearchParams } from 'expo-router';
-import { Check, Clock3, Copy, SlidersHorizontal, Target, Wand2 } from 'lucide-react-native';
+import { Copy, SlidersHorizontal, Target, Wand2 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
+import { JobProgressPanel } from '@/components/ticket/JobProgressPanel';
+import { LegDetailSheet, type TicketLeg } from '@/components/ticket/LegDetailSheet';
 import {
   enterUp,
   FormField,
   GlassCard,
   GradientButton,
   IconButton,
-  LiveDot,
   PressableScale,
   ProgressBar,
   Screen,
@@ -24,14 +25,6 @@ import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
-const pipeline = [
-  { id: 'decode', label: 'Decode', state: 'done' },
-  { id: 'research', label: 'Research', state: 'active' },
-  { id: 'verify', label: 'Verify', state: 'next' },
-  { id: 'optimize', label: 'Optimize', state: 'next' },
-  { id: 'save', label: 'Save', state: 'next' },
-];
-
 const riskLevels = ['Safe', 'Balanced', 'Bold'];
 const riskMap = {
   Balanced: 'moderate',
@@ -39,35 +32,18 @@ const riskMap = {
   Safe: 'conservative',
 } as const;
 
-function PipelineStep({ label, state }: { label: string; state: string }) {
-  const theme = useAppTheme();
-  const done = state === 'done';
-  const active = state === 'active';
 
-  return (
-    <View style={styles.pipelineStep}>
-      <View
-        style={[
-          styles.stepIcon,
-          {
-            backgroundColor: done ? theme.successSoft : active ? theme.warningSoft : theme.field,
-            borderColor: done ? theme.successSoft : active ? theme.warningSoft : theme.border,
-          },
-        ]}>
-        {done ? <Check color={theme.success} size={14} /> : <Clock3 color={active ? theme.warning : theme.muted} size={13} />}
-      </View>
-      <Text style={[styles.stepLabel, { color: theme.foreground }]}>{label}</Text>
-      {active ? <LiveDot color={theme.warning} size={6} /> : null}
-    </View>
-  );
-}
-
-function TicketRow({ row }: { row: TicketRowData }) {
+function TicketRow({ onPress, row }: { onPress?: () => void; row: TicketRowData }) {
   const theme = useAppTheme();
   const keep = row.status === 'Keep';
 
   return (
-    <PressableScale accessibilityLabel={row.teams} accessibilityRole="button" scaleTo={0.98}>
+    <PressableScale
+      accessibilityHint="Opens leg details and evidence"
+      accessibilityLabel={row.teams}
+      accessibilityRole="button"
+      onPress={onPress}
+      scaleTo={0.98}>
       <GlassCard style={styles.ticketRow}>
         <View style={styles.ticketTop}>
           <View style={styles.ticketCopy}>
@@ -104,6 +80,7 @@ export default function FixTicketScreen() {
     setBookingCode(seededCode);
   }
   const [risk, setRisk] = useState('Balanced');
+  const [selectedLeg, setSelectedLeg] = useState<TicketLeg | null>(null);
   const theme = useAppTheme();
   const fixTicket = useFixTicketMutation();
   const jobStatus = useJobStatus(jobId);
@@ -190,11 +167,7 @@ export default function FixTicketScreen() {
           </View>
           {jobStatus.data?.status === 'error' ? <Text style={[styles.reason, { color: theme.danger }]}>{jobStatus.data.message}</Text> : null}
           {jobStatus.data?.status === 'done' ? <Text style={[styles.reason, { color: theme.mutedLight }]}>{jobStatus.data.summary}</Text> : null}
-          <View style={styles.pipelineGrid}>
-            {pipeline.map((step) => (
-              <PipelineStep key={step.id} label={step.label} state={step.state} />
-            ))}
-          </View>
+          <JobProgressPanel pending={fixTicket.isPending} state={jobStatus.data ?? null} />
         </GlassCard>
       </Animated.View>
 
@@ -231,9 +204,17 @@ export default function FixTicketScreen() {
 
       {displayRows.map((row, index) => (
         <Animated.View entering={enterUp(6 + index)} key={row.id}>
-          <TicketRow row={row} />
+          <TicketRow
+            onPress={() => {
+              const leg = ticket.data?.matches?.find((match) => match.id === row.id) ?? null;
+              setSelectedLeg(leg);
+            }}
+            row={row}
+          />
         </Animated.View>
       ))}
+
+      <LegDetailSheet leg={selectedLeg} onClose={() => setSelectedLeg(null)} />
     </Screen>
   );
 }
@@ -309,14 +290,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.extraBold,
     fontSize: 15,
   },
-  pipelineGrid: {
-    gap: spacing.sm,
-  },
-  pipelineStep: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
   reason: {
     fontFamily: fonts.regular,
     fontSize: 12,
@@ -346,18 +319,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontFamily: fonts.extraBold,
     fontSize: 17,
-  },
-  stepIcon: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 30,
-    justifyContent: 'center',
-    width: 30,
-  },
-  stepLabel: {
-    fontFamily: fonts.bold,
-    fontSize: 13,
   },
   ticketCopy: {
     flex: 1,

@@ -78,15 +78,15 @@ export function DashboardMetric({
     <View style={[primitiveStyles.metric, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       {Icon ? (
         <View style={[primitiveStyles.metricIcon, { backgroundColor: theme.primarySubtle }]}>
-          <Icon color={theme.primary} size={16} />
+          <Icon color={theme.primary} size={14} />
         </View>
       ) : null}
       <View style={primitiveStyles.metricCopy}>
-        <Text numberOfLines={1} style={[primitiveStyles.metricLabel, { color: theme.muted }]}>
-          {label}
-        </Text>
-        <Text numberOfLines={1} style={[primitiveStyles.metricValue, { color: theme.foregroundStrong }]}>
+        <Text adjustsFontSizeToFit numberOfLines={1} style={[primitiveStyles.metricValue, { color: theme.foregroundStrong }]}>
           {value}
+        </Text>
+        <Text numberOfLines={2} style={[primitiveStyles.metricLabel, { color: theme.muted }]}>
+          {label}
         </Text>
       </View>
     </View>
@@ -336,8 +336,6 @@ const primitiveStyles = StyleSheet.create({
     flexDirection: 'row',
     gap: 7,
     height: 46,
-    maxWidth: 220,
-    minWidth: 118,
     paddingHorizontal: spacing.md,
     shadowOffset: { height: 10, width: 0 },
     shadowOpacity: 0.16,
@@ -353,7 +351,6 @@ const primitiveStyles = StyleSheet.create({
     fontSize: 11,
   },
   chipLabel: {
-    flex: 1,
     fontFamily: fonts.extraBold,
     fontSize: 12,
   },
@@ -394,13 +391,11 @@ const primitiveStyles = StyleSheet.create({
     fontSize: 13,
   },
   metric: {
-    alignItems: 'center',
     borderRadius: radius.md,
     borderWidth: 1,
     flex: 1,
-    flexDirection: 'row',
     gap: spacing.sm,
-    minHeight: 62,
+    minHeight: 88,
     minWidth: 0,
     padding: spacing.sm,
   },
@@ -411,19 +406,22 @@ const primitiveStyles = StyleSheet.create({
   metricIcon: {
     alignItems: 'center',
     borderRadius: radius.pill,
-    height: 34,
+    height: 28,
     justifyContent: 'center',
-    width: 34,
+    width: 28,
   },
   metricLabel: {
     fontFamily: fonts.bold,
     fontSize: 10,
+    letterSpacing: 0.4,
+    lineHeight: 13,
+    marginTop: 2,
     textTransform: 'uppercase',
   },
   metricValue: {
     fontFamily: fonts.extraBold,
-    fontSize: 15,
-    marginTop: 2,
+    fontSize: 16,
+    fontVariant: ['tabular-nums'],
   },
   odds: {
     alignItems: 'center',

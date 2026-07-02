@@ -258,6 +258,7 @@ export type FixtureInsight = {
     status?: 'available' | 'pending' | 'unavailable' | string;
   } | null;
   players?: MatchPlayersContext | null;
+  predictionView?: PredictionView | null;
   providerLinks?: { fetchedAt?: string | Date | null; provider?: string | null }[];
   recentMatches?: {
     away?: RecentMatchTeam | null;
@@ -279,28 +280,42 @@ export type FixtureInsight = {
   venue?: string | null;
 };
 
+export type RecentMatch = {
+  date?: string | Date | null;
+  leagueName?: string | null;
+  opponent?: string | null;
+  opponentScore?: number | null;
+  result?: string | null;
+  round?: string | null;
+  teamScore?: number | null;
+  venue?: 'home' | 'away' | string | null;
+};
+
 export type RecentMatchTeam = {
-  matches?: {
-    awayScore?: number | null;
-    awayTeam?: string | null;
-    date?: string | Date | null;
-    homeScore?: number | null;
-    homeTeam?: string | null;
-    result?: string | null;
-  }[];
+  draws?: number | null;
+  losses?: number | null;
+  matches?: RecentMatch[];
+  sampleSize?: number | null;
   summary?: string | null;
+  teamName?: string | null;
+  wins?: number | null;
 };
 
 export type StandingsRow = {
-  all?: { draw?: number | null; lose?: number | null; played?: number | null; win?: number | null };
   description?: string | null;
+  draws?: number | null;
   form?: string | null;
+  goalDiff?: number | null;
+  goalsAgainst?: number | null;
+  goalsFor?: number | null;
+  group?: string | null;
   logoUrl?: string | null;
-  points?: number | null;
+  losses?: number | null;
   played?: number | null;
+  points?: number | null;
   rank?: number | null;
   teamName?: string | null;
-  team?: { id?: number | null; name?: string | null };
+  wins?: number | null;
 };
 
 export type TelegramCommunityStatus = {
@@ -388,7 +403,16 @@ export type BillingHistory = {
 };
 
 export type TicketJobState =
-  | { stage?: string; status: 'processing' }
+  | {
+      chunksCompleted?: number;
+      chunksStarted?: number;
+      chunksTimedOut?: number;
+      chunksTotal?: number;
+      isLargeTicket?: boolean;
+      selectionCount?: number;
+      stage?: string;
+      status: 'processing';
+    }
   | { message: string; stage: 'error'; status: 'error' }
   | {
       fallbackStatus?: string;
@@ -421,6 +445,7 @@ export type TicketDetail = {
     homeTeam: string;
     id: string;
     keyFactors?: string | null;
+    kickoffTime?: string | Date | null;
     matchResult?: TicketMatchResult;
     market: string;
     odds?: number | null;
