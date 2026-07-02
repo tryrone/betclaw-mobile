@@ -9,16 +9,22 @@ import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
 function normalizedStatus(match: FeedMatch) {
-  return String(match.status ?? '').toUpperCase();
+  return String(match.dataSnapshot?.status ?? match.status ?? '').toUpperCase();
 }
 
 function isFinished(match: FeedMatch) {
-  return ['FT', 'AET', 'PEN', 'FINISHED'].includes(normalizedStatus(match));
+  return ['FT', 'AET', 'PEN', 'FINISHED'].includes(normalizedStatus(match)) || match.dataSnapshot?.phase === 'finished';
 }
 
 function isLive(match: FeedMatch) {
   const status = normalizedStatus(match);
-  return !isFinished(match) && (['LIVE', '1H', '2H', 'HT', 'ET', 'BT', 'P', 'SUSP', 'INT'].includes(status) || Boolean(match.elapsedMinute));
+  const elapsedMinute = match.elapsedMinute ?? match.dataSnapshot?.elapsedMinute;
+  return (
+    !isFinished(match) &&
+    (match.dataSnapshot?.phase === 'live' ||
+      ['LIVE', '1H', '2H', 'HT', 'ET', 'BT', 'P', 'SUSP', 'INT'].includes(status) ||
+      (typeof elapsedMinute === 'number' && Number.isFinite(elapsedMinute)))
+  );
 }
 
 function parseScore(score?: string | null) {
@@ -96,7 +102,8 @@ export function FeedMatchCard({
   const live = isLive(match);
   const finished = isFinished(match);
   const showScore = live || finished;
-  const score = parseScore(match.score);
+  const score = parseScore(match.score ?? match.dataSnapshot?.score);
+  const elapsedMinute = match.elapsedMinute ?? match.dataSnapshot?.elapsedMinute;
   const odds = match.matchOdds;
   const bestOdd = formatOdd(match.bestMarket?.odds);
   const hasTripleOdds = Boolean(formatOdd(odds?.home) ?? formatOdd(odds?.draw) ?? formatOdd(odds?.away));
@@ -143,7 +150,7 @@ export function FeedMatchCard({
             </View>
             <View style={[cardStyles.centerPill, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <Text style={[cardStyles.pillPrimary, { color: theme.foregroundStrong }]}>
-                {match.elapsedMinute ? `${match.elapsedMinute}'` : normalizedStatus(match)}
+                {typeof elapsedMinute === 'number' && Number.isFinite(elapsedMinute) ? `${elapsedMinute}'` : normalizedStatus(match)}
               </Text>
               <Text style={[cardStyles.pillSecondary, { color: theme.muted }]}>{phaseLabel(match)}</Text>
             </View>

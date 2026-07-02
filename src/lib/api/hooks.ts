@@ -80,16 +80,23 @@ export function useMe() {
   });
 }
 
-export function useHomeFeed(input?: { cursor?: string; date?: string; leagueKey?: string; limit?: number; query?: string; windowDays?: 1 | 3 }) {
+export function useHomeFeed(
+  input?: { cursor?: string; date?: string; leagueKey?: string; limit?: number; query?: string; windowDays?: 1 | 3 },
+  options?: { refetchIntervalMs?: number },
+) {
   const status = useAuthStore((state) => state.status);
   return useQuery<HomeFeed>({
     enabled: status === 'authenticated',
     queryKey: queryKeys.homeFeed(input),
     queryFn: () => callWithMobileRefresh(() => asPromise<HomeFeed>(trpc.matchday.getHomeFeed.query(input ?? { limit: 24 }))),
+    refetchInterval: options?.refetchIntervalMs ?? false,
   });
 }
 
-export function useInfiniteHomeFeed(input?: { date?: string; leagueKey?: string; limit?: number; query?: string; windowDays?: 1 | 3 }) {
+export function useInfiniteHomeFeed(
+  input?: { date?: string; leagueKey?: string; limit?: number; query?: string; windowDays?: 1 | 3 },
+  options?: { refetchIntervalMs?: number },
+) {
   const status = useAuthStore((state) => state.status);
   return useInfiniteQuery<HomeFeed>({
     enabled: status === 'authenticated',
@@ -105,6 +112,7 @@ export function useInfiniteHomeFeed(input?: { date?: string; leagueKey?: string;
           }),
         ),
       ),
+    refetchInterval: options?.refetchIntervalMs ?? false,
   });
 }
 

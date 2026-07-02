@@ -3,14 +3,12 @@ import { Image } from 'expo-image';
 import * as Linking from 'expo-linking';
 import { Link, useRouter } from 'expo-router';
 import {
-  Activity,
   ArrowRight,
   Bell,
   CalendarDays,
   Gift,
   LoaderCircle,
   MessageCircle,
-  Radio,
   Search,
   ShieldCheck,
   Trophy,
@@ -21,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { FeedMatchCard } from '@/components/home/FeedMatchCard';
+import { LiveNowCarousel } from '@/components/home/LiveNowCarousel';
 import {
   DashboardButton,
   DashboardChip,
@@ -31,8 +30,6 @@ import {
   DashboardStatePanel,
   PressableScale,
   Screen,
-  StatusBadge,
-  TeamLogo,
   useToast,
 } from '@/components/ui';
 import {
@@ -426,139 +423,13 @@ function DateStrip({ dates, selectedDate, onSelect }: { dates: DateOption[]; sel
   );
 }
 
-type OngoingMatch = {
-  league: LeagueSection;
-  match: FeedMatch;
-};
 
-function normalizedStatus(match: FeedMatch) {
-  return String(match.status ?? match.dataSnapshot?.status ?? '').toUpperCase();
-}
 
-function isFinished(match: FeedMatch) {
-  return ['FT', 'AET', 'PEN', 'FINISHED'].includes(normalizedStatus(match)) || match.dataSnapshot?.phase === 'finished';
-}
 
-function isOngoingMatch(match: FeedMatch) {
-  const status = normalizedStatus(match);
-  return !isFinished(match) && (['LIVE', '1H', '2H', 'HT', 'ET', 'BT', 'P', 'SUSP', 'INT'].includes(status) || Boolean(match.elapsedMinute ?? match.dataSnapshot?.elapsedMinute));
-}
 
-function buildOngoingMatches(sections: LeagueSection[]) {
-  return sections.flatMap((league) =>
-    league.matches.filter(isOngoingMatch).map((match) => ({
-      league,
-      match,
-    })),
-  );
-}
 
-function parseLiveScore(score?: string | null) {
-  const parsed = /(\d+)\D+(\d+)/.exec(score ?? '');
-  if (!parsed) return { away: null, home: null } as const;
-  return { away: Number(parsed[2]), home: Number(parsed[1]) } as const;
-}
 
-function liveTimeLabel(match: FeedMatch) {
-  const minute = match.elapsedMinute ?? match.dataSnapshot?.elapsedMinute;
-  if (minute) return `${minute}'`;
-  const status = normalizedStatus(match);
-  return status === 'HT' ? 'HT' : 'Live';
-}
 
-function OngoingMatchCard({ league, match }: OngoingMatch) {
-  const router = useRouter();
-  const theme = useAppTheme();
-  const score = parseLiveScore(match.score ?? match.dataSnapshot?.score);
-  const openMatch = () => router.push(`/match/${match.fixtureId}` as any);
-
-  return (
-    <PressableScale
-      accessibilityLabel={`${match.homeTeam.name} vs ${match.awayTeam.name}, ongoing match`}
-      accessibilityRole="button"
-      onPress={openMatch}
-      scaleTo={0.98}
-      style={[styles.ongoingMatchCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-      <View style={styles.ongoingCardTop}>
-        <StatusBadge label={liveTimeLabel(match)} tone="danger" />
-        <View style={styles.ongoingLiveMark}>
-          <View style={[styles.ongoingLiveDot, { backgroundColor: theme.live }]} />
-          <Text style={[styles.ongoingLiveText, { color: theme.live }]}>In play</Text>
-        </View>
-      </View>
-      <View style={styles.ongoingTeams}>
-        <View style={styles.ongoingTeam}>
-          <TeamLogo logoUrl={match.homeTeam.logoUrl} name={match.homeTeam.name} size={38} />
-          <Text numberOfLines={2} style={[styles.ongoingTeamName, { color: theme.foregroundStrong }]}>
-            {match.homeTeam.name}
-          </Text>
-        </View>
-        <View style={[styles.ongoingScore, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.ongoingScoreText, { color: theme.foregroundStrong }]}>{score.home ?? '-'}</Text>
-          <Text style={[styles.ongoingScoreDivider, { color: theme.muted }]}>:</Text>
-          <Text style={[styles.ongoingScoreText, { color: theme.foregroundStrong }]}>{score.away ?? '-'}</Text>
-        </View>
-        <View style={[styles.ongoingTeam, styles.ongoingTeamRight]}>
-          <TeamLogo logoUrl={match.awayTeam.logoUrl} name={match.awayTeam.name} size={38} />
-          <Text numberOfLines={2} style={[styles.ongoingTeamName, styles.ongoingTeamNameRight, { color: theme.foregroundStrong }]}>
-            {match.awayTeam.name}
-          </Text>
-        </View>
-      </View>
-      <Text numberOfLines={1} style={[styles.ongoingLeague, { color: theme.mutedLight }]}>
-        {league.name}
-      </Text>
-    </PressableScale>
-  );
-}
-
-function OngoingMatchesRail({ isLoading, matches }: { isLoading: boolean; matches: OngoingMatch[] }) {
-  const theme = useAppTheme();
-
-  if (isLoading) {
-    return (
-      <DashboardGlassCard>
-        <DashboardStatePanel icon={LoaderCircle} title="Checking live matches">
-          Looking for ongoing fixtures in the selected slate.
-        </DashboardStatePanel>
-      </DashboardGlassCard>
-    );
-  }
-
-  if (matches.length === 0) {
-    return (
-      <DashboardGlassCard>
-        <DashboardStatePanel icon={Radio} title="No ongoing matches" tone="warning">
-          Live fixtures will appear here as soon as the slate kicks off.
-        </DashboardStatePanel>
-      </DashboardGlassCard>
-    );
-  }
-
-  return (
-    <DashboardGlassCard gradient="matchHero" style={styles.ongoingCard}>
-      <DashboardSectionHeader
-        action={<StatusBadge label={`${matches.length} live`} tone="danger" />}
-        eyebrow="Live"
-        title="Ongoing matches"
-        description="Swipe through fixtures currently in play"
-      />
-      <ScrollView
-        contentContainerStyle={styles.ongoingRail}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.horizontalBleed}>
-        {matches.map((item) => (
-          <OngoingMatchCard key={`${item.league.key}-${item.match.fixtureId}`} league={item.league} match={item.match} />
-        ))}
-      </ScrollView>
-      <View style={[styles.ongoingHint, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
-        <Activity color={theme.primary} size={14} />
-        <Text style={[styles.ongoingHintText, { color: theme.primary }]}>Tap a card for full match context</Text>
-      </View>
-    </DashboardGlassCard>
-  );
-}
 
 function LeagueFilterBar({
   isLoading,
@@ -705,7 +576,6 @@ export default function DashboardScreen() {
   const feedPages = useMemo(() => feed.data?.pages ?? [], [feed.data?.pages]);
   const leagueSections = useMemo(() => buildLeagueSections(feedPages), [feedPages]);
   const flatMatches = useMemo(() => leagueSections.flatMap((league) => league.matches), [leagueSections]);
-  const ongoingMatches = useMemo(() => buildOngoingMatches(leagueSections), [leagueSections]);
   const totalMatches = feedPages[0]?.totalMatches ?? flatMatches.length;
   const bestAccuracy = flatMatches.reduce((max, match) => Math.max(max, getConfidence(match)), 0);
   const tokenBalance = subscription.data?.researchTokensRemaining ?? me.data?.researchTokensRemaining ?? 0;
@@ -811,7 +681,7 @@ export default function DashboardScreen() {
 
       <DateStrip dates={dateOptions} selectedDate={selectedDate} onSelect={handleDateSelect} />
 
-      <OngoingMatchesRail isLoading={feed.isLoading && feedPages.length === 0} matches={ongoingMatches} />
+      <LiveNowCarousel />
 
       <LeagueFilterBar
         isLoading={leagues.isLoading}
