@@ -201,7 +201,15 @@ export default function WalletScreen() {
   };
 
   return (
-    <Screen hasTabs>
+    <Screen
+      hasTabs
+      onRefresh={() => {
+        void plans.refetch();
+        void subscription.refetch();
+        void usage.refetch();
+        void billing.refetch();
+      }}
+      refreshing={subscription.isRefetching || billing.isRefetching}>
       <Animated.View entering={enterUp(0)}>
         <ScreenHeader action={<IconButton icon={CreditCard} label="Payment methods" />} eyebrow="Billing" title="Wallet" />
       </Animated.View>

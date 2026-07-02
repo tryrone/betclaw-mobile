@@ -1,10 +1,10 @@
 import { Link } from 'expo-router';
 import { Mail } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { BrandLogo, enterUp, FormField, GradientButton, Screen, StatusBadge } from '@/components/ui';
+import { BrandLogo, enterUp, FormErrorBanner, FormField, GradientButton, Screen, StatusBadge, useToast } from '@/components/ui';
 import { getErrorMessage } from '@/lib/api/client';
 import { useForgotPasswordMutation } from '@/lib/api/hooks';
 import { useAppTheme } from '@/theme/colors';
@@ -13,8 +13,18 @@ import { fonts } from '@/theme/typography';
 
 export default function ForgotPasswordScreen() {
   const theme = useAppTheme();
+  const { showToast } = useToast();
   const forgotPassword = useForgotPasswordMutation();
   const [email, setEmail] = useState('');
+
+  useEffect(() => {
+    if (!forgotPassword.data?.message) return;
+    showToast({
+      message: forgotPassword.data.message,
+      title: 'Reset email sent',
+      tone: 'success',
+    });
+  }, [forgotPassword.data?.message, showToast]);
 
   return (
     <Screen>
@@ -28,8 +38,7 @@ export default function ForgotPasswordScreen() {
       <Animated.View entering={enterUp(2)} style={styles.form}>
         <StatusBadge label="Email recovery" tone="accent" />
         <FormField icon={Mail} keyboardType="email-address" label="Email" onChangeText={setEmail} placeholder="you@example.com" value={email} />
-        {forgotPassword.error ? <Text style={[styles.message, { color: theme.danger }]}>{getErrorMessage(forgotPassword.error)}</Text> : null}
-        {forgotPassword.data ? <Text style={[styles.message, { color: theme.success }]}>{forgotPassword.data.message}</Text> : null}
+        {forgotPassword.error ? <FormErrorBanner message={getErrorMessage(forgotPassword.error)} /> : null}
         <GradientButton onPress={() => forgotPassword.mutate({ email: email.trim() })}>
           {forgotPassword.isPending ? 'Sending...' : 'Send Reset Link'}
         </GradientButton>

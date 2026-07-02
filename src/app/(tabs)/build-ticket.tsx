@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Bot, Check, Copy, Share2, SlidersHorizontal, Target, Trophy } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -14,6 +14,7 @@ import {
   Screen,
   ScreenHeader,
   StatusBadge,
+  useToast,
 } from '@/components/ui';
 import { DEFAULT_BOOKMAKER_PLATFORM } from '@/lib/bookmaker-platforms';
 import { getErrorMessage } from '@/lib/api/client';
@@ -118,6 +119,7 @@ function TicketMatchRow({ match }: { match: any }) {
 export default function BuildTicketScreen() {
   const router = useRouter();
   const theme = useAppTheme();
+  const { showToast } = useToast();
   const [selectedDate, setSelectedDate] = useState(dateOptions[0].value);
   const [timeWindow, setTimeWindow] = useState<NonNullable<BuildTicketInput['timeWindow']>>('all_day');
   const [oddsProfile, setOddsProfile] = useState<NonNullable<BuildTicketInput['oddsProfile']>>('BALANCED');
@@ -127,7 +129,6 @@ export default function BuildTicketScreen() {
   const [selectedMarkets, setSelectedMarkets] = useState<string[]>([]);
   const [selectedLeagues, setSelectedLeagues] = useState<string[]>([]);
   const [jobId, setJobId] = useState<string | null>(null);
-  const [copyState, setCopyState] = useState<string | null>(null);
 
   const optionInput = useMemo<Partial<BuildTicketInput>>(
     () => ({
@@ -193,9 +194,17 @@ export default function BuildTicketScreen() {
     try {
       const result = await createShareLink.mutateAsync({ ticketId: doneTicket.id });
       await copyOrShareText(result.previewUrl, 'BetClaw ticket');
-      setCopyState('Share link ready');
+      showToast({
+        message: 'Share link ready',
+        title: 'Ticket share',
+        tone: 'success',
+      });
     } catch {
-      setCopyState('Could not create share link');
+      showToast({
+        message: 'Could not create share link',
+        title: 'Ticket share failed',
+        tone: 'error',
+      });
     }
   };
 
@@ -203,11 +212,46 @@ export default function BuildTicketScreen() {
     if (!code) return;
     try {
       const mode = await copyOrShareText(code, 'BetClaw booking code');
-      setCopyState(mode === 'copied' ? 'Code copied' : 'Code shared');
+      showToast({
+        message: mode === 'copied' ? 'Code copied' : 'Code shared',
+        title: 'Booking code',
+        tone: 'success',
+      });
     } catch {
-      setCopyState('Could not copy code');
+      showToast({
+        message: 'Could not copy code',
+        title: 'Copy failed',
+        tone: 'error',
+      });
     }
   };
+
+  useEffect(() => {
+    if (!buildTicket.error) return;
+    showToast({
+      message: getErrorMessage(buildTicket.error),
+      title: 'Build failed',
+      tone: 'error',
+    });
+  }, [buildTicket.error, showToast]);
+
+  useEffect(() => {
+    if (!generateCode.error) return;
+    showToast({
+      message: getErrorMessage(generateCode.error),
+      title: 'Booking code failed',
+      tone: 'error',
+    });
+  }, [generateCode.error, showToast]);
+
+  useEffect(() => {
+    if (!generateCode.data || generateCode.data.success) return;
+    showToast({
+      message: generateCode.data.error ?? generateCode.data.regenerationError ?? 'Code generation is unavailable.',
+      title: 'Booking code unavailable',
+      tone: 'warning',
+    });
+  }, [generateCode.data, showToast]);
 
   return (
     <Screen hasTabs>
@@ -339,7 +383,6 @@ export default function BuildTicketScreen() {
             style={[styles.notes, { backgroundColor: theme.field, borderColor: theme.border, color: theme.foreground }]}
             value={notes}
           />
-          {buildTicket.error ? <Text style={[styles.errorText, { color: theme.danger }]}>{getErrorMessage(buildTicket.error)}</Text> : null}
           <GradientButton icon={Trophy} onPress={handleBuild}>
             {buildTicket.isPending ? 'Submitting...' : 'Build Ticket'}
           </GradientButton>
@@ -397,10 +440,6 @@ export default function BuildTicketScreen() {
                 <Copy color={theme.primarySoft} size={16} />
               </PressableScale>
             ) : null}
-            {generateCode.data && !generateCode.data.success ? (
-              <Text style={[styles.errorText, { color: theme.warning }]}>{generateCode.data.error ?? generateCode.data.regenerationError}</Text>
-            ) : null}
-            {copyState ? <Text style={[styles.helper, { color: theme.success }]}>{copyState}</Text> : null}
           </GlassCard>
         </Animated.View>
       ) : null}

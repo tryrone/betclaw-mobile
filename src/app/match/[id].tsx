@@ -593,8 +593,7 @@ function SectionSwitcher({ activeSection, onSelect }: { activeSection: DetailSec
             accessibilityState={{ selected: active }}
             key={section}
             onPress={() => onSelect(section)}
-            style={[styles.sectionTab, { backgroundColor: active ? 'transparent' : theme.field, borderColor: active ? 'transparent' : theme.border }]}>
-            {active ? <LinearGradient colors={[theme.primary, theme.primary]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={StyleSheet.absoluteFill} /> : null}
+            style={[styles.sectionTab, { backgroundColor: active ? theme.primary : theme.field, borderColor: active ? theme.primary : theme.border }]}>
             <Text numberOfLines={1} style={[styles.sectionTabText, { color: active ? theme.primaryDark : theme.mutedLight }]}>{section}</Text>
           </PressableScale>
         );
@@ -1286,7 +1285,7 @@ export default function MatchDetailScreen() {
   ].filter((item): item is { label: string; value: number } => typeof item.value === 'number');
 
   return (
-    <Screen>
+    <Screen onRefresh={() => void insight.refetch()} refreshing={insight.isRefetching}>
       <Animated.View entering={enterUp(0)} style={styles.header}>
         <IconButton icon={ArrowLeft} label="Go back" onPress={goBack} />
         <View style={styles.headerTitleWrap}>

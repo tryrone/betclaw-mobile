@@ -4,6 +4,8 @@ export * from './BrandLogo';
 export * from './BrandMark';
 export * from './DashboardBottomNav';
 export * from './DashboardPrimitives';
+export * from './FloatingAlert';
+export * from './FormErrorBanner';
 export * from './FormField';
 export * from './GlassCard';
 export * from './GradientButton';

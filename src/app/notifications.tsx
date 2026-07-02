@@ -31,7 +31,7 @@ export default function NotificationsScreen() {
   const items = notifications.data?.items ?? [];
 
   return (
-    <Screen>
+    <Screen onRefresh={() => void notifications.refetch()} refreshing={notifications.isRefetching}>
       <Animated.View entering={enterUp(0)} style={styles.header}>
         <IconButton icon={ArrowLeft} label="Go back" onPress={() => router.back()} />
         <Text style={[styles.title, { color: theme.foregroundStrong }]}>Notifications</Text>

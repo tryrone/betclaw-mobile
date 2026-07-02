@@ -65,7 +65,24 @@ export async function callWithMobileRefresh<T>(operation: () => Promise<T>) {
   }
 }
 
+function friendlyZodMessage(raw: string): string | null {
+  // tRPC surfaces Zod validation failures as a JSON array of issues.
+  if (!raw.trimStart().startsWith('[')) return null;
+  try {
+    const issues = JSON.parse(raw);
+    if (!Array.isArray(issues)) return null;
+    const messages = issues
+      .map((issue) => (issue && typeof issue.message === 'string' ? issue.message : null))
+      .filter((message): message is string => Boolean(message));
+    return messages.length > 0 ? Array.from(new Set(messages)).join('\n') : null;
+  } catch {
+    return null;
+  }
+}
+
 export function getErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error && error.message) {
+    return friendlyZodMessage(error.message) ?? error.message;
+  }
   return 'Something went wrong. Please try again.';
 }

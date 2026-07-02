@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
 import { ArrowLeft, ArrowRight, Copy, Gift, Search, Share2, Users } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { enterUp, GlassCard, GradientButton, IconButton, PressableScale, Screen, ScreenHeader, StatusBadge } from '@/components/ui';
+import { enterUp, GlassCard, GradientButton, IconButton, PressableScale, Screen, ScreenHeader, StatusBadge, useToast } from '@/components/ui';
 import { getErrorMessage } from '@/lib/api/client';
 import { useGenerateReferralMutation, useMyReferral, useReferralLookup } from '@/lib/api/hooks';
 import type { ReferralReport } from '@/lib/api/types';
@@ -80,11 +80,11 @@ function ReferralReportCard({ report }: { report: ReferralReport }) {
 export default function ReferralsScreen() {
   const router = useRouter();
   const theme = useAppTheme();
+  const { showToast } = useToast();
   const myReferral = useMyReferral();
   const generateReferral = useGenerateReferralMutation();
   const [lookupCode, setLookupCode] = useState('');
   const [submittedCode, setSubmittedCode] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
   const lookup = useReferralLookup(submittedCode);
   const report = myReferral.data;
   const referralLink = report ? `${publicWebBaseUrl()}/r/${report.partner.code}` : '';
@@ -94,11 +94,37 @@ export default function ReferralsScreen() {
     if (!referralLink) return;
     try {
       const mode = await copyOrShareText(referralLink, 'Join me on BetClaw');
-      setMessage(mode === 'copied' ? 'Referral link copied' : 'Referral link shared');
+      showToast({
+        message: mode === 'copied' ? 'Referral link copied' : 'Referral link shared',
+        title: 'Referral link',
+        tone: 'success',
+      });
     } catch {
-      setMessage('Could not share referral link');
+      showToast({
+        message: 'Could not share referral link',
+        title: 'Referral sharing failed',
+        tone: 'error',
+      });
     }
   };
+
+  useEffect(() => {
+    if (!generateReferral.error) return;
+    showToast({
+      message: getErrorMessage(generateReferral.error),
+      title: 'Referral link failed',
+      tone: 'error',
+    });
+  }, [generateReferral.error, showToast]);
+
+  useEffect(() => {
+    if (!lookup.error) return;
+    showToast({
+      message: getErrorMessage(lookup.error),
+      title: 'Referral lookup failed',
+      tone: 'error',
+    });
+  }, [lookup.error, showToast]);
 
   return (
     <Screen hasTabs>
@@ -139,7 +165,6 @@ export default function ReferralsScreen() {
               <GradientButton icon={Gift} onPress={() => generateReferral.mutate()}>
                 {generateReferral.isPending ? 'Generating...' : 'Generate referral link'}
               </GradientButton>
-              {generateReferral.error ? <Text style={[styles.errorText, { color: theme.danger }]}>{getErrorMessage(generateReferral.error)}</Text> : null}
             </>
           ) : null}
 
@@ -166,7 +191,6 @@ export default function ReferralsScreen() {
                   <Text style={[styles.actionText, { color: theme.foreground }]}>Share</Text>
                 </PressableScale>
               </View>
-              {message ? <Text style={[styles.message, { color: theme.success }]}>{message}</Text> : null}
               <View style={styles.statGrid}>
                 <StatTile label="Signups" value={report.stats.totalSignups.toLocaleString()} />
                 <StatTile label="Qualified" value={report.stats.qualifiedSignups.toLocaleString()} />
@@ -205,7 +229,6 @@ export default function ReferralsScreen() {
             }}>
             {lookup.isLoading ? 'Loading...' : 'View Report'}
           </GradientButton>
-          {lookup.error ? <Text style={[styles.errorText, { color: theme.danger }]}>{getErrorMessage(lookup.error)}</Text> : null}
           {submittedCode && !lookup.isLoading && !lookup.data && !lookup.error ? (
             <Text style={[styles.emptyLine, { color: theme.muted }]}>No active referral code found.</Text>
           ) : null}

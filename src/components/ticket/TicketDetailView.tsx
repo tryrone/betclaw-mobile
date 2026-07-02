@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
 import { ChevronRight, Copy, ExternalLink, PencilLine, Share2, ShieldCheck, Sparkles, Trophy } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { enterUp, GlassCard, PressableScale, ProgressBar, StatusBadge } from '@/components/ui';
+import { FormBadges } from '@/components/ticket/FormBadges';
+import { enterUp, GlassCard, PressableScale, ProgressBar, StatusBadge, useToast } from '@/components/ui';
 import { getErrorMessage } from '@/lib/api/client';
 import {
   useCreateShareLinkMutation,
@@ -35,6 +36,10 @@ function matchTone(status?: string) {
 function matchStatusLabel(status?: string) {
   if (status === 'NO_BET') return 'Not picked';
   return status ?? 'Match';
+}
+
+function isInactiveMatchStatus(status?: string | null) {
+  return status === 'REMOVED' || status === 'NO_BET';
 }
 
 function resultTone(result?: string | null) {
@@ -84,6 +89,7 @@ function MatchDetailRow({
   const theme = useAppTheme();
   const confidence = Math.round(match.confidence ?? 0);
   const canOpenMatch = Boolean(match.fixtureId);
+  const isInactive = isInactiveMatchStatus(match.status);
   const evidence = [
     match.selectionReason,
     match.confidenceReason,
@@ -92,13 +98,12 @@ function MatchDetailRow({
   ].filter(Boolean);
   const readiness = match.dataReadiness;
   const labeledInsights = [
-    match.homeForm ? { label: 'Home form', value: String(match.homeForm) } : null,
-    match.awayForm ? { label: 'Away form', value: String(match.awayForm) } : null,
     match.h2hSummary ? { label: 'H2H', value: String(match.h2hSummary).replace(/^H2H:\s*/i, '') } : null,
     readiness?.status
       ? { label: 'Data readiness', value: `${readiness.status}${typeof readiness.score === 'number' ? ` (${Math.round(readiness.score)}%)` : ''}` }
       : null,
   ].filter((line): line is { label: string; value: string } => Boolean(line));
+  const hasFormData = Boolean(match.homeForm || match.awayForm);
 
   const openMatch = () => {
     if (!match.fixtureId) return;
@@ -107,7 +112,7 @@ function MatchDetailRow({
   };
 
   return (
-    <GlassCard style={styles.matchCard}>
+    <GlassCard style={[styles.matchCard, isInactive ? styles.inactiveMatchCard : null, isInactive ? { shadowColor: theme.danger } : null]}>
       <PressableScale
         accessibilityHint={canOpenMatch ? 'Opens the match detail page' : undefined}
         accessibilityLabel={`${match.homeTeam} vs ${match.awayTeam}`}
@@ -163,8 +168,20 @@ function MatchDetailRow({
         </View>
       ) : null}
 
-      {labeledInsights.length > 0 ? (
+      {hasFormData || labeledInsights.length > 0 ? (
         <View style={[styles.insightBox, { backgroundColor: theme.field, borderColor: theme.border }]}>
+          {match.homeForm ? (
+            <View style={styles.insightFormRow}>
+              <Text style={[styles.insightLabel, { color: theme.muted }]}>Home form</Text>
+              <FormBadges value={match.homeForm} />
+            </View>
+          ) : null}
+          {match.awayForm ? (
+            <View style={styles.insightFormRow}>
+              <Text style={[styles.insightLabel, { color: theme.muted }]}>Away form</Text>
+              <FormBadges value={match.awayForm} />
+            </View>
+          ) : null}
           {labeledInsights.map((line) => (
             <Text key={line.label} style={[styles.insightLine, { color: theme.mutedLight }]}>
               <Text style={[styles.insightLabel, { color: theme.muted }]}>{line.label}: </Text>
@@ -232,12 +249,12 @@ export function TicketDetailView({
 }) {
   const router = useRouter();
   const theme = useAppTheme();
+  const { showToast } = useToast();
   const ticket = useTicketById(ticketId);
   const generateCode = useGenerateBookingCodeMutation();
   const createShareLink = useCreateShareLinkMutation();
   const setMatchResult = useSetMatchResultMutation(ticketId);
   const [platform, setPlatform] = useState<SupportedPlatform>(DEFAULT_BOOKMAKER_PLATFORM);
-  const [message, setMessage] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const data = ticket.data;
   const kept = data?.matches?.filter((match) => match.status === 'KEPT').length ?? 0;
@@ -245,7 +262,6 @@ export function TicketDetailView({
 
   const handleGenerate = () => {
     if (!ticketId || generateCode.isPending) return;
-    setMessage(null);
     generateCode.mutate({ platform, ticketId });
   };
 
@@ -255,16 +271,28 @@ export function TicketDetailView({
       const result = await createShareLink.mutateAsync({ ticketId });
       setPreviewUrl(result.previewUrl);
       await copyOrShareText(result.previewUrl, 'BetClaw ticket');
-      setMessage('Share link ready');
+      showToast({
+        message: 'Share link ready',
+        title: 'Ticket share',
+        tone: 'success',
+      });
     } catch {
-      setMessage('Could not create share link');
+      showToast({
+        message: 'Could not create share link',
+        title: 'Ticket share failed',
+        tone: 'error',
+      });
     }
   };
 
   const handleEditAgain = () => {
     const code = data?.originalCode ?? data?.bookingCode;
     if (!code) {
-      setMessage('No booking code available to edit');
+      showToast({
+        message: 'No booking code available to edit',
+        title: 'Edit unavailable',
+        tone: 'warning',
+      });
       return;
     }
     onNavigate?.();
@@ -275,15 +303,41 @@ export function TicketDetailView({
     if (!code) return;
     try {
       const mode = await copyOrShareText(code, 'BetClaw booking code');
-      setMessage(mode === 'copied' ? 'Code copied' : 'Code shared');
+      showToast({
+        message: mode === 'copied' ? 'Code copied' : 'Code shared',
+        title: 'Booking code',
+        tone: 'success',
+      });
     } catch {
-      setMessage('Could not copy code');
+      showToast({
+        message: 'Could not copy code',
+        title: 'Copy failed',
+        tone: 'error',
+      });
     }
   };
 
   const handleSetResult = (matchId: string, result: TicketMatchResult) => {
     setMatchResult.mutate({ matchId, result });
   };
+
+  useEffect(() => {
+    if (!generateCode.error) return;
+    showToast({
+      message: getErrorMessage(generateCode.error),
+      title: 'Booking code failed',
+      tone: 'error',
+    });
+  }, [generateCode.error, showToast]);
+
+  useEffect(() => {
+    if (!generateCode.data || generateCode.data.success) return;
+    showToast({
+      message: generateCode.data.error ?? generateCode.data.regenerationError ?? 'Code generation is unavailable.',
+      title: 'Booking code unavailable',
+      tone: 'warning',
+    });
+  }, [generateCode.data, showToast]);
 
   return (
     <View style={styles.root}>
@@ -373,14 +427,6 @@ export function TicketDetailView({
                   <Copy color={theme.primarySoft} size={16} />
                 </PressableScale>
               ) : null}
-              {generateCode.data && !generateCode.data.success ? (
-                <Text style={[styles.errorText, { color: theme.warning }]}>
-                  {generateCode.data.error ?? generateCode.data.regenerationError ?? 'Code generation is unavailable.'}
-                </Text>
-              ) : null}
-              {generateCode.error ? <Text style={[styles.errorText, { color: theme.danger }]}>{getErrorMessage(generateCode.error)}</Text> : null}
-              {createShareLink.error ? <Text style={[styles.errorText, { color: theme.danger }]}>{getErrorMessage(createShareLink.error)}</Text> : null}
-              {message ? <Text style={[styles.message, { color: theme.success }]}>{message}</Text> : null}
             </GlassCard>
           </Animated.View>
 
@@ -527,8 +573,14 @@ const styles = StyleSheet.create({
   insightBox: {
     borderRadius: radius.md,
     borderWidth: 1,
-    gap: 4,
+    gap: spacing.sm,
     padding: spacing.md,
+  },
+  insightFormRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
   },
   insightLabel: {
     fontFamily: fonts.bold,
@@ -539,6 +591,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     fontSize: 12,
     lineHeight: 18,
+  },
+  inactiveMatchCard: {
+    backgroundColor: 'rgba(248,113,113,0.055)',
+    borderColor: 'rgba(248,113,113,0.35)',
+    shadowOpacity: 0.18,
   },
   matchCard: {
     gap: spacing.sm,

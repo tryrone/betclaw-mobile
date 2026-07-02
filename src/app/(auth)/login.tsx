@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { BrandLogo, enterUp, FormField, GradientButton, PressableScale, Screen, StatusBadge } from '@/components/ui';
+import { BrandLogo, enterUp, FormErrorBanner, FormField, GradientButton, PressableScale, Screen, StatusBadge } from '@/components/ui';
 import { getErrorMessage } from '@/lib/api/client';
 import { useLoginMutation, useOAuthLoginMutation } from '@/lib/api/hooks';
 import type { MobileOAuthProvider } from '@/lib/api/types';
@@ -60,8 +60,8 @@ export default function LoginScreen() {
           <Animated.View entering={enterUp(2)} style={styles.form}>
             <FormField icon={Mail} keyboardType="email-address" label="Email" onChangeText={setEmail} placeholder="you@example.com" value={email} />
             <FormField icon={Lock} label="Password" onChangeText={setPassword} placeholder="Your password" secure value={password} />
-            {login.error ? <Text style={[styles.errorText, { color: theme.danger }]}>{getErrorMessage(login.error)}</Text> : null}
-            {oauthLogin.error ? <Text style={[styles.errorText, { color: theme.danger }]}>{getErrorMessage(oauthLogin.error)}</Text> : null}
+            {login.error ? <FormErrorBanner message={getErrorMessage(login.error)} /> : null}
+            {oauthLogin.error ? <FormErrorBanner message={getErrorMessage(oauthLogin.error)} /> : null}
             <GradientButton icon={Fingerprint} onPress={handleLogin}>
               {login.isPending ? 'Signing In...' : 'Sign In'}
             </GradientButton>

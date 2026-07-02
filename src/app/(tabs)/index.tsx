@@ -1,23 +1,23 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import * as Linking from 'expo-linking';
 import { Link, useRouter } from 'expo-router';
 import {
+  Activity,
   ArrowRight,
   Bell,
   CalendarDays,
-  CircleAlert,
   Gift,
   LoaderCircle,
-  LockKeyhole,
   MessageCircle,
+  Radio,
   Search,
   ShieldCheck,
-  Target,
   Trophy,
   UsersRound,
   Wallet,
 } from 'lucide-react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { FeedMatchCard } from '@/components/home/FeedMatchCard';
@@ -32,10 +32,11 @@ import {
   PressableScale,
   Screen,
   StatusBadge,
+  TeamLogo,
+  useToast,
 } from '@/components/ui';
 import {
   useCreateTelegramCommunityInviteMutation,
-  useDailyTicket,
   useInfiniteHomeFeed,
   useLeagues,
   useMe,
@@ -44,9 +45,6 @@ import {
   useTelegramCommunityStatus,
 } from '@/lib/api/hooks';
 import type {
-  DailyTicketBookmakerPlatform,
-  DailyTicketData,
-  DailyTicketLeg,
   FeedMatch,
   HomeFeed,
   LeagueOption,
@@ -59,7 +57,7 @@ import { fonts } from '@/theme/typography';
 
 const userAvatar = require('@/../assets/images/user_avatar.png');
 const ALL_LEAGUES_KEY = '__all_leagues__';
-const DAILY_TICKET_BOOKMAKER_PLATFORM = 'SPORTYBET' satisfies DailyTicketBookmakerPlatform;
+const COMMUNITY_BANNER_HIDDEN_PREFIX = 'betclaw.community-banner.hidden.';
 
 type DateOption = {
   main: string;
@@ -76,6 +74,10 @@ function dateKeyFromDate(date: Date) {
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
   const day = String(date.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function communityBannerHiddenKey(userId: string) {
+  return `${COMMUNITY_BANNER_HIDDEN_PREFIX}${userId}`;
 }
 
 function dateKey(offset: number) {
@@ -121,22 +123,9 @@ function formatSelectedDateLabel(key: string) {
   });
 }
 
-
-function formatMatchTime(value: string | Date) {
-  return new Date(value).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-}
-
 function formatCompact(value?: number | null) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return 'Wallet';
   return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 1, notation: 'compact' }).format(value)} tokens`;
-}
-
-function formatOdds(value?: number | null) {
-  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : '--';
-}
-
-function formatDailyTicketProvider(platform: DailyTicketBookmakerPlatform | string) {
-  return platform === 'SPORTYBET' ? 'SportyBet' : 'API-Football';
 }
 
 function matchKickoffTime(match: FeedMatch) {
@@ -311,14 +300,12 @@ function TelegramCommunityCard({
   invite,
   isCreating,
   isLoading,
-  message,
   onJoin,
   status,
 }: {
   invite: TelegramCommunityInvite | null;
   isCreating: boolean;
   isLoading: boolean;
-  message: { type: 'success' | 'error'; text: string } | null;
   onJoin: () => void;
   status?: TelegramCommunityStatus;
 }) {
@@ -352,11 +339,7 @@ function TelegramCommunityCard({
         <DashboardButton icon={isCreating || isLoading ? LoaderCircle : MessageCircle} onPress={onJoin} style={styles.communityButton}>
           {ready ? 'Join Community' : 'Setup Pending'}
         </DashboardButton>
-        {message ? (
-          <Text numberOfLines={2} style={[styles.communityStatus, { color: message.type === 'error' ? theme.danger : theme.success }]}>
-            {message.text}
-          </Text>
-        ) : inviteExpiry ? (
+        {inviteExpiry ? (
           <Text numberOfLines={1} style={[styles.communityStatus, { color: theme.muted }]}>Expires {inviteExpiry}</Text>
         ) : null}
       </View>
@@ -443,136 +426,137 @@ function DateStrip({ dates, selectedDate, onSelect }: { dates: DateOption[]; sel
   );
 }
 
-function DailyTicketCard({
-  dailyTicket,
-  error,
-  isAccessLoading,
-  isLoading,
-  isLocked,
-  selectedDateLabel,
-}: {
-  dailyTicket?: DailyTicketData;
-  error?: string;
-  isAccessLoading: boolean;
-  isLoading: boolean;
-  isLocked: boolean;
-  selectedDateLabel: string;
-}) {
+type OngoingMatch = {
+  league: LeagueSection;
+  match: FeedMatch;
+};
+
+function normalizedStatus(match: FeedMatch) {
+  return String(match.status ?? match.dataSnapshot?.status ?? '').toUpperCase();
+}
+
+function isFinished(match: FeedMatch) {
+  return ['FT', 'AET', 'PEN', 'FINISHED'].includes(normalizedStatus(match)) || match.dataSnapshot?.phase === 'finished';
+}
+
+function isOngoingMatch(match: FeedMatch) {
+  const status = normalizedStatus(match);
+  return !isFinished(match) && (['LIVE', '1H', '2H', 'HT', 'ET', 'BT', 'P', 'SUSP', 'INT'].includes(status) || Boolean(match.elapsedMinute ?? match.dataSnapshot?.elapsedMinute));
+}
+
+function buildOngoingMatches(sections: LeagueSection[]) {
+  return sections.flatMap((league) =>
+    league.matches.filter(isOngoingMatch).map((match) => ({
+      league,
+      match,
+    })),
+  );
+}
+
+function parseLiveScore(score?: string | null) {
+  const parsed = /(\d+)\D+(\d+)/.exec(score ?? '');
+  if (!parsed) return { away: null, home: null } as const;
+  return { away: Number(parsed[2]), home: Number(parsed[1]) } as const;
+}
+
+function liveTimeLabel(match: FeedMatch) {
+  const minute = match.elapsedMinute ?? match.dataSnapshot?.elapsedMinute;
+  if (minute) return `${minute}'`;
+  const status = normalizedStatus(match);
+  return status === 'HT' ? 'HT' : 'Live';
+}
+
+function OngoingMatchCard({ league, match }: OngoingMatch) {
   const router = useRouter();
   const theme = useAppTheme();
-  const provider = formatDailyTicketProvider(dailyTicket?.bookmakerPlatform ?? DAILY_TICKET_BOOKMAKER_PLATFORM);
+  const score = parseLiveScore(match.score ?? match.dataSnapshot?.score);
+  const openMatch = () => router.push(`/match/${match.fixtureId}` as any);
 
-  if (isAccessLoading) {
-    return (
-      <DashboardGlassCard>
-        <DashboardStatePanel icon={LoaderCircle} title="Loading access" />
-      </DashboardGlassCard>
-    );
-  }
-
-  if (isLocked) {
-    return (
-      <DashboardGlassCard gradient="amberCard">
-        <StatusBadge label="Premium" tone="warning" />
-        <Text style={[styles.ticketTitle, { color: theme.foregroundStrong }]}>Verified ticket odds of the day</Text>
-        <Text style={[styles.ticketCopy, { color: theme.mutedLight }]}>Verified legs targeting around 2.00 total odds for {selectedDateLabel}.</Text>
-        <View style={[styles.lockPreview, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <LockKeyhole color={theme.warning} size={18} />
-          <Text style={[styles.lockPreviewText, { color: theme.foregroundStrong }]}>Premium locked</Text>
+  return (
+    <PressableScale
+      accessibilityLabel={`${match.homeTeam.name} vs ${match.awayTeam.name}, ongoing match`}
+      accessibilityRole="button"
+      onPress={openMatch}
+      scaleTo={0.98}
+      style={[styles.ongoingMatchCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+      <View style={styles.ongoingCardTop}>
+        <StatusBadge label={liveTimeLabel(match)} tone="danger" />
+        <View style={styles.ongoingLiveMark}>
+          <View style={[styles.ongoingLiveDot, { backgroundColor: theme.live }]} />
+          <Text style={[styles.ongoingLiveText, { color: theme.live }]}>In play</Text>
         </View>
-        <DashboardButton icon={Wallet} onPress={() => router.push('/(tabs)/wallet' as any)}>
-          Open Wallet
-        </DashboardButton>
-      </DashboardGlassCard>
-    );
-  }
+      </View>
+      <View style={styles.ongoingTeams}>
+        <View style={styles.ongoingTeam}>
+          <TeamLogo logoUrl={match.homeTeam.logoUrl} name={match.homeTeam.name} size={38} />
+          <Text numberOfLines={2} style={[styles.ongoingTeamName, { color: theme.foregroundStrong }]}>
+            {match.homeTeam.name}
+          </Text>
+        </View>
+        <View style={[styles.ongoingScore, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <Text style={[styles.ongoingScoreText, { color: theme.foregroundStrong }]}>{score.home ?? '-'}</Text>
+          <Text style={[styles.ongoingScoreDivider, { color: theme.muted }]}>:</Text>
+          <Text style={[styles.ongoingScoreText, { color: theme.foregroundStrong }]}>{score.away ?? '-'}</Text>
+        </View>
+        <View style={[styles.ongoingTeam, styles.ongoingTeamRight]}>
+          <TeamLogo logoUrl={match.awayTeam.logoUrl} name={match.awayTeam.name} size={38} />
+          <Text numberOfLines={2} style={[styles.ongoingTeamName, styles.ongoingTeamNameRight, { color: theme.foregroundStrong }]}>
+            {match.awayTeam.name}
+          </Text>
+        </View>
+      </View>
+      <Text numberOfLines={1} style={[styles.ongoingLeague, { color: theme.mutedLight }]}>
+        {league.name}
+      </Text>
+    </PressableScale>
+  );
+}
+
+function OngoingMatchesRail({ isLoading, matches }: { isLoading: boolean; matches: OngoingMatch[] }) {
+  const theme = useAppTheme();
 
   if (isLoading) {
     return (
       <DashboardGlassCard>
-        <DashboardStatePanel icon={LoaderCircle} title="Building verified ticket">
-          Verifying the best available legs for {selectedDateLabel}.
+        <DashboardStatePanel icon={LoaderCircle} title="Checking live matches">
+          Looking for ongoing fixtures in the selected slate.
         </DashboardStatePanel>
       </DashboardGlassCard>
     );
   }
 
-  if (error) {
-    return (
-      <DashboardGlassCard style={{ borderColor: theme.dangerSoft }}>
-        <DashboardStatePanel icon={CircleAlert} title="Daily ticket unavailable" tone="danger">
-          {error}
-        </DashboardStatePanel>
-      </DashboardGlassCard>
-    );
-  }
-
-  if (!dailyTicket || dailyTicket.legs.length === 0) {
+  if (matches.length === 0) {
     return (
       <DashboardGlassCard>
-        <DashboardStatePanel icon={Target} title={`No verified 2.00 ${provider} ticket yet`} tone="warning">
-          {provider}-ready predictions for {selectedDateLabel} are still being verified.
+        <DashboardStatePanel icon={Radio} title="No ongoing matches" tone="warning">
+          Live fixtures will appear here as soon as the slate kicks off.
         </DashboardStatePanel>
       </DashboardGlassCard>
     );
   }
 
   return (
-    <DashboardGlassCard gradient="matchHero">
-      <View style={styles.ticketHeader}>
-        <StatusBadge label={`Verified ${provider}`} tone="accent" />
-        <StatusBadge label={`Target ${formatOdds(dailyTicket.targetOdds)}`} tone="warning" />
-      </View>
-      <Text style={[styles.ticketTitle, { color: theme.foregroundStrong }]}>Ticket odds of the day</Text>
-      <Text style={[styles.ticketCopy, { color: theme.mutedLight }]}>{selectedDateLabel} selections verified through {provider}.</Text>
-      <View style={styles.ticketMetrics}>
-        <DashboardMetric label="Total odds" value={formatOdds(dailyTicket.totalOdds)} />
-        <DashboardMetric label="Legs" value={String(dailyTicket.legCount)} />
-        <DashboardMetric label="Avg confidence" value={dailyTicket.avgConfidence !== null ? `${dailyTicket.avgConfidence}%` : '--'} />
-      </View>
-      {dailyTicket.bookingCode ? (
-        <View style={[styles.bookingCode, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
-          <Text style={[styles.bookingLabel, { color: theme.muted }]}>SportyBet booking code</Text>
-          <Text numberOfLines={1} style={[styles.bookingValue, { color: theme.primary }]}>{dailyTicket.bookingCode}</Text>
-        </View>
-      ) : null}
-      <View style={styles.legsList}>
-        {dailyTicket.legs.map((leg) => (
-          <DailyTicketLegRow key={leg.id} leg={leg} />
+    <DashboardGlassCard gradient="matchHero" style={styles.ongoingCard}>
+      <DashboardSectionHeader
+        action={<StatusBadge label={`${matches.length} live`} tone="danger" />}
+        eyebrow="Live"
+        title="Ongoing matches"
+        description="Swipe through fixtures currently in play"
+      />
+      <ScrollView
+        contentContainerStyle={styles.ongoingRail}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.horizontalBleed}>
+        {matches.map((item) => (
+          <OngoingMatchCard key={`${item.league.key}-${item.match.fixtureId}`} league={item.league} match={item.match} />
         ))}
+      </ScrollView>
+      <View style={[styles.ongoingHint, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
+        <Activity color={theme.primary} size={14} />
+        <Text style={[styles.ongoingHintText, { color: theme.primary }]}>Tap a card for full match context</Text>
       </View>
     </DashboardGlassCard>
-  );
-}
-
-function DailyTicketLegRow({ leg }: { leg: DailyTicketLeg }) {
-  const theme = useAppTheme();
-  const reason = leg.edgeSummary ?? leg.modelSummary ?? `Verified ${formatDailyTicketProvider(leg.bookmakerPlatform)} market with priced odds and active prediction lineage.`;
-
-  return (
-    <View style={[styles.legRow, { backgroundColor: 'rgba(0,0,0,0.20)', borderColor: theme.border }]}>
-      <View style={styles.legCopy}>
-        <Text numberOfLines={1} style={[styles.legTeams, { color: theme.foregroundStrong }]}>
-          {leg.homeTeam} vs {leg.awayTeam}
-        </Text>
-        <Text numberOfLines={1} style={[styles.legMeta, { color: theme.muted }]}>
-          {leg.league}
-          {leg.kickoffTime ? `  ${formatMatchTime(leg.kickoffTime)}` : ''}
-        </Text>
-        <Text numberOfLines={1} style={[styles.legMarket, { color: theme.foregroundStrong }]}>{leg.selectionLabel ?? leg.verdict}</Text>
-        <Text numberOfLines={2} style={[styles.legReason, { color: theme.mutedLight }]}>{reason}</Text>
-      </View>
-      <View style={styles.legStats}>
-        <View style={[styles.legStat, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
-          <Text style={[styles.legStatLabel, { color: theme.primary }]}>Odds</Text>
-          <Text style={[styles.legStatValue, { color: theme.primary }]}>{formatOdds(leg.odds)}</Text>
-        </View>
-        <View style={[styles.legStat, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.legStatLabel, { color: theme.muted }]}>Conf.</Text>
-          <Text style={[styles.legStatValue, { color: theme.foregroundStrong }]}>{Math.round(leg.confidence)}%</Text>
-        </View>
-      </View>
-    </View>
   );
 }
 
@@ -659,13 +643,17 @@ function LeagueMatchSection({ league }: { league: LeagueSection }) {
 
 export default function DashboardScreen() {
   const theme = useAppTheme();
+  const { showToast } = useToast();
   const initialDate = dateKey(0);
   const [todayKey, setTodayKey] = useState(initialDate);
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [selectedLeagueKey, setSelectedLeagueKey] = useState(ALL_LEAGUES_KEY);
   const [query, setQuery] = useState('');
   const [communityInvite, setCommunityInvite] = useState<TelegramCommunityInvite | null>(null);
-  const [communityMessage, setCommunityMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [communityBannerPreference, setCommunityBannerPreference] = useState<{
+    hidden: boolean;
+    key: string | null;
+  }>({ hidden: false, key: null });
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -693,20 +681,6 @@ export default function DashboardScreen() {
   const communityStatus = useTelegramCommunityStatus();
   const createCommunityInvite = useCreateTelegramCommunityInviteMutation();
   const leagues = useLeagues({ date: selectedDate, windowDays: 1 });
-  const hasDailyTicketAccess =
-    subscription.data?.accessTier === 'PREMIUM' &&
-    !subscription.data?.isPremiumExhausted &&
-    !subscription.data?.isBelowMinimumTokenBalance;
-  const dailyTicket = useDailyTicket(
-    {
-      bookmakerPlatform: DAILY_TICKET_BOOKMAKER_PLATFORM,
-      date: selectedDate,
-      maxLegs: 4,
-      sport: 'FOOTBALL',
-      targetOdds: 2,
-    },
-    { enabled: hasDailyTicketAccess },
-  );
   const feed = useInfiniteHomeFeed({
     date: selectedDate,
     leagueKey: activeLeagueKey,
@@ -715,13 +689,60 @@ export default function DashboardScreen() {
     windowDays: 1,
   });
 
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.allSettled([
+      feed.refetch(),
+      leagues.refetch(),
+      notificationSummary.refetch(),
+      subscription.refetch(),
+    ]);
+    setRefreshing(false);
+  };
+
   const leagueOptions = useMemo(() => ((leagues.data ?? []).slice().sort(compareLeagues)), [leagues.data]);
   const feedPages = useMemo(() => feed.data?.pages ?? [], [feed.data?.pages]);
   const leagueSections = useMemo(() => buildLeagueSections(feedPages), [feedPages]);
   const flatMatches = useMemo(() => leagueSections.flatMap((league) => league.matches), [leagueSections]);
+  const ongoingMatches = useMemo(() => buildOngoingMatches(leagueSections), [leagueSections]);
   const totalMatches = feedPages[0]?.totalMatches ?? flatMatches.length;
   const bestAccuracy = flatMatches.reduce((max, match) => Math.max(max, getConfidence(match)), 0);
   const tokenBalance = subscription.data?.researchTokensRemaining ?? me.data?.researchTokensRemaining ?? 0;
+  const communityPreferenceKey = me.data?.id ? communityBannerHiddenKey(me.data.id) : null;
+  const communityBannerPreferenceReady =
+    !me.isLoading && (!communityPreferenceKey || communityBannerPreference.key === communityPreferenceKey);
+  const communityBannerHidden = communityBannerPreference.key === communityPreferenceKey && communityBannerPreference.hidden;
+
+  useEffect(() => {
+    let mounted = true;
+
+    if (!communityPreferenceKey) {
+      return () => {
+        mounted = false;
+      };
+    }
+
+    AsyncStorage.getItem(communityPreferenceKey)
+      .then((value) => {
+        if (!mounted) return;
+        setCommunityBannerPreference({ hidden: value === '1', key: communityPreferenceKey });
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setCommunityBannerPreference({ hidden: false, key: communityPreferenceKey });
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [communityPreferenceKey]);
+
+  const hideCommunityBanner = useCallback(() => {
+    setCommunityBannerPreference({ hidden: true, key: communityPreferenceKey });
+    if (!communityPreferenceKey) return;
+    AsyncStorage.setItem(communityPreferenceKey, '1').catch(() => undefined);
+  }, [communityPreferenceKey]);
 
   const handleDateSelect = (value: string) => {
     setSelectedDate(value);
@@ -729,21 +750,37 @@ export default function DashboardScreen() {
   };
 
   const handleTelegramJoin = () => {
-    setCommunityMessage(null);
     createCommunityInvite.mutate(undefined, {
-      onError: (error) => setCommunityMessage({ type: 'error', text: error.message }),
+      onError: (error) =>
+        showToast({
+          message: error.message,
+          title: 'Community invite failed',
+          tone: 'error',
+        }),
       onSuccess: (invite) => {
         setCommunityInvite(invite);
-        setCommunityMessage({ type: 'success', text: 'Invite ready. Opening Telegram.' });
-        Linking.openURL(invite.inviteLink).catch(() => {
-          setCommunityMessage({ type: 'error', text: 'Open Telegram from the invite link.' });
-        });
+        Linking.openURL(invite.inviteLink)
+          .then(() => {
+            hideCommunityBanner();
+            showToast({
+              message: 'Invite ready. Opening Telegram.',
+              title: 'Community invite',
+              tone: 'success',
+            });
+          })
+          .catch(() => {
+            showToast({
+              message: 'Open Telegram from the invite link.',
+              title: 'Could not open Telegram',
+              tone: 'error',
+            });
+          });
       },
     });
   };
 
   return (
-    <Screen hasTabs>
+    <Screen hasTabs onRefresh={handleRefresh} refreshing={refreshing} safeTop={false}>
       <DashboardUtilityBar
         image={me.data?.image}
         name={me.data?.name}
@@ -760,27 +797,21 @@ export default function DashboardScreen() {
         selectedDateLabel={selectedDateLabel}
       />
 
-      <TelegramCommunityCard
-        invite={communityInvite}
-        isCreating={createCommunityInvite.isPending}
-        isLoading={communityStatus.isLoading}
-        message={communityMessage}
-        status={communityStatus.data}
-        onJoin={handleTelegramJoin}
-      />
+      {communityBannerPreferenceReady && !communityBannerHidden ? (
+        <TelegramCommunityCard
+          invite={communityInvite}
+          isCreating={createCommunityInvite.isPending}
+          isLoading={communityStatus.isLoading}
+          status={communityStatus.data}
+          onJoin={handleTelegramJoin}
+        />
+      ) : null}
 
       <ReferralPrompt />
 
       <DateStrip dates={dateOptions} selectedDate={selectedDate} onSelect={handleDateSelect} />
 
-      <DailyTicketCard
-        dailyTicket={dailyTicket.data}
-        error={dailyTicket.error?.message}
-        isAccessLoading={subscription.isLoading}
-        isLoading={dailyTicket.isLoading || (dailyTicket.isFetching && !dailyTicket.data)}
-        isLocked={!hasDailyTicketAccess}
-        selectedDateLabel={selectedDateLabel}
-      />
+      <OngoingMatchesRail isLoading={feed.isLoading && feedPages.length === 0} matches={ongoingMatches} />
 
       <LeagueFilterBar
         isLoading={leagues.isLoading}
@@ -1232,6 +1263,101 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   metricsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  ongoingCard: {
+    gap: spacing.md,
+  },
+  ongoingCardTop: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  ongoingHint: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  ongoingHintText: {
+    fontFamily: fonts.bold,
+    fontSize: 11,
+  },
+  ongoingLeague: {
+    fontFamily: fonts.bold,
+    fontSize: 12,
+  },
+  ongoingLiveDot: {
+    borderRadius: radius.pill,
+    height: 7,
+    width: 7,
+  },
+  ongoingLiveMark: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  ongoingLiveText: {
+    fontFamily: fonts.extraBold,
+    fontSize: 11,
+    textTransform: 'uppercase',
+  },
+  ongoingMatchCard: {
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    gap: spacing.md,
+    minHeight: 184,
+    padding: spacing.md,
+    width: 278,
+  },
+  ongoingRail: {
+    gap: spacing.md,
+    paddingRight: spacing.md,
+  },
+  ongoingScore: {
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 4,
+    justifyContent: 'center',
+    minWidth: 76,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  ongoingScoreDivider: {
+    fontFamily: fonts.extraBold,
+    fontSize: 18,
+  },
+  ongoingScoreText: {
+    fontFamily: fonts.extraBold,
+    fontSize: 26,
+    fontVariant: ['tabular-nums'],
+  },
+  ongoingTeam: {
+    alignItems: 'flex-start',
+    flex: 1,
+    gap: spacing.xs,
+    minWidth: 0,
+  },
+  ongoingTeamName: {
+    fontFamily: fonts.bold,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  ongoingTeamNameRight: {
+    textAlign: 'right',
+  },
+  ongoingTeamRight: {
+    alignItems: 'flex-end',
+  },
+  ongoingTeams: {
+    alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
   },

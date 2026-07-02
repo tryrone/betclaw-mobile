@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { BrandLogo, enterUp, FormField, GradientButton, Screen, StatusBadge } from '@/components/ui';
+import { BrandLogo, enterUp, FormErrorBanner, FormField, GradientButton, Screen, StatusBadge } from '@/components/ui';
 import { getErrorMessage } from '@/lib/api/client';
 import { useResetPasswordMutation } from '@/lib/api/hooks';
 import { useAppTheme } from '@/theme/colors';
@@ -45,7 +45,7 @@ export default function ResetPasswordScreen() {
         <FormField icon={Lock} label="Confirm password" onChangeText={setConfirmPassword} placeholder="Repeat password" secure value={confirmPassword} />
         {!token ? <Text style={[styles.message, { color: theme.warning }]}>Open the reset link from your email to continue.</Text> : null}
         {password && confirmPassword && password !== confirmPassword ? <Text style={[styles.message, { color: theme.danger }]}>Passwords do not match.</Text> : null}
-        {resetPassword.error ? <Text style={[styles.message, { color: theme.danger }]}>{getErrorMessage(resetPassword.error)}</Text> : null}
+        {resetPassword.error ? <FormErrorBanner message={getErrorMessage(resetPassword.error)} /> : null}
         <GradientButton onPress={handleReset}>{resetPassword.isPending ? 'Updating...' : 'Update Password'}</GradientButton>
       </Animated.View>
       <Animated.View entering={enterUp(3)}>

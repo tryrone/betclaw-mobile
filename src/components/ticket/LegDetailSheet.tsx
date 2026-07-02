@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { ArrowUpRight, ExternalLink, Sparkles } from 'lucide-react-native';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { FormBadges } from '@/components/ticket/FormBadges';
 import { BottomSheet, PressableScale, StatusBadge } from '@/components/ui';
 import type { TicketDetail } from '@/lib/api/types';
 import { formatDateTime, isRealUrl, openExternalUrl } from '@/lib/mobile-format';
@@ -34,11 +35,10 @@ export function LegDetailSheet({ leg, onClose }: { leg: TicketLeg | null; onClos
   const citations = (leg?.citations ?? []).filter((citation) => isRealUrl(citation.url));
 
   const insights = [
-    leg?.homeForm ? { label: 'Home form', value: String(leg.homeForm) } : null,
-    leg?.awayForm ? { label: 'Away form', value: String(leg.awayForm) } : null,
     leg?.h2hSummary ? { label: 'H2H', value: String(leg.h2hSummary).replace(/^H2H:\s*/i, '') } : null,
     leg?.keyFactors ? { label: 'Key factors', value: String(leg.keyFactors) } : null,
   ].filter((line): line is { label: string; value: string } => Boolean(line));
+  const hasFormData = Boolean(leg?.homeForm || leg?.awayForm);
 
   const openMatch = () => {
     if (!leg?.fixtureId) return;
@@ -106,8 +106,20 @@ export function LegDetailSheet({ leg, onClose }: { leg: TicketLeg | null; onClos
             </View>
           ) : null}
 
-          {insights.length > 0 ? (
+          {hasFormData || insights.length > 0 ? (
             <View style={[sheetStyles.insightBox, { backgroundColor: theme.field, borderColor: theme.border }]}>
+              {leg?.homeForm ? (
+                <View style={sheetStyles.insightFormRow}>
+                  <Text style={[sheetStyles.insightLabel, { color: theme.muted }]}>Home form</Text>
+                  <FormBadges value={leg.homeForm} />
+                </View>
+              ) : null}
+              {leg?.awayForm ? (
+                <View style={sheetStyles.insightFormRow}>
+                  <Text style={[sheetStyles.insightLabel, { color: theme.muted }]}>Away form</Text>
+                  <FormBadges value={leg.awayForm} />
+                </View>
+              ) : null}
               {insights.map((line) => (
                 <Text key={line.label} style={[sheetStyles.insightLine, { color: theme.mutedLight }]}>
                   <Text style={[sheetStyles.insightLabel, { color: theme.muted }]}>{line.label}: </Text>
@@ -234,8 +246,14 @@ const sheetStyles = StyleSheet.create({
   insightBox: {
     borderRadius: radius.md,
     borderWidth: 1,
-    gap: 4,
+    gap: spacing.sm,
     padding: spacing.md,
+  },
+  insightFormRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
   },
   insightLabel: {
     fontFamily: fonts.bold,

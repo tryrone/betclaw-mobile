@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
 import { ArrowLeft, ArrowRightLeft, Check, Copy, Ticket } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { enterUp, GlassCard, GradientButton, IconButton, PressableScale, Screen, ScreenHeader, StatusBadge } from '@/components/ui';
+import { enterUp, GlassCard, GradientButton, IconButton, PressableScale, Screen, ScreenHeader, StatusBadge, useToast } from '@/components/ui';
 import { getErrorMessage } from '@/lib/api/client';
 import { useConvertBookingCodeMutation } from '@/lib/api/hooks';
 import { BOOKMAKER_PLATFORM_OPTIONS, getPlatformLabel, type SupportedPlatform } from '@/lib/bookmaker-platforms';
@@ -44,15 +44,14 @@ function PlatformPill({
 export default function ConvertTicketScreen() {
   const router = useRouter();
   const theme = useAppTheme();
+  const { showToast } = useToast();
   const [code, setCode] = useState('');
   const [fromPlatform, setFromPlatform] = useState<SupportedPlatform>('SPORTYBET');
   const [toPlatform, setToPlatform] = useState<SupportedPlatform>('BET9JA');
-  const [copyState, setCopyState] = useState<string | null>(null);
   const convertCode = useConvertBookingCodeMutation();
 
   const handleConvert = () => {
     if (!code.trim() || fromPlatform === toPlatform || convertCode.isPending) return;
-    setCopyState(null);
     convertCode.mutate({
       code: code.trim(),
       fromPlatform,
@@ -70,14 +69,31 @@ export default function ConvertTicketScreen() {
     if (!convertedCode) return;
     try {
       const mode = await copyOrShareText(convertedCode, 'Converted BetClaw code');
-      setCopyState(mode === 'copied' ? 'Code copied' : 'Code shared');
+      showToast({
+        message: mode === 'copied' ? 'Code copied' : 'Code shared',
+        title: 'Converted code',
+        tone: 'success',
+      });
     } catch {
-      setCopyState('Could not copy code');
+      showToast({
+        message: 'Could not copy code',
+        title: 'Copy failed',
+        tone: 'error',
+      });
     }
   };
 
   const errorMessage =
     convertCode.error ? getErrorMessage(convertCode.error) : convertCode.data && !convertCode.data.success ? convertCode.data.error : null;
+
+  useEffect(() => {
+    if (!errorMessage) return;
+    showToast({
+      message: errorMessage,
+      title: 'Conversion failed',
+      tone: 'error',
+    });
+  }, [errorMessage, showToast]);
 
   return (
     <Screen hasTabs>
@@ -149,7 +165,6 @@ export default function ConvertTicketScreen() {
             />
           </View>
 
-          {errorMessage ? <Text style={[styles.errorText, { color: theme.danger }]}>{errorMessage}</Text> : null}
           <GradientButton icon={ArrowRightLeft} onPress={handleConvert}>
             {convertCode.isPending ? 'Converting...' : 'Convert Code'}
           </GradientButton>
@@ -172,7 +187,6 @@ export default function ConvertTicketScreen() {
               <Text style={[styles.resultCodeText, { color: theme.primarySoft }]}>{convertCode.data.convertedCode}</Text>
               <Copy color={theme.primarySoft} size={18} />
             </PressableScale>
-            {copyState ? <Text style={[styles.copyState, { color: theme.success }]}>{copyState}</Text> : null}
           </GlassCard>
         </Animated.View>
       ) : null}

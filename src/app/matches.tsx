@@ -146,7 +146,7 @@ export default function MatchesScreen() {
   const sectionTitle = leagueOptions.find((league) => league.id === activeLeague)?.label ?? 'All leagues';
 
   return (
-    <Screen>
+    <Screen onRefresh={() => void homeFeed.refetch()} refreshing={homeFeed.isRefetching}>
       <Animated.View entering={enterUp(0)} style={styles.header}>
         <IconButton icon={ArrowLeft} label="Go back" onPress={() => router.back()} />
         <Text style={[styles.title, { color: theme.foregroundStrong }]}>Matches</Text>

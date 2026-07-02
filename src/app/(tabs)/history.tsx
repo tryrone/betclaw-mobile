@@ -93,7 +93,7 @@ export default function HistoryScreen() {
   };
 
   return (
-    <Screen hasTabs>
+    <Screen hasTabs onRefresh={() => void tickets.refetch()} refreshing={tickets.isRefetching}>
       <Animated.View entering={enterUp(0)}>
         <ScreenHeader eyebrow="Ticket archive" title="History" />
       </Animated.View>

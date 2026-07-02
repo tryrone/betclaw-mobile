@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { BrandLogo, enterUp, FormField, GradientButton, Screen } from '@/components/ui';
+import { BrandLogo, enterUp, FormErrorBanner, FormField, GradientButton, Screen } from '@/components/ui';
 import { getErrorMessage } from '@/lib/api/client';
 import { useSignupMutation } from '@/lib/api/hooks';
 import { useAppTheme } from '@/theme/colors';
@@ -48,7 +48,7 @@ export default function SignupScreen() {
         <FormField icon={Mail} keyboardType="email-address" label="Email" onChangeText={setEmail} placeholder="you@example.com" value={email} />
         <FormField icon={Lock} label="Password" onChangeText={setPassword} placeholder="8+ characters" secure value={password} />
         <FormField autoCapitalize="characters" icon={UserRound} label="Referral code" onChangeText={setReferralCode} placeholder="Optional" value={referralCode} />
-        {signup.error ? <Text style={[styles.errorText, { color: theme.danger }]}>{getErrorMessage(signup.error)}</Text> : null}
+        {signup.error ? <FormErrorBanner message={getErrorMessage(signup.error)} /> : null}
         <GradientButton onPress={handleSignup}>{signup.isPending ? 'Creating Account...' : 'Create Account'}</GradientButton>
       </Animated.View>
       <Animated.View entering={enterUp(3)}>
