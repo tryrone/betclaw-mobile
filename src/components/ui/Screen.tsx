@@ -4,8 +4,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Background } from '@/components/ui/Background';
 import { layout, spacing } from '@/theme/spacing';
 
-/** Clearance for content above the floating bottom dock (dock 68 + glow + breathing room). */
-const NAV_CLEARANCE = 124;
+/** Clearance for content above the anchored bottom nav bar (row 56 + padding + breathing room). */
+const NAV_CLEARANCE = 96;
 
 export function Screen({
   children,

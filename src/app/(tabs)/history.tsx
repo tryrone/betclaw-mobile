@@ -1,10 +1,10 @@
-import { useRouter } from 'expo-router';
-import { ArrowLeft, ChevronLeft, ChevronRight, Eye, Filter, Search } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Eye, Filter, Search } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { enterUp, GlassCard, IconButton, PressableScale, Screen, ScreenHeader, StatusBadge } from '@/components/ui';
+import { TicketDetailView } from '@/components/ticket/TicketDetailView';
+import { BottomSheet, enterUp, GlassCard, PressableScale, Screen, ScreenHeader, StatusBadge } from '@/components/ui';
 import { useTicketList } from '@/lib/api/hooks';
 import type { TicketDetail, TicketResult } from '@/lib/api/types';
 import { formatDate } from '@/lib/mobile-format';
@@ -25,8 +25,7 @@ function resultTone(result?: string) {
   return 'warning' as const;
 }
 
-function TicketCard({ ticket }: { ticket: TicketDetail }) {
-  const router = useRouter();
+function TicketCard({ onPress, ticket }: { onPress: () => void; ticket: TicketDetail }) {
   const theme = useAppTheme();
   const kept = ticket.matches?.filter((match) => match.status === 'KEPT').length ?? 0;
   const total = ticket.matches?.length ?? 0;
@@ -36,7 +35,7 @@ function TicketCard({ ticket }: { ticket: TicketDetail }) {
     <PressableScale
       accessibilityLabel={`Open ${displayCode}`}
       accessibilityRole="button"
-      onPress={() => router.push(`/ticket/${ticket.id}` as any)}
+      onPress={onPress}
       scaleTo={0.98}>
       <GlassCard style={styles.ticketCard}>
         <View style={styles.ticketTop}>
@@ -59,9 +58,9 @@ function TicketCard({ ticket }: { ticket: TicketDetail }) {
 }
 
 export default function HistoryScreen() {
-  const router = useRouter();
   const theme = useAppTheme();
   const [search, setSearch] = useState('');
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [status, setStatus] = useState<TicketResult | undefined>();
   const [pageIndex, setPageIndex] = useState(0);
   const [cursors, setCursors] = useState<(string | undefined)[]>([undefined]);
@@ -96,11 +95,7 @@ export default function HistoryScreen() {
   return (
     <Screen hasTabs>
       <Animated.View entering={enterUp(0)}>
-        <ScreenHeader
-          eyebrow="Ticket archive"
-          leadingAction={<IconButton icon={ArrowLeft} label="Go back" onPress={() => router.back()} />}
-          title="History"
-        />
+        <ScreenHeader eyebrow="Ticket archive" title="History" />
       </Animated.View>
 
       <Animated.View entering={enterUp(1)}>
@@ -166,9 +161,17 @@ export default function HistoryScreen() {
 
       {items.map((ticket, index) => (
         <Animated.View entering={enterUp(2 + index)} key={ticket.id}>
-          <TicketCard ticket={ticket} />
+          <TicketCard onPress={() => setSelectedTicketId(ticket.id)} ticket={ticket} />
         </Animated.View>
       ))}
+
+      <BottomSheet onClose={() => setSelectedTicketId(null)} title="Ticket detail" visible={Boolean(selectedTicketId)}>
+        <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
+          {selectedTicketId ? (
+            <TicketDetailView onNavigate={() => setSelectedTicketId(null)} ticketId={selectedTicketId} />
+          ) : null}
+        </ScrollView>
+      </BottomSheet>
 
       {items.length > 0 ? (
         <Animated.View entering={enterUp(3 + items.length)}>
@@ -275,6 +278,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     minHeight: 48,
     paddingHorizontal: spacing.md,
+  },
+  sheetContent: {
+    paddingBottom: spacing.xl,
+    paddingTop: spacing.xs,
   },
   ticketCard: {
     gap: spacing.sm,

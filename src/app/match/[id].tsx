@@ -8,11 +8,8 @@ import {
   CalendarDays,
   ChevronRight,
   Clock3,
-  ExternalLink,
-  FileText,
   MapPin,
   Radio,
-  RefreshCw,
   ShieldCheck,
   Sparkles,
   Trophy,
@@ -22,13 +19,14 @@ import {
 } from 'lucide-react-native';
 import { useMemo, useState, type ComponentType } from 'react';
 import { ScrollView, StyleSheet, Text, View, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import {
   enterUp,
   GlassCard,
   IconButton,
   PressableScale,
+  ProgressBar,
   Screen,
   StatusBadge,
   TeamLogo,
@@ -44,13 +42,13 @@ import type {
   RecentMatchTeam,
   StandingsRow,
 } from '@/lib/api/types';
-import { formatDate, formatDateTime, openExternalUrl } from '@/lib/mobile-format';
+import { formatDate } from '@/lib/mobile-format';
 import { flattenHomeFeed, insightSummary, mapInsightStats } from '@/lib/mobile-mappers';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
-const sections = ['Overview', 'Analysis', 'Lineups', 'Sources'] as const;
+const sections = ['Overview', 'Analysis', 'Lineups'] as const;
 type DetailSection = (typeof sections)[number];
 type LineupSideKey = 'home' | 'away';
 type IconComponent = ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
@@ -164,19 +162,21 @@ function matchStatusTone(match: MatchCardData, insight?: FixtureInsight | null):
 }
 
 function statusLabel(match: MatchCardData, insight?: FixtureInsight | null) {
+  if (isFinished(insight)) return 'Full time';
   if (insight?.elapsedMinute) return `${insight.elapsedMinute}'`;
   if (insight?.status) return insight.status;
   return match.clock ?? match.status;
 }
 
-function standingLine(row?: StandingsRow) {
-  if (!row) return 'Standing unavailable';
-  const team = row.teamName ?? row.team?.name ?? 'Team';
-  const rank = row.rank ? `#${row.rank}` : 'Unranked';
-  const points = row.points != null ? `${row.points} pts` : 'points n/a';
-  const form = row.form ? ` - ${row.form}` : '';
-  return `${team} ${rank} - ${points}${form}`;
+function findStandingRow(rows?: StandingsRow[], teamName?: string | null) {
+  if (!rows || !teamName) return undefined;
+  const target = teamName.toLowerCase();
+  return rows.find((row) => {
+    const name = (row.teamName ?? row.team?.name ?? '').toLowerCase();
+    return Boolean(name) && (name.includes(target) || target.includes(name));
+  });
 }
+
 
 function coverageCount(insight?: FixtureInsight | null) {
   const providerCount = insight?.providerLinks?.length ?? 0;
@@ -247,17 +247,17 @@ function statListFromAverageStats(insight?: FixtureInsight | null) {
 
 function formValues(row?: StandingsRow, recent?: RecentMatchTeam | null) {
   const value = row?.form ?? recent?.summary ?? '';
-  const compact = value.replace(/[^WDL]/gi, '').slice(0, 5).toUpperCase();
+  let compact = value.replace(/[^WDL]/gi, '').slice(0, 5).toUpperCase();
+  if (!compact) {
+    // Fall back to deriving form from the recent-match results themselves.
+    compact = (recent?.matches ?? [])
+      .map((match) => resultLetter(match.result) ?? '')
+      .join('')
+      .slice(0, 5);
+  }
   return compact.length > 0 ? compact.split('') : [];
 }
 
-function formatCoverageValue(value: unknown) {
-  if (value == null) return 'Pending';
-  if (typeof value === 'boolean') return value ? 'Available' : 'Missing';
-  if (typeof value === 'number') return String(value);
-  if (typeof value === 'string') return value;
-  return 'Tracked';
-}
 
 function lineupRows(players: MatchPlayerSummary[], formation?: string | null) {
   if (players.length === 0) return [];
@@ -389,19 +389,6 @@ function StatComparison({ stat }: { stat: MatchStatData }) {
   );
 }
 
-function SummaryList({ items }: { items: string[] }) {
-  const theme = useAppTheme();
-  return (
-    <GlassCard style={styles.listCard}>
-      {items.map((item, index) => (
-        <View key={`${item}-${index}`} style={styles.summaryRow}>
-          <View style={[styles.summaryDot, { backgroundColor: theme.primarySoft }]} />
-          <Text style={[styles.summaryText, { color: theme.foreground }]}>{item}</Text>
-        </View>
-      ))}
-    </GlassCard>
-  );
-}
 
 function PlayerMarker({ player }: { player: MatchPlayerSummary }) {
   const theme = useAppTheme();
@@ -644,7 +631,9 @@ function MatchHero({
         <View style={styles.heroCenter}>
           <Text adjustsFontSizeToFit numberOfLines={1} style={styles.scoreText}>{score}</Text>
           <View style={styles.liveTimeRow}>
-            <View style={[styles.liveDot, { backgroundColor: isLiveMatch(match, insight) ? theme.live : theme.primary }]} />
+            {!isFinished(insight) ? (
+              <View style={[styles.liveDot, { backgroundColor: isLiveMatch(match, insight) ? theme.live : theme.primary }]} />
+            ) : null}
             <Text numberOfLines={1} style={styles.liveClock}>{statusLabel(match, insight)}</Text>
           </View>
           <ConfidenceRing value={readinessScore} />
@@ -662,7 +651,7 @@ function MatchHero({
         <HeroMetaPill icon={CalendarDays} label={match.date} tone="accent" />
         <HeroMetaPill icon={Clock3} label={match.time} />
         <HeroMetaPill icon={MapPin} label={match.venue} />
-        {insight?.apiFootballContext?.standingsSummary ? (
+        {insight?.apiFootballContext?.standingsSummary && insight.apiFootballContext.standingsSummary !== insight.round ? (
           <HeroMetaPill icon={Trophy} label={insight.apiFootballContext.standingsSummary} />
         ) : null}
       </View>
@@ -682,21 +671,30 @@ function ContextStrip({
   sourceCount: number;
 }) {
   const theme = useAppTheme();
+  const tone = readinessTone(readinessStatus);
   return (
     <View style={[styles.contextStrip, { backgroundColor: theme.cardMuted, borderColor: theme.border }]}>
-      <View style={styles.contextTile}>
-        <Text style={[styles.contextValue, { color: theme.primarySoft }]}>{readinessScore}%</Text>
-        <Text style={[styles.contextLabel, { color: theme.muted }]}>Readiness</Text>
+      <View style={styles.contextHeader}>
+        <Text style={[styles.contextTitle, { color: theme.muted }]}>Data readiness</Text>
+        <StatusBadge label={readinessStatus ?? 'Coverage'} tone={tone} />
       </View>
-      <View style={styles.contextTile}>
-        <Text style={[styles.contextValue, { color: theme.foregroundStrong }]}>{h2hCount}</Text>
-        <Text style={[styles.contextLabel, { color: theme.muted }]}>H2H</Text>
+      <View style={styles.contextScoreRow}>
+        <Text style={[styles.contextScore, { color: tone === 'success' ? theme.primary : theme.warning }]}>{readinessScore}%</Text>
+        <View style={styles.contextBar}>
+          <ProgressBar tone={tone === 'success' ? 'success' : 'warning'} value={readinessScore} />
+        </View>
       </View>
-      <View style={styles.contextTile}>
-        <Text style={[styles.contextValue, { color: theme.foregroundStrong }]}>{sourceCount}</Text>
-        <Text style={[styles.contextLabel, { color: theme.muted }]}>Sources</Text>
+      <View style={styles.contextStatsRow}>
+        <View style={styles.contextTile}>
+          <Text style={[styles.contextValue, { color: theme.foregroundStrong }]}>{h2hCount}</Text>
+          <Text style={[styles.contextLabel, { color: theme.muted }]}>H2H meetings</Text>
+        </View>
+        <View style={[styles.contextDivider, { backgroundColor: theme.border }]} />
+        <View style={styles.contextTile}>
+          <Text style={[styles.contextValue, { color: theme.foregroundStrong }]}>{sourceCount}</Text>
+          <Text style={[styles.contextLabel, { color: theme.muted }]}>Data sources</Text>
+        </View>
       </View>
-      <StatusBadge label={readinessStatus ?? 'Coverage'} tone={readinessTone(readinessStatus)} />
     </View>
   );
 }
@@ -740,6 +738,8 @@ function RecentMatchRows({ accent, rows }: { accent?: string; rows: NonNullable<
       {rows.map((row, index) => {
         const letter = resultLetter(row.result);
         const color = letter === 'W' ? theme.success : letter === 'D' ? theme.warning : letter === 'L' ? theme.danger : theme.muted;
+        const hasTeams = Boolean(row.homeTeam || row.awayTeam);
+        const hasScore = row.homeScore != null || row.awayScore != null;
         return (
           <View
             key={`${row.date ?? index}-${index}`}
@@ -749,9 +749,15 @@ function RecentMatchRows({ accent, rows }: { accent?: string; rows: NonNullable<
               accent ? { borderLeftColor: accent, borderLeftWidth: 3, paddingLeft: spacing.sm } : null,
             ]}>
             <Text style={[styles.recentDate, { color: theme.muted }]}>{row.date ? formatDate(row.date) : '--'}</Text>
-            <Text numberOfLines={1} style={[styles.recentTeams, { color: theme.foreground }]}>
-              {row.homeTeam ?? 'Home'} <Text style={{ color: theme.foregroundStrong }}>{row.homeScore ?? '-'}–{row.awayScore ?? '-'}</Text> {row.awayTeam ?? 'Away'}
-            </Text>
+            {hasTeams || hasScore ? (
+              <Text numberOfLines={1} style={[styles.recentTeams, { color: theme.foreground }]}>
+                {row.homeTeam ?? 'Home'} <Text style={{ color: theme.foregroundStrong }}>{row.homeScore ?? '-'}–{row.awayScore ?? '-'}</Text> {row.awayTeam ?? 'Away'}
+              </Text>
+            ) : (
+              <Text numberOfLines={1} style={[styles.recentTeams, { color: theme.muted }]}>
+                Fixture details pending
+              </Text>
+            )}
             <View style={[styles.resultPill, { backgroundColor: `${color}22`, borderColor: `${color}66` }]}>
               <Text style={[styles.resultPillText, { color }]}>{letter ?? '?'}</Text>
             </View>
@@ -823,13 +829,11 @@ function StandingsMiniTable({ highlightTeams, rows, title }: { highlightTeams: s
 function OverviewSection({
   awayForm,
   awayRecentMatches,
-  awayStanding,
   awayStandings,
   displayStatus,
   h2h,
   homeForm,
   homeRecentMatches,
-  homeStanding,
   homeStandings,
   match,
   predictionItems,
@@ -837,14 +841,12 @@ function OverviewSection({
 }: {
   awayForm: string[];
   awayRecentMatches?: RecentMatchTeam | null;
-  awayStanding?: StandingsRow;
   awayStandings?: StandingsRow[];
   displayStatus: string;
   h2h?: FixtureInsight['h2h'];
 
   homeForm: string[];
   homeRecentMatches?: RecentMatchTeam | null;
-  homeStanding?: StandingsRow;
   homeStandings?: StandingsRow[];
   match: MatchCardData;
   predictionItems: string[];
@@ -864,7 +866,7 @@ function OverviewSection({
   const sameGroup = homeTable.length > 0 && JSON.stringify(homeTable) === JSON.stringify(awayTable);
 
   return (
-    <Animated.View entering={enterUp(5)} style={styles.tabContent}>
+    <Animated.View entering={enterUp(0)} style={styles.tabContent}>
       <GlassCard gradient="hero" style={styles.outlookCard}>
         <SectionHeader icon={Sparkles} kicker="Match Analysis Outlook" title={`Likely outcome: ${match.trend}`} />
         <Text style={[styles.outlookText, { color: theme.foreground }]}>
@@ -901,9 +903,9 @@ function OverviewSection({
       <GlassCard style={styles.listCard}>
         <SectionHeader icon={Trophy} title="Head to head and table" />
         <View style={styles.h2hBarHeader}>
-          <Text numberOfLines={1} style={[styles.h2hLabel, { color: theme.primary }]}>{match.home} ({h2h?.homeWins ?? 0}W)</Text>
-          <Text style={[styles.h2hLabel, { color: theme.warning }]}>{h2h?.draws ?? 0}D</Text>
-          <Text numberOfLines={1} style={[styles.h2hLabel, styles.h2hAwayLabel, { color: theme.accent }]}>({h2h?.awayWins ?? 0}W) {match.away}</Text>
+          <Text numberOfLines={1} style={[styles.h2hLabel, { color: theme.primary }]}>{h2h?.homeWins ?? 0}W · {match.home}</Text>
+          <Text style={[styles.h2hDrawLabel, { color: theme.warning }]}>{h2h?.draws ?? 0}D</Text>
+          <Text ellipsizeMode="head" numberOfLines={1} style={[styles.h2hLabel, styles.h2hAwayLabel, { color: theme.danger }]}>{match.away} · {h2h?.awayWins ?? 0}W</Text>
         </View>
         <View style={[styles.h2hTrack, { backgroundColor: theme.statTrack }]}>
           <View style={[styles.h2hSegment, { backgroundColor: theme.primary, width: `${homePct}%` as DimensionValue }]} />
@@ -921,9 +923,13 @@ function OverviewSection({
               return (
                 <View key={`${meeting.date ?? index}-${index}`} style={[styles.recentRow, { borderColor: theme.border }]}>
                   <Text style={[styles.recentDate, { color: theme.muted }]}>{meeting.date ? formatDate(meeting.date) : '--'}</Text>
-                  <Text numberOfLines={1} style={[styles.recentTeams, { color: theme.foreground }]}>
-                    {meeting.homeTeam ?? 'Home'} <Text style={{ color: theme.foregroundStrong }}>{meeting.homeScore ?? '-'}–{meeting.awayScore ?? '-'}</Text> {meeting.awayTeam ?? 'Away'}
-                  </Text>
+                  <Text numberOfLines={1} style={[styles.meetingTeam, { color: theme.foreground }]}>{meeting.homeTeam ?? 'Home'}</Text>
+                  <View style={[styles.meetingScore, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                    <Text style={[styles.meetingScoreText, { color: theme.foregroundStrong }]}>
+                      {meeting.homeScore ?? '-'} – {meeting.awayScore ?? '-'}
+                    </Text>
+                  </View>
+                  <Text numberOfLines={1} style={[styles.meetingTeam, styles.meetingTeamAway, { color: theme.foreground }]}>{meeting.awayTeam ?? 'Away'}</Text>
                   <View style={[styles.meetingDot, { backgroundColor: color }]} />
                 </View>
               );
@@ -942,11 +948,11 @@ function OverviewSection({
             <Text numberOfLines={1} style={[styles.formTeamName, { color: theme.primary }]}>{match.home}</Text>
             {homeRecentRows.length > 0 ? <Text style={[styles.formTally, { color: theme.mutedLight }]}>{formTally(homeRecentRows)}</Text> : null}
           </View>
-          <FormPills values={homeForm} />
+          {homeForm.length > 0 ? <FormPills values={homeForm} /> : null}
           {homeRecentRows.length > 0 ? (
             <RecentMatchRows accent={theme.primary} rows={homeRecentRows} />
           ) : (
-            <Text style={[styles.emptyText, { color: theme.muted }]}>Recent matches pending for {match.home}.</Text>
+            <Text style={[styles.insightText, { color: theme.muted }]}>Recent matches pending for {match.home}.</Text>
           )}
         </View>
         <View style={[styles.formDivider, { backgroundColor: theme.border }]} />
@@ -955,11 +961,11 @@ function OverviewSection({
             <Text numberOfLines={1} style={[styles.formTeamName, { color: theme.accent }]}>{match.away}</Text>
             {awayRecentRows.length > 0 ? <Text style={[styles.formTally, { color: theme.mutedLight }]}>{formTally(awayRecentRows)}</Text> : null}
           </View>
-          <FormPills values={awayForm} />
+          {awayForm.length > 0 ? <FormPills values={awayForm} /> : null}
           {awayRecentRows.length > 0 ? (
             <RecentMatchRows accent={theme.accent} rows={awayRecentRows} />
           ) : (
-            <Text style={[styles.emptyText, { color: theme.muted }]}>Recent matches pending for {match.away}.</Text>
+            <Text style={[styles.insightText, { color: theme.muted }]}>Recent matches pending for {match.away}.</Text>
           )}
         </View>
       </GlassCard>
@@ -980,10 +986,6 @@ function OverviewSection({
               ) : null}
             </>
           )}
-          <View style={styles.contextPair}>
-            <Text style={[styles.insightText, { color: theme.mutedLight }]}>{standingLine(homeStanding)}</Text>
-            <Text style={[styles.insightText, { color: theme.mutedLight }]}>{standingLine(awayStanding)}</Text>
-          </View>
         </GlassCard>
       ) : null}
     </Animated.View>
@@ -1001,7 +1003,7 @@ function AnalysisSection({
 }) {
   const theme = useAppTheme();
   return (
-    <Animated.View entering={enterUp(5)} style={styles.tabContent}>
+    <Animated.View entering={enterUp(0)} style={styles.tabContent}>
       <GlassCard style={styles.statsCard}>
         <SectionHeader icon={Activity} kicker={insight?.matchStats?.status ?? 'Pre-match'} title="Important match stats" />
         {stats.length > 0 ? stats.map((stat) => <StatComparison key={stat.id} stat={stat} />) : <Text style={[styles.emptyText, { color: theme.muted }]}>Stats are pending for this fixture.</Text>}
@@ -1045,10 +1047,12 @@ function LineupsSection({
   const keyPlayers = players?.keyPlayers ?? [];
 
   return (
-    <Animated.View entering={enterUp(5)} style={styles.tabContent}>
+    <Animated.View entering={enterUp(0)} style={styles.tabContent}>
       <GlassCard style={styles.listCard}>
         <View style={styles.lineupHeader}>
-          <SectionHeader icon={Users} title="Lineups" />
+          <View style={styles.lineupHeaderCopy}>
+            <SectionHeader icon={Users} title="Lineups" />
+          </View>
           <View style={styles.headerBadges}>
             <StatusBadge label={players?.lineupStatus ?? (players?.hasLineups ? 'Available' : 'Pending')} tone={players?.hasLineups ? 'success' : 'neutral'} />
             {players?.lineupUnavailableCount ? (
@@ -1107,75 +1111,6 @@ function LineupsSection({
   );
 }
 
-function SourcesSection({
-  eventRows,
-  insight,
-}: {
-  eventRows: string[];
-  insight?: FixtureInsight | null;
-}) {
-  const theme = useAppTheme();
-  const evidence = insight?.evidence ?? [];
-  const providers = insight?.providerLinks ?? [];
-  const coverageEntries = Object.entries(insight?.sourceCoverage ?? {});
-  const missingFields = insight?.dataReadiness?.missingFields ?? [];
-
-  return (
-    <Animated.View entering={enterUp(5)} style={styles.tabContent}>
-      <GlassCard style={styles.listCard}>
-        <SectionHeader icon={FileText} title="Source notes" />
-        {evidence.length > 0 ? evidence.slice(0, 5).map((item, index) => (
-          <PressableScale
-            accessibilityRole={item.url ? 'link' : 'button'}
-            key={`${item.title ?? 'source'}-${index}`}
-            onPress={() => openExternalUrl(item.url)}
-            style={[styles.sourceItem, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <View style={styles.sourceItemHeader}>
-              <Text numberOfLines={2} style={[styles.sourceTitle, { color: theme.foregroundStrong }]}>{item.title ?? 'Source note'}</Text>
-              {item.url ? <ExternalLink color={theme.primary} size={13} /> : null}
-            </View>
-            <Text numberOfLines={2} style={[styles.sourceSnippet, { color: theme.mutedLight }]}>{item.snippet ?? 'Provider evidence is available for this fixture.'}</Text>
-            <Text style={[styles.sourceType, { color: theme.muted }]}>{item.evidenceType ?? 'Evidence'}</Text>
-          </PressableScale>
-        )) : (
-          <Text style={[styles.emptyText, { color: theme.muted }]}>Source notes will appear when provider evidence is available.</Text>
-        )}
-      </GlassCard>
-
-      <GlassCard style={styles.listCard}>
-        <SectionHeader icon={RefreshCw} title="Data refresh and readiness" />
-        <View style={styles.providerGrid}>
-          {providers.length > 0 ? providers.slice(0, 4).map((provider, index) => (
-            <View key={`${provider.provider ?? 'provider'}-${index}`} style={[styles.providerTile, { backgroundColor: theme.field, borderColor: theme.border }]}>
-              <Text numberOfLines={1} style={[styles.providerName, { color: theme.foregroundStrong }]}>{provider.provider ?? 'Provider'}</Text>
-              <Text numberOfLines={1} style={[styles.providerDate, { color: theme.muted }]}>{provider.fetchedAt ? formatDateTime(provider.fetchedAt) : 'Fetch pending'}</Text>
-            </View>
-          )) : (
-            <Text style={[styles.emptyText, { color: theme.muted }]}>Provider fetches are pending.</Text>
-          )}
-        </View>
-        {coverageEntries.length > 0 ? (
-          <View style={styles.coverageWrap}>
-            {coverageEntries.slice(0, 6).map(([key, value]) => (
-              <View key={key} style={[styles.coveragePill, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                <Text numberOfLines={1} style={[styles.coverageKey, { color: theme.muted }]}>{key}</Text>
-                <Text numberOfLines={1} style={[styles.coverageValue, { color: theme.foregroundStrong }]}>{formatCoverageValue(value)}</Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
-        {missingFields.length > 0 ? (
-          <View style={[styles.unavailableNotice, { backgroundColor: theme.warningSoft, borderColor: theme.warningSoft }]}>
-            <AlertTriangle color={theme.warning} size={15} />
-            <Text style={[styles.noticeText, { color: theme.warning }]}>Missing: {missingFields.slice(0, 4).join(', ')}</Text>
-          </View>
-        ) : null}
-      </GlassCard>
-
-      <SummaryList items={eventRows.length > 0 ? eventRows : ['Recent meetings and provider events will appear as coverage updates.']} />
-    </Animated.View>
-  );
-}
 
 export default function MatchDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -1198,21 +1133,20 @@ export default function MatchDetailScreen() {
   const readinessStatus = fixtureInsight?.dataReadiness?.status ?? match?.readiness;
   const readinessScore = Math.round(fixtureInsight?.dataReadiness?.score ?? match?.confidence ?? 0);
   const h2h = fixtureInsight?.h2h;
-  const homeStanding = fixtureInsight?.standings?.home?.[0];
-  const awayStanding = fixtureInsight?.standings?.away?.[0];
-  const providerLinks = fixtureInsight?.providerLinks ?? [];
-  const predictionItems = [
-    fixtureInsight?.recommendation?.summary,
-    fixtureInsight?.apiFootballContext?.predictionSummary,
-    ...insightSummary(fixtureInsight),
-    ...(match?.summary ?? []),
-  ].filter(Boolean) as string[];
+  const homeStanding = findStandingRow(fixtureInsight?.standings?.home, match?.home);
+  const awayStanding = findStandingRow(fixtureInsight?.standings?.away, match?.away);
+  const predictionItems = Array.from(
+    new Set(
+      [
+        fixtureInsight?.recommendation?.summary,
+        fixtureInsight?.apiFootballContext?.predictionSummary,
+        ...insightSummary(fixtureInsight),
+        ...(match?.summary ?? []),
+      ].filter(Boolean) as string[],
+    ),
+  );
   const averageRows = statListFromAverageStats(fixtureInsight);
   const activeLineup = lineupSide === 'home' ? fixtureInsight?.players?.lineups?.home : fixtureInsight?.players?.lineups?.away;
-  const eventRows = [
-    ...(h2h?.meetings ?? []).slice(0, 5).map((meeting) => `${meeting.homeTeam ?? 'Home'} ${meeting.homeScore ?? '-'} - ${meeting.awayScore ?? '-'} ${meeting.awayTeam ?? 'Away'}`),
-    ...(providerLinks.slice(0, 3).map((link) => `${link.provider ?? 'Provider'}${link.fetchedAt ? ` - ${formatDate(link.fetchedAt)}` : ''}`)),
-  ];
   const isLoadingMatch = !match && (homeFeed.isLoading || homeFeed.isFetching || insight.isLoading || insight.isFetching);
   const homeForm = formValues(homeStanding, fixtureInsight?.recentMatches?.home);
   const awayForm = formValues(awayStanding, fixtureInsight?.recentMatches?.away);
@@ -1316,37 +1250,35 @@ export default function MatchDetailScreen() {
         <SectionSwitcher activeSection={activeSection} onSelect={setActiveSection} />
       </Animated.View>
 
-      {activeSection === 'Overview' ? (
-        <OverviewSection
-          awayForm={awayForm}
-          awayRecentMatches={fixtureInsight?.recentMatches?.away}
-          awayStanding={awayStanding}
-          awayStandings={fixtureInsight?.standings?.away}
-          displayStatus={statusLabel(match, fixtureInsight)}
-          h2h={h2h}
-          homeForm={homeForm}
-          homeRecentMatches={fixtureInsight?.recentMatches?.home}
-          homeStanding={homeStanding}
-          homeStandings={fixtureInsight?.standings?.home}
-          match={match}
-          predictionItems={predictionItems}
-          probabilities={probabilities}
-        />
-      ) : null}
+      <Animated.View entering={FadeInDown.duration(220)} key={activeSection}>
+        {activeSection === 'Overview' ? (
+          <OverviewSection
+            awayForm={awayForm}
+            awayRecentMatches={fixtureInsight?.recentMatches?.away}
+            awayStandings={fixtureInsight?.standings?.away}
+            displayStatus={statusLabel(match, fixtureInsight)}
+            h2h={h2h}
+            homeForm={homeForm}
+            homeRecentMatches={fixtureInsight?.recentMatches?.home}
+            homeStandings={fixtureInsight?.standings?.home}
+            match={match}
+            predictionItems={predictionItems}
+            probabilities={probabilities}
+          />
+        ) : null}
 
-      {activeSection === 'Analysis' ? <AnalysisSection averageRows={averageRows} insight={fixtureInsight} stats={stats} /> : null}
+        {activeSection === 'Analysis' ? <AnalysisSection averageRows={averageRows} insight={fixtureInsight} stats={stats} /> : null}
 
-      {activeSection === 'Lineups' ? (
-        <LineupsSection
-          activeLineup={activeLineup}
-          lineupSide={lineupSide}
-          match={match}
-          players={fixtureInsight?.players}
-          setLineupSide={setLineupSide}
-        />
-      ) : null}
-
-      {activeSection === 'Sources' ? <SourcesSection eventRows={eventRows} insight={fixtureInsight} /> : null}
+        {activeSection === 'Lineups' ? (
+          <LineupsSection
+            activeLineup={activeLineup}
+            lineupSide={lineupSide}
+            match={match}
+            players={fixtureInsight?.players}
+            setLineupSide={setLineupSide}
+          />
+        ) : null}
+      </Animated.View>
     </Screen>
   );
 }
@@ -1395,30 +1327,61 @@ const styles = StyleSheet.create({
     fontFamily: fonts.extraBold,
     fontSize: 14,
   },
+  contextBar: {
+    flex: 1,
+  },
+  contextDivider: {
+    height: 26,
+    width: 1,
+  },
+  contextHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
   contextLabel: {
     fontFamily: fonts.semibold,
     fontSize: 10,
+    letterSpacing: 0.4,
     marginTop: 2,
+    textTransform: 'uppercase',
   },
-  contextPair: {
-    gap: spacing.sm,
-    marginTop: spacing.md,
+  contextScore: {
+    fontFamily: fonts.extraBold,
+    fontSize: 26,
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -0.5,
+  },
+  contextScoreRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  contextStatsRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
   },
   contextStrip: {
-    alignItems: 'center',
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    padding: spacing.sm,
+    gap: spacing.md,
+    padding: spacing.lg,
   },
   contextTile: {
     flex: 1,
     minWidth: 0,
   },
+  contextTitle: {
+    fontFamily: fonts.bold,
+    fontSize: 11,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
   contextValue: {
     fontFamily: fonts.extraBold,
     fontSize: 16,
+    fontVariant: ['tabular-nums'],
   },
   countryText: {
     flexShrink: 1,
@@ -1530,6 +1493,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
+  },
+  h2hDrawLabel: {
+    fontFamily: fonts.bold,
+    fontSize: 11,
   },
   h2hLabel: {
     flex: 1,
@@ -1649,7 +1616,12 @@ const styles = StyleSheet.create({
   lineupHeader: {
     alignItems: 'center',
     flexDirection: 'row',
+    gap: spacing.sm,
     justifyContent: 'space-between',
+  },
+  lineupHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
   },
   listCard: {
     gap: spacing.md,
@@ -1676,6 +1648,26 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     height: 8,
     width: 8,
+  },
+  meetingScore: {
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  meetingScoreText: {
+    fontFamily: fonts.extraBold,
+    fontSize: 13,
+    fontVariant: ['tabular-nums'],
+  },
+  meetingTeam: {
+    flex: 1,
+    fontFamily: fonts.semibold,
+    fontSize: 12,
+    textAlign: 'right',
+  },
+  meetingTeamAway: {
+    textAlign: 'left',
   },
   metricLabel: {
     fontFamily: fonts.semibold,

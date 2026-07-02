@@ -48,7 +48,7 @@ const darkPalette = {
   statTrack: 'rgba(255,255,255,0.10)',
   statHome: '#2ef2d0',
   statAway: '#ffd34d',
-  tabBar: 'rgba(4,16,14,0.95)',
+  tabBar: '#0a0f0d',
   overlay: 'rgba(0,0,0,0.55)',
   shadow: '#000000',
   white: '#ffffff',

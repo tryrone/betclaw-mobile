@@ -1,4 +1,5 @@
 export * from './Background';
+export * from './BottomSheet';
 export * from './BrandLogo';
 export * from './BrandMark';
 export * from './DashboardBottomNav';

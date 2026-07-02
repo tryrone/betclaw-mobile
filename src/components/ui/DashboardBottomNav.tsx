@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { useAppTheme } from '@/theme/colors';
 import { useAppGradients } from '@/theme/gradients';
-import { layout, radius, spacing } from '@/theme/spacing';
+import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
 type IconComponent = React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
@@ -52,30 +52,19 @@ function NavItem({
   onPress?: () => void;
 }) {
   const theme = useAppTheme();
-  const gradients = useAppGradients();
-  const itemStyle = StyleSheet.flatten([
-    navStyles.item,
-    {
-      backgroundColor: active ? theme.primarySubtle : 'transparent',
-      borderColor: active ? theme.selectionBorder : 'transparent',
-    },
-  ]);
 
   return (
     <Link href={href as any} asChild>
-      <PressableScale accessibilityRole="tab" accessibilityState={{ selected: active }} onPress={onPress} scaleTo={0.94} style={itemStyle}>
-        {active ? (
-          <LinearGradient
-            colors={gradients.navActive}
-            end={{ x: 1, y: 1 }}
-            start={{ x: 0, y: 0 }}
-            style={StyleSheet.absoluteFill}
-          />
-        ) : null}
-        <Icon color={active ? theme.primary : theme.mutedLight} size={20} strokeWidth={active ? 2.5 : 1.9} />
-        <Text numberOfLines={1} style={[navStyles.label, { color: active ? theme.primary : theme.mutedLight }]}>
-          {label}
-        </Text>
+      <PressableScale
+        accessibilityLabel={label}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: active }}
+        onPress={onPress}
+        scaleTo={0.92}
+        style={navStyles.item}>
+        <View style={[navStyles.iconCircle, active ? { backgroundColor: theme.primary } : null]}>
+          <Icon color={active ? theme.primaryDark : theme.muted} size={22} strokeWidth={active ? 2.2 : 1.8} />
+        </View>
       </PressableScale>
     </Link>
   );
@@ -89,14 +78,6 @@ export function DashboardBottomNav() {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreActive = moreItems.some((item) => isActive(pathname, item.activePaths));
   const bottomInset = Math.max(insets.bottom, 8);
-
-  const moreButtonStyle = StyleSheet.flatten([
-    navStyles.item,
-    {
-      backgroundColor: moreActive || moreOpen ? theme.primarySubtle : 'transparent',
-      borderColor: moreActive || moreOpen ? theme.selectionBorder : 'transparent',
-    },
-  ]);
 
   return (
     <>
@@ -177,47 +158,42 @@ export function DashboardBottomNav() {
         </View>
       </Modal>
 
-      <View pointerEvents="box-none" style={[navStyles.wrap, { paddingBottom: bottomInset }]}>
-        <View style={[navStyles.glow, { backgroundColor: theme.primary }]} />
-        <View style={[navStyles.dock, { borderColor: theme.border, shadowColor: theme.shadow }]}>
-          <BlurView intensity={38} tint="dark" style={StyleSheet.absoluteFill} />
-          <LinearGradient
-            colors={gradients.dock}
-            end={{ x: 1, y: 1 }}
-            start={{ x: 0, y: 0 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={navStyles.row}>
-            {primaryItems.map((item) => (
-              <NavItem
-                active={isActive(pathname, item.activePaths)}
-                href={item.href}
-                icon={item.icon}
-                key={item.href}
-                label={item.label}
+      <View
+        pointerEvents="box-none"
+        style={[
+          navStyles.bar,
+          {
+            backgroundColor: theme.tabBar,
+            borderColor: theme.border,
+            paddingBottom: bottomInset,
+            shadowColor: theme.shadow,
+          },
+        ]}>
+        <View style={navStyles.row}>
+          {primaryItems.map((item) => (
+            <NavItem
+              active={isActive(pathname, item.activePaths)}
+              href={item.href}
+              icon={item.icon}
+              key={item.href}
+              label={item.label}
+            />
+          ))}
+          <PressableScale
+            accessibilityLabel="More dashboard navigation"
+            accessibilityRole="button"
+            accessibilityState={{ expanded: moreOpen, selected: moreActive }}
+            onPress={() => setMoreOpen((open) => !open)}
+            scaleTo={0.92}
+            style={navStyles.item}>
+            <View style={[navStyles.iconCircle, moreActive || moreOpen ? { backgroundColor: theme.primary } : null]}>
+              <Menu
+                color={moreActive || moreOpen ? theme.primaryDark : theme.muted}
+                size={22}
+                strokeWidth={moreActive || moreOpen ? 2.2 : 1.8}
               />
-            ))}
-            <PressableScale
-              accessibilityLabel="More dashboard navigation"
-              accessibilityRole="button"
-              accessibilityState={{ expanded: moreOpen, selected: moreActive }}
-              onPress={() => setMoreOpen((open) => !open)}
-              scaleTo={0.94}
-              style={moreButtonStyle}>
-              {moreActive || moreOpen ? (
-                <LinearGradient
-                  colors={gradients.navActive}
-                  end={{ x: 1, y: 1 }}
-                  start={{ x: 0, y: 0 }}
-                  style={StyleSheet.absoluteFill}
-                />
-              ) : null}
-              <Menu color={moreActive || moreOpen ? theme.primary : theme.mutedLight} size={20} strokeWidth={moreActive || moreOpen ? 2.5 : 1.9} />
-              <Text numberOfLines={1} style={[navStyles.label, { color: moreActive || moreOpen ? theme.primary : theme.mutedLight }]}>
-                More
-              </Text>
-            </PressableScale>
-          </View>
+            </View>
+          </PressableScale>
         </View>
       </View>
     </>
@@ -233,39 +209,32 @@ const navStyles = StyleSheet.create({
     justifyContent: 'center',
     width: 34,
   },
-  dock: {
-    borderRadius: radius.xl,
-    borderWidth: 1,
+  bar: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderTopWidth: 1,
+    bottom: 0,
     elevation: 24,
-    height: 68,
-    overflow: 'hidden',
+    left: 0,
+    paddingTop: 10,
+    position: 'absolute',
+    right: 0,
     shadowOffset: { height: -8, width: 0 },
     shadowOpacity: 0.38,
     shadowRadius: 28,
   },
-  glow: {
-    alignSelf: 'center',
+  iconCircle: {
+    alignItems: 'center',
     borderRadius: radius.pill,
-    height: 3,
-    marginBottom: 7,
-    opacity: 0.44,
-    width: 92,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
   },
   item: {
     alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
     flex: 1,
-    gap: 3,
-    height: 54,
     justifyContent: 'center',
     minWidth: 0,
-    overflow: 'hidden',
-  },
-  label: {
-    fontFamily: fonts.semibold,
-    fontSize: 11,
-    lineHeight: 14,
   },
   modalRoot: {
     flex: 1,
@@ -316,10 +285,9 @@ const navStyles = StyleSheet.create({
   },
   row: {
     alignItems: 'center',
-    flex: 1,
     flexDirection: 'row',
-    gap: 3,
-    paddingHorizontal: 6,
+    height: 56,
+    paddingHorizontal: spacing.md,
   },
   scrim: {
     bottom: 0,
@@ -348,13 +316,5 @@ const navStyles = StyleSheet.create({
   sheetTitle: {
     fontFamily: fonts.extraBold,
     fontSize: 16,
-  },
-  wrap: {
-    bottom: 0,
-    left: 0,
-    paddingHorizontal: layout.screenGutter,
-    paddingTop: spacing.xs,
-    position: 'absolute',
-    right: 0,
   },
 });

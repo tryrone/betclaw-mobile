@@ -90,6 +90,12 @@ export type FeedMatch = {
   homeTeam: TeamReference;
   kickoffTime: string | Date;
   leagueKey?: string;
+  /** 1X2 odds when the feed serializer provides them (optional; falls back to bestMarket). */
+  matchOdds?: {
+    away?: number | null;
+    draw?: number | null;
+    home?: number | null;
+  } | null;
   predictionView?: PredictionView | null;
   score?: string | null;
   sourceKind?: 'canonical' | 'bookmakerFallback' | string;

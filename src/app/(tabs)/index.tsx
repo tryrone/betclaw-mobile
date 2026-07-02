@@ -3,7 +3,6 @@ import * as Linking from 'expo-linking';
 import { Link, useRouter } from 'expo-router';
 import {
   ArrowRight,
-  ArrowUpRight,
   Bell,
   CalendarDays,
   CircleAlert,
@@ -13,7 +12,6 @@ import {
   MessageCircle,
   Search,
   ShieldCheck,
-  Sparkles,
   Target,
   Trophy,
   UsersRound,
@@ -22,6 +20,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { FeedMatchCard } from '@/components/home/FeedMatchCard';
 import {
   DashboardButton,
   DashboardChip,
@@ -33,7 +32,6 @@ import {
   PressableScale,
   Screen,
   StatusBadge,
-  TeamLogo,
 } from '@/components/ui';
 import {
   useCreateTelegramCommunityInviteMutation,
@@ -123,9 +121,6 @@ function formatSelectedDateLabel(key: string) {
   });
 }
 
-function formatMatchDate(value: string | Date) {
-  return new Date(value).toLocaleDateString('en-US', { day: 'numeric', month: 'short', weekday: 'short' });
-}
 
 function formatMatchTime(value: string | Date) {
   return new Date(value).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -149,28 +144,10 @@ function matchKickoffTime(match: FeedMatch) {
   return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
 }
 
-function normalizedStatus(match: FeedMatch) {
-  return String(match.status ?? '').toUpperCase();
-}
 
-function isFinished(match: FeedMatch) {
-  return ['FT', 'AET', 'PEN', 'FINISHED'].includes(normalizedStatus(match));
-}
 
-function isLive(match: FeedMatch) {
-  const status = normalizedStatus(match);
-  return !isFinished(match) && (['LIVE', '1H', '2H', 'HT', 'ET', 'BT', 'P', 'SUSP', 'INT'].includes(status) || Boolean(match.elapsedMinute));
-}
 
-function scoreLabel(match: FeedMatch) {
-  return match.score ?? match.status;
-}
 
-function centerLabel(match: FeedMatch) {
-  if (isFinished(match)) return normalizedStatus(match);
-  if (isLive(match)) return match.elapsedMinute ? `${match.elapsedMinute}'` : match.status;
-  return formatMatchTime(match.kickoffTime);
-}
 
 function getConfidence(match: FeedMatch) {
   return Math.max(
@@ -190,30 +167,9 @@ function getConfidence(match: FeedMatch) {
   );
 }
 
-function getReadinessLabel(match: FeedMatch) {
-  const status = match.dataSnapshot?.readiness?.status ?? match.dataReadiness?.status ?? 'partial';
-  if (/ready|verified/i.test(status)) return 'Verified';
-  if (/insufficient|limited/i.test(status)) return 'Limited data';
-  return 'Partial data';
-}
 
-function getPredictionLabel(match: FeedMatch) {
-  return match.predictionView?.label ?? match.bestMarket?.label ?? 'Analysis pending';
-}
 
-function getPredictionMeta(match: FeedMatch) {
-  const view = match.predictionView;
-  if (!view) return getReadinessLabel(match);
-  if (typeof view.odds === 'number') return `Odds ${view.odds.toFixed(2)}`;
-  if (typeof view.confidence === 'number') return `${Math.round(view.confidence)}%`;
-  return view.kind === 'lean' ? 'Market signal' : 'Prediction';
-}
 
-function matchSummary(match: FeedMatch) {
-  if (isFinished(match)) return `Final result: ${scoreLabel(match)}. Past match data is available in details.`;
-  if (isLive(match)) return `Live match: ${scoreLabel(match)}. Details update with available match data.`;
-  return match.predictionView?.summary ?? match.bestMarket?.summary ?? getReadinessLabel(match);
-}
 
 function compareLeagues(left: LeagueOption, right: LeagueOption) {
   return (right.matchCount ?? 0) - (left.matchCount ?? 0) || left.name.localeCompare(right.name);
@@ -647,82 +603,8 @@ function LeagueLogoMark({ league }: { league: LeagueOption }) {
   );
 }
 
-function MatchCard({ match, league }: { match: FeedMatch; league: LeagueSection }) {
-  const theme = useAppTheme();
-  const accuracy = getConfidence(match);
-  const live = isLive(match);
-  const finished = isFinished(match);
 
-  return (
-    <DashboardGlassCard gradient="matchHero" style={styles.matchCard}>
-      <View style={styles.matchTop}>
-        <View style={styles.matchLeagueCopy}>
-          <Text numberOfLines={1} style={[styles.matchLeague, { color: theme.foregroundStrong }]}>{league.name}</Text>
-          <Text style={[styles.matchDate, { color: theme.mutedLight }]}>{formatMatchDate(match.kickoffTime)}</Text>
-        </View>
-        <View style={[styles.accuracyPill, { backgroundColor: 'rgba(79,141,130,0.32)' }]}>
-          <Sparkles color={theme.primary} size={13} />
-          <Text style={[styles.accuracyText, { color: theme.foregroundStrong }]}>
-            {finished ? 'Final' : live ? 'Live' : `${accuracy}% Accuracy`}
-          </Text>
-        </View>
-      </View>
 
-      <View style={styles.matchTeams}>
-        <TeamSide name={match.homeTeam.name} logoUrl={match.homeTeam.logoUrl} />
-        <View style={styles.matchCenter}>
-          <Text style={[styles.matchCenterText, { color: theme.primary }]}>{centerLabel(match)}</Text>
-          <View style={[styles.scoreBadge, { backgroundColor: 'rgba(0,0,0,0.20)', borderColor: theme.border }]}>
-            <Text style={[styles.scoreBadgeText, { color: theme.mutedLight }]}>{scoreLabel(match)}</Text>
-          </View>
-        </View>
-        <TeamSide alignRight name={match.awayTeam.name} logoUrl={match.awayTeam.logoUrl} />
-      </View>
-
-      <View style={styles.pickGrid}>
-        <PredictionPick label={finished || live ? (finished ? 'Result' : 'Score') : match.predictionView ? 'Prediction' : 'Market'} value={finished || live ? scoreLabel(match) : getPredictionLabel(match)} />
-        <PredictionPick label={finished || live ? 'Status' : match.predictionView ? 'Signal' : 'Coverage'} value={finished || live ? match.status : getPredictionMeta(match)} />
-      </View>
-
-      <Text numberOfLines={3} style={[styles.matchSummary, { color: theme.mutedLight }]}>{matchSummary(match)}</Text>
-
-      <Link href={`/match/${match.fixtureId}` as any} asChild>
-        <PressableScale
-          accessibilityRole="button"
-          style={StyleSheet.flatten([styles.matchDetailsButton, { backgroundColor: theme.surface, borderColor: theme.border }])}>
-          <Text style={[styles.matchDetailsText, { color: theme.foregroundStrong }]}>Match Details</Text>
-          <View style={[styles.matchDetailsIcon, { backgroundColor: theme.primarySubtle }]}>
-            <ArrowUpRight color={theme.primary} size={15} />
-          </View>
-        </PressableScale>
-      </Link>
-    </DashboardGlassCard>
-  );
-}
-
-function TeamSide({ alignRight, logoUrl, name }: { alignRight?: boolean; logoUrl?: string | null; name: string }) {
-  const theme = useAppTheme();
-
-  return (
-    <View style={[styles.teamSide, alignRight ? styles.teamSideRight : null]}>
-      <TeamLogo logoUrl={logoUrl} name={name} size={44} />
-      <Text numberOfLines={2} style={[styles.teamName, alignRight ? styles.teamNameRight : null, { color: theme.foregroundStrong }]}>
-        {name}
-      </Text>
-    </View>
-  );
-}
-
-function PredictionPick({ label, value }: { label: string; value: string }) {
-  const theme = useAppTheme();
-
-  return (
-    <View style={[styles.pick, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-      <Text style={[styles.pickLabel, { color: theme.muted }]}>{label}</Text>
-      <Text numberOfLines={2} style={[styles.pickValue, { color: theme.foregroundStrong }]}>{value}</Text>
-    </View>
-  );
-}
 
 function LeagueMatchSection({ league }: { league: LeagueSection }) {
   const theme = useAppTheme();
@@ -743,7 +625,7 @@ function LeagueMatchSection({ league }: { league: LeagueSection }) {
       </View>
       <View style={styles.matchList}>
         {league.matches.map((match) => (
-          <MatchCard key={`${league.key}-${match.fixtureId}`} league={league} match={match} />
+          <FeedMatchCard key={`${league.key}-${match.fixtureId}`} league={league} match={match} />
         ))}
       </View>
     </View>
