@@ -21,6 +21,7 @@ import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
 const heroImage = require('@/../assets/images/neymar_cutout.png');
+const WELCOME_HORIZONTAL_PADDING = spacing.xl / 2;
 
 const slides = [
   {
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   copyBlock: {
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: WELCOME_HORIZONTAL_PADDING,
   },
   ctaButton: {
     alignItems: 'center',
@@ -226,7 +227,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     justifyContent: 'space-between',
     marginTop: spacing.xl,
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: WELCOME_HORIZONTAL_PADDING,
   },
   hero: {
     height: '64%',
@@ -291,6 +292,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: WELCOME_HORIZONTAL_PADDING,
   },
 });

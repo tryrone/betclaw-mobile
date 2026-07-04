@@ -9,8 +9,12 @@ export const spacing = {
 } as const;
 
 export const layout = {
-  /** Outer horizontal/top gutter applied by Screen (12 → 6 → 3 per design passes). */
+  /** Top gutter applied by Screen. */
   screenGutter: 3,
+  /** Outer horizontal gutter applied by Screen (12 -> 6 -> 3 -> 1.5 per design passes). */
+  screenHorizontalGutter: 1.5,
+  /** Shared phone content cap; widens the prior 390 cap so wide-phone gutters are roughly halved. */
+  screenMaxWidth: 408,
 } as const;
 
 export const radius = {

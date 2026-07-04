@@ -14,6 +14,7 @@ import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
 const broadcastImage = require('@/../assets/images/live_stream_match.png');
+const LIVE_SCREEN_HORIZONTAL_PADDING = spacing.md / 2;
 
 function scoreText(match?: ReturnType<typeof flattenHomeFeed>[number]) {
   if (!match) return 'Match center';
@@ -95,11 +96,11 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     gap: spacing.sm,
-    left: spacing.md,
+    left: LIVE_SCREEN_HORIZONTAL_PADDING,
     overflow: 'hidden',
     padding: spacing.md,
     position: 'absolute',
-    right: spacing.md,
+    right: LIVE_SCREEN_HORIZONTAL_PADDING,
   },
   bottomTitleWrap: {
     flex: 1,
@@ -208,7 +209,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: LIVE_SCREEN_HORIZONTAL_PADDING,
     paddingTop: spacing.sm,
   },
 });

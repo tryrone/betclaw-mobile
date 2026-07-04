@@ -69,8 +69,8 @@ export function Screen({
 const styles = StyleSheet.create({
   content: {
     gap: spacing.lg,
-    maxWidth: 390,
-    paddingHorizontal: layout.screenGutter,
+    maxWidth: layout.screenMaxWidth,
+    paddingHorizontal: layout.screenHorizontalGutter,
     width: '100%',
   },
   fill: {

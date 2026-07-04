@@ -22,7 +22,6 @@ import { fonts } from '@/theme/typography';
 const LIVE_POLL_MS = 30_000;
 const LIVE_FEED_PAGE_LIMIT = 48;
 const MAX_LIVE_FEED_PAGES = 8;
-const CONTENT_MAX_WIDTH = 390;
 
 type LiveEntry = {
   league: { country?: string | null; name: string };
@@ -75,7 +74,7 @@ export function LiveNowCarousel() {
     return entries;
   }, [data]);
 
-  const pageWidth = Math.min(width, CONTENT_MAX_WIDTH) - layout.screenGutter * 2;
+  const pageWidth = Math.min(width, layout.screenMaxWidth) - layout.screenHorizontalGutter * 2;
 
   const handleScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const next = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
