@@ -9,8 +9,8 @@ export const spacing = {
 } as const;
 
 export const layout = {
-  /** Outer horizontal/top gutter applied by Screen (was spacing.md = 12). */
-  screenGutter: 6,
+  /** Outer horizontal/top gutter applied by Screen (12 → 6 → 3 per design passes). */
+  screenGutter: 3,
 } as const;
 
 export const radius = {

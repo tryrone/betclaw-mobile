@@ -44,6 +44,9 @@ module.exports = {
     ios: {
       bundleIdentifier: 'com.betclaw.app',
       icon: './assets/images/ios-icon.png',
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
+      },
     },
     android: {
       package: 'com.betclaw.app',
