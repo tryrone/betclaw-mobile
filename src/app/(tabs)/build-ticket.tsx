@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Bot, Check, Copy, Share2, SlidersHorizontal, Target, Trophy } from 'lucide-react-native';
+import { ArrowLeft, Bot, Check, Copy, Minus, Plus, Share2, SlidersHorizontal, Target, Trophy } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -57,6 +57,8 @@ const dateOptions = [
   { label: 'Next day', value: dateInput(2) },
 ];
 
+const LEAGUE_PREVIEW_COUNT = 8;
+
 function OptionPill({
   active,
   label,
@@ -108,6 +110,16 @@ function TicketMatchRow({ match }: { match: any }) {
         <Text style={[styles.metric, { color: theme.muted }]}>
           {Math.round(match.confidence ?? 0)}% confidence
         </Text>
+        {typeof match.baseRate === 'number' ? (
+          <View style={[styles.historyTag, { backgroundColor: theme.successSoft }]}>
+            <Text style={[styles.historyTagText, { color: theme.success }]}>
+              History {Math.round(match.baseRate * 100)}%
+              {typeof match.baseRateSample === 'number' && match.baseRateSample > 0
+                ? ` · ${match.baseRateSample}`
+                : ''}
+            </Text>
+          </View>
+        ) : null}
       </View>
       {match.selectionReason || match.reason ? (
         <Text style={[styles.matchReason, { color: theme.mutedLight }]}>{match.selectionReason ?? match.reason}</Text>
@@ -128,6 +140,7 @@ export default function BuildTicketScreen() {
   const [notes, setNotes] = useState('');
   const [selectedMarkets, setSelectedMarkets] = useState<string[]>([]);
   const [selectedLeagues, setSelectedLeagues] = useState<string[]>([]);
+  const [showAllLeagues, setShowAllLeagues] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
 
   const optionInput = useMemo<Partial<BuildTicketInput>>(
@@ -156,6 +169,8 @@ export default function BuildTicketScreen() {
     : builderOptions.data?.recommendedLeagueKeys ?? [];
   const status = jobStatus.data?.status ?? (buildTicket.isPending ? 'processing' : 'ready');
   const doneTicket = ticket.data;
+  const allLeagues = builderOptions.data?.leagues ?? [];
+  const visibleLeagues = showAllLeagues ? allLeagues : allLeagues.slice(0, LEAGUE_PREVIEW_COUNT);
 
   const toggle = (id: string, values: string[], setValues: (next: string[]) => void) => {
     setValues(values.includes(id) ? values.filter((value) => value !== id) : [...values, id]);
@@ -282,6 +297,7 @@ export default function BuildTicketScreen() {
             <Text style={[styles.cardTitle, { color: theme.foregroundStrong }]}>Date and profile</Text>
             <SlidersHorizontal color={theme.primarySoft} size={18} />
           </View>
+          <Text style={[styles.sectionLabel, { color: theme.muted }]}>Match day</Text>
           <ScrollView contentContainerStyle={styles.pillRow} horizontal showsHorizontalScrollIndicator={false}>
             {dateOptions.map((option) => (
               <OptionPill
@@ -292,6 +308,7 @@ export default function BuildTicketScreen() {
               />
             ))}
           </ScrollView>
+          <Text style={[styles.sectionLabel, { color: theme.muted }]}>Kickoff window</Text>
           <ScrollView contentContainerStyle={styles.pillRow} horizontal showsHorizontalScrollIndicator={false}>
             {timeWindows.map((option) => (
               <OptionPill
@@ -302,6 +319,7 @@ export default function BuildTicketScreen() {
               />
             ))}
           </ScrollView>
+          <Text style={[styles.sectionLabel, { color: theme.muted }]}>Risk profile</Text>
           <ScrollView contentContainerStyle={styles.pillRow} horizontal showsHorizontalScrollIndicator={false}>
             {oddsProfiles.map((option) => (
               <OptionPill
@@ -315,14 +333,28 @@ export default function BuildTicketScreen() {
           <View style={styles.inputGrid}>
             <View style={[styles.inputBox, { backgroundColor: theme.field, borderColor: theme.border }]}>
               <Text style={[styles.inputLabel, { color: theme.muted }]}>Games</Text>
-              <TextInput
-                keyboardType="number-pad"
-                onChangeText={setGameCount}
-                placeholder="5"
-                placeholderTextColor={theme.muted}
-                style={[styles.input, { color: theme.foregroundStrong }]}
-                value={gameCount}
-              />
+              <View style={styles.stepperRow}>
+                <PressableScale
+                  accessibilityLabel="Fewer games"
+                  accessibilityRole="button"
+                  onPress={() => setGameCount(String(Math.max(1, (Number(gameCount) || 5) - 1)))}
+                  style={[styles.stepperButton, { backgroundColor: theme.primarySubtle, borderColor: theme.border }]}>
+                  <Minus color={theme.primarySoft} size={16} />
+                </PressableScale>
+                <Text style={[styles.stepperValue, { color: theme.foregroundStrong }]}>
+                  {Math.max(1, Math.min(10, Number(gameCount) || 5))}
+                </Text>
+                <PressableScale
+                  accessibilityLabel="More games"
+                  accessibilityRole="button"
+                  onPress={() => setGameCount(String(Math.min(10, (Number(gameCount) || 5) + 1)))}
+                  style={[styles.stepperButton, { backgroundColor: theme.primarySubtle, borderColor: theme.border }]}>
+                  <Plus color={theme.primarySoft} size={16} />
+                </PressableScale>
+              </View>
+              <Text style={[styles.helper, { color: theme.muted }]}>
+                Historical screening may keep fewer legs to protect the win rate.
+              </Text>
             </View>
             <View style={[styles.inputBox, { backgroundColor: theme.field, borderColor: theme.border }]}>
               <Text style={[styles.inputLabel, { color: theme.muted }]}>Target odds</Text>
@@ -334,6 +366,7 @@ export default function BuildTicketScreen() {
                 style={[styles.input, { color: theme.foregroundStrong }]}
                 value={targetOdds}
               />
+              <Text style={[styles.helper, { color: theme.muted }]}>Optional. Leave as-is to let odds float.</Text>
             </View>
           </View>
         </GlassCard>
@@ -355,6 +388,10 @@ export default function BuildTicketScreen() {
               />
             ))}
           </View>
+          <Text style={[styles.helper, { color: theme.muted }]}>
+            Goal markets (Over/Under, BTTS) are screened against each league&apos;s historical hit rate, so
+            they may produce fewer, stronger legs.
+          </Text>
           {builderOptions.isLoading ? <Text style={[styles.helper, { color: theme.muted }]}>Loading available markets...</Text> : null}
         </GlassCard>
       </Animated.View>
@@ -363,10 +400,18 @@ export default function BuildTicketScreen() {
         <GlassCard>
           <View style={styles.cardHeader}>
             <Text style={[styles.cardTitle, { color: theme.foregroundStrong }]}>Leagues</Text>
-            <StatusBadge label={selectedLeagues.length ? `${selectedLeagues.length} manual` : 'Recommended'} tone="warning" />
+            <StatusBadge
+              label={selectedLeagues.length ? `${selectedLeagues.length} selected` : 'Recommended'}
+              tone={selectedLeagues.length ? 'accent' : 'warning'}
+            />
           </View>
+          <Text style={[styles.helper, { color: theme.muted }]}>
+            {selectedLeagues.length
+              ? 'Building only from your selected leagues.'
+              : 'Using leagues recommended from fixture coverage and historical hit rates. Tap to pick your own.'}
+          </Text>
           <View style={styles.wrapGrid}>
-            {(builderOptions.data?.leagues ?? []).slice(0, 10).map((league) => (
+            {visibleLeagues.map((league) => (
               <OptionPill
                 active={selectedLeagues.includes(league.key) || (selectedLeagues.length === 0 && Boolean(league.recommended))}
                 key={league.key}
@@ -374,6 +419,28 @@ export default function BuildTicketScreen() {
                 onPress={() => toggle(league.key, selectedLeagues, setSelectedLeagues)}
               />
             ))}
+          </View>
+          <View style={styles.leagueActions}>
+            {allLeagues.length > LEAGUE_PREVIEW_COUNT ? (
+              <PressableScale
+                accessibilityLabel={showAllLeagues ? 'Show fewer leagues' : 'Show all leagues'}
+                accessibilityRole="button"
+                onPress={() => setShowAllLeagues((prev) => !prev)}
+                style={[styles.leagueActionButton, { backgroundColor: theme.field, borderColor: theme.border }]}>
+                <Text style={[styles.leagueActionText, { color: theme.primarySoft }]}>
+                  {showAllLeagues ? 'Show fewer' : `Show all (${allLeagues.length})`}
+                </Text>
+              </PressableScale>
+            ) : null}
+            {selectedLeagues.length ? (
+              <PressableScale
+                accessibilityLabel="Reset to recommended leagues"
+                accessibilityRole="button"
+                onPress={() => setSelectedLeagues([])}
+                style={[styles.leagueActionButton, { backgroundColor: theme.field, borderColor: theme.border }]}>
+                <Text style={[styles.leagueActionText, { color: theme.mutedLight }]}>Use recommended</Text>
+              </PressableScale>
+            ) : null}
           </View>
           <TextInput
             multiline
@@ -424,6 +491,16 @@ export default function BuildTicketScreen() {
               </View>
               <Target color={theme.primarySoft} size={22} />
             </View>
+            {typeof doneTicket.projectedWinRate === 'number' ? (
+              <View style={[styles.projectedBox, { backgroundColor: theme.successSoft }]}>
+                <Text style={[styles.projectedValue, { color: theme.success }]}>
+                  Projected win {Math.round(doneTicket.projectedWinRate * 100)}%
+                </Text>
+                <Text style={[styles.helper, { color: theme.mutedLight }]}>
+                  Based on how often each leg&apos;s market has landed in its league historically.
+                </Text>
+              </View>
+            ) : null}
             <View style={styles.actionGrid}>
               <PressableScale accessibilityLabel="Generate booking code" accessibilityRole="button" onPress={handleGenerateCode} style={[styles.actionButton, { borderColor: theme.border, backgroundColor: theme.field }]}>
                 <Copy color={theme.primarySoft} size={16} />
@@ -611,5 +688,63 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+  },
+  sectionLabel: {
+    fontFamily: fonts.semibold,
+    fontSize: 11,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  stepperRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+  },
+  stepperButton: {
+    alignItems: 'center',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    width: 40,
+  },
+  stepperValue: {
+    fontFamily: fonts.extraBold,
+    fontSize: 20,
+  },
+  historyTag: {
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  historyTagText: {
+    fontFamily: fonts.bold,
+    fontSize: 11,
+  },
+  leagueActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  leagueActionButton: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    minHeight: 34,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  leagueActionText: {
+    fontFamily: fonts.bold,
+    fontSize: 12,
+  },
+  projectedBox: {
+    borderRadius: radius.lg,
+    gap: 4,
+    padding: spacing.md,
+  },
+  projectedValue: {
+    fontFamily: fonts.extraBold,
+    fontSize: 15,
   },
 });

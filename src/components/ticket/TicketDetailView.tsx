@@ -159,6 +159,16 @@ function MatchDetailRow({
         <Text style={[styles.metric, { color: theme.foreground }]}>{confidence}% confidence</Text>
         <StatusBadge label={match.matchResult ?? 'PENDING'} tone={resultTone(match.matchResult)} />
       </View>
+      {typeof match.baseRate === 'number' ? (
+        <View style={[styles.historyTag, { backgroundColor: theme.successSoft }]}>
+          <Text style={[styles.historyTagText, { color: theme.success }]}>
+            History {Math.round(match.baseRate * 100)}%
+            {typeof match.baseRateSample === 'number' && match.baseRateSample > 0
+              ? ` in ${match.baseRateSample} settled matches`
+              : ''}
+          </Text>
+        </View>
+      ) : null}
       <ProgressBar tone={match.status === 'KEPT' ? 'success' : 'warning'} value={confidence} />
 
       {evidence.slice(0, 2).map((item, index) => (
@@ -398,7 +408,20 @@ export function TicketDetailView({
                   <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.tileValue, { color: theme.foregroundStrong }]}>{data.optimizedOdds?.toFixed(2) ?? '-'}</Text>
                   <Text numberOfLines={1} style={[styles.tileLabel, { color: theme.muted }]}>Optimized odds</Text>
                 </View>
+                {typeof data.projectedWinRate === 'number' ? (
+                  <View style={[styles.metricTile, { backgroundColor: theme.successSoft, borderColor: theme.border }]}>
+                    <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.tileValue, { color: theme.success }]}>
+                      {Math.round(data.projectedWinRate * 100)}%
+                    </Text>
+                    <Text numberOfLines={1} style={[styles.tileLabel, { color: theme.muted }]}>Projected win</Text>
+                  </View>
+                ) : null}
               </View>
+              {typeof data.projectedWinRate === 'number' ? (
+                <Text style={[styles.summaryMeta, { color: theme.muted }]}>
+                  Projected win is based on how often each leg&apos;s market has landed in its league historically.
+                </Text>
+              ) : null}
             </GlassCard>
           </Animated.View>
 
@@ -652,6 +675,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+  },
+  historyTag: {
+    alignSelf: 'flex-start',
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  historyTagText: {
+    fontFamily: fonts.bold,
+    fontSize: 11,
   },
   metricTile: {
     borderRadius: radius.md,

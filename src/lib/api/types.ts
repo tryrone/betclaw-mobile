@@ -435,6 +435,8 @@ export type TicketDetail = {
     alternativeReason?: string | null;
     awayForm?: string | null;
     awayTeam: string;
+    baseRate?: number | null;
+    baseRateSample?: number | null;
     citations?: { snippet?: string | null; title?: string | null; url: string }[] | null;
     confidence?: number | null;
     confidenceReason?: string | null;
@@ -462,6 +464,7 @@ export type TicketDetail = {
   optimizedOdds?: number | null;
   originalCode?: string | null;
   originalOdds?: number | null;
+  projectedWinRate?: number | null;
   result?: TicketResult;
   shareToken?: string | null;
 };
