@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { AppBootGate } from '@/components/bootstrap/AppBootGate';
 import { AuthBootstrap } from '@/components/bootstrap/AuthBootstrap';
 import { NotificationBootstrap } from '@/components/bootstrap/NotificationBootstrap';
 import { FloatingToastProvider } from '@/components/ui';
@@ -70,6 +71,7 @@ function RootLayoutContent() {
             <Stack.Screen name="live-match" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="+not-found" />
           </Stack>
+          <AppBootGate />
         </ThemeProvider>
       </FloatingToastProvider>
     </GestureHandlerRootView>
