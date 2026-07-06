@@ -10,6 +10,7 @@ const NAV_CLEARANCE = 96;
 
 export function Screen({
   children,
+  floatingAction,
   hasTabs,
   onRefresh,
   refreshing,
@@ -17,6 +18,8 @@ export function Screen({
   scroll = true,
 }: {
   children: React.ReactNode;
+  /** Optional element pinned above the bottom nav (e.g. a floating action button). */
+  floatingAction?: React.ReactNode;
   hasTabs?: boolean;
   /** Enable pull-to-refresh; called when the user pulls down. */
   onRefresh?: () => void;
@@ -27,7 +30,7 @@ export function Screen({
 }) {
   const insets = useSafeAreaInsets();
   const theme = useAppTheme();
-  const bottomPadding = (hasTabs ? NAV_CLEARANCE : 24) + insets.bottom;
+  const bottomPadding = (hasTabs ? NAV_CLEARANCE : 24) + insets.bottom + (floatingAction ? 64 : 0);
   const statusBarTop = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0;
   const manualTopInset = safeTop ? 0 : Math.max(insets.top, statusBarTop);
   const contentPadding = {
@@ -61,6 +64,11 @@ export function Screen({
             <View style={[styles.content, styles.fill, contentPadding]}>{children}</View>
           </View>
         )}
+        {floatingAction ? (
+          <View pointerEvents="box-none" style={[styles.floatingAction, { bottom: (hasTabs ? NAV_CLEARANCE - 8 : 24) + insets.bottom }]}>
+            {floatingAction}
+          </View>
+        ) : null}
       </SafeAreaView>
     </Background>
   );
@@ -75,6 +83,13 @@ const styles = StyleSheet.create({
   },
   fill: {
     flex: 1,
+  },
+  floatingAction: {
+    alignItems: 'flex-end',
+    left: 0,
+    paddingHorizontal: layout.screenHorizontalGutter + 4,
+    position: 'absolute',
+    right: 0,
   },
   safe: {
     flex: 1,

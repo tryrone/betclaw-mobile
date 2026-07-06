@@ -1,5 +1,15 @@
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Bell, CheckCheck } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  ArrowUpCircle,
+  Bell,
+  CheckCheck,
+  Sparkles,
+  Target,
+  Wallet,
+  XCircle,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -9,7 +19,8 @@ import {
   useMarkNotificationReadMutation,
   useNotifications,
 } from '@/lib/api/hooks';
-import { useAppTheme } from '@/theme/colors';
+import type { NotificationItem } from '@/lib/api/types';
+import { useAppTheme, type AppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
@@ -20,6 +31,41 @@ function formatActivityDate(value: string | Date) {
     minute: '2-digit',
     month: 'short',
   });
+}
+
+type NotificationVisual = { icon: LucideIcon; color: string; soft: string };
+
+function visualForType(type: string | undefined, theme: AppTheme): NotificationVisual {
+  switch (type) {
+    case 'TICKET_BUILT':
+      return { icon: Sparkles, color: theme.primarySoft, soft: theme.primarySubtle };
+    case 'TICKET_OPTIMIZED':
+    case 'POLYMARKET_TRADE_OUTCOME':
+      return { icon: Target, color: theme.success, soft: theme.successSoft };
+    case 'PLAN_UPGRADED':
+      return { icon: ArrowUpCircle, color: theme.success, soft: theme.successSoft };
+    case 'PLAN_CANCELLED':
+      return { icon: XCircle, color: theme.danger, soft: theme.dangerSoft };
+    case 'PAYMENT_RETRY':
+    case 'PAYMENT_REMINDER':
+    case 'SUBSCRIPTION_REMINDER':
+      return { icon: Wallet, color: theme.warning, soft: theme.warningSoft };
+    default:
+      return { icon: Bell, color: theme.mutedLight, soft: theme.field };
+  }
+}
+
+function resolveDeepLink(item: NotificationItem): string | null {
+  const metadata = item.metadata;
+  if (metadata) {
+    if (typeof metadata.url === 'string' && metadata.url.startsWith('/')) {
+      return metadata.url;
+    }
+    if (typeof metadata.ticketId === 'string' && metadata.ticketId.length > 0) {
+      return `/ticket/${metadata.ticketId}`;
+    }
+  }
+  return null;
 }
 
 export default function NotificationsScreen() {
@@ -65,38 +111,55 @@ export default function NotificationsScreen() {
         </Animated.View>
       ) : null}
 
-      {items.map((item: any, index: number) => (
-        <Animated.View entering={enterUp(2 + index)} key={item.id}>
-          <PressableScale
-            accessibilityHint={item.readAt ? undefined : 'Marks this notification as read'}
-            accessibilityLabel={item.title}
-            accessibilityRole="button"
-            onPress={() => markRead.mutate(item.id)}
-            scaleTo={0.98}>
-            <GlassCard style={[styles.item, !item.readAt ? { borderColor: theme.selectionBorder } : null]}>
-              <View style={styles.itemTop}>
-                <View style={styles.itemTitleWrap}>
-                  {!item.readAt ? <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} /> : null}
-                  <Text
-                    numberOfLines={1}
-                    style={[styles.itemTitle, { color: item.readAt ? theme.mutedLight : theme.foregroundStrong }]}>
-                    {item.title}
-                  </Text>
+      {items.map((item: NotificationItem, index: number) => {
+        const visual = visualForType(item.type, theme);
+        const VisualIcon = visual.icon;
+        const deepLink = resolveDeepLink(item);
+        const handlePress = () => {
+          if (!item.readAt) markRead.mutate(item.id);
+          if (deepLink) router.push(deepLink as never);
+        };
+
+        return (
+          <Animated.View entering={enterUp(2 + index)} key={item.id}>
+            <PressableScale
+              accessibilityHint={deepLink ? 'Opens the related ticket' : item.readAt ? undefined : 'Marks this notification as read'}
+              accessibilityLabel={item.title}
+              accessibilityRole="button"
+              onPress={handlePress}
+              scaleTo={0.98}>
+              <GlassCard
+                style={[
+                  styles.item,
+                  !item.readAt ? { borderColor: theme.selectionBorder } : null,
+                ]}>
+                <View style={styles.itemTop}>
+                  <View style={styles.itemTitleWrap}>
+                    <View style={[styles.itemIcon, { backgroundColor: visual.soft }]}>
+                      <VisualIcon color={visual.color} size={16} />
+                    </View>
+                    {!item.readAt ? <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} /> : null}
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.itemTitle, { color: item.readAt ? theme.mutedLight : theme.foregroundStrong }]}>
+                      {item.title}
+                    </Text>
+                  </View>
+                  {item.readAt ? (
+                    <CheckCheck color={theme.muted} size={15} />
+                  ) : (
+                    <StatusBadge label="New" tone="accent" />
+                  )}
                 </View>
-                {item.readAt ? (
-                  <CheckCheck color={theme.muted} size={15} />
-                ) : (
-                  <StatusBadge label="New" tone="accent" />
-                )}
-              </View>
-              {item.description ? (
-                <Text style={[styles.itemText, { color: theme.mutedLight }]}>{item.description}</Text>
-              ) : null}
-              <Text style={[styles.itemDate, { color: theme.muted }]}>{formatActivityDate(item.createdAt)}</Text>
-            </GlassCard>
-          </PressableScale>
-        </Animated.View>
-      ))}
+                {item.description ? (
+                  <Text style={[styles.itemText, { color: theme.mutedLight }]}>{item.description}</Text>
+                ) : null}
+                <Text style={[styles.itemDate, { color: theme.muted }]}>{formatActivityDate(item.createdAt)}</Text>
+              </GlassCard>
+            </PressableScale>
+          </Animated.View>
+        );
+      })}
     </Screen>
   );
 }
@@ -118,6 +181,13 @@ const styles = StyleSheet.create({
   itemDate: {
     fontFamily: fonts.medium,
     fontSize: 11,
+  },
+  itemIcon: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    height: 30,
+    justifyContent: 'center',
+    width: 30,
   },
   itemText: {
     fontFamily: fonts.medium,

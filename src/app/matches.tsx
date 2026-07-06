@@ -4,8 +4,8 @@ import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { enterUp, GlassCard, IconButton, PressableScale, ProgressBar, Screen, StatusBadge, TeamLogo } from '@/components/ui';
-import { dateChips, type MatchCardData } from '@/data/mock';
+import { DashboardPillField, enterUp, GlassCard, IconButton, PressableScale, ProgressBar, Screen, StatusBadge, TeamLogo } from '@/components/ui';
+import { type MatchCardData } from '@/data/mock';
 import { useHomeFeed, useLeagues } from '@/lib/api/hooks';
 import { flattenHomeFeed } from '@/lib/mobile-mappers';
 import { useAppTheme } from '@/theme/colors';
@@ -16,6 +16,32 @@ type LeagueRailOption = {
   id: string;
   label: string;
 };
+
+type DateChip = {
+  date: string;
+  day: string;
+  id: string;
+};
+
+function dateKeyFromDate(date: Date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/** Real calendar strip: today plus the next six days. */
+function buildDateChips(): DateChip[] {
+  return Array.from({ length: 7 }, (_, offset) => {
+    const date = new Date();
+    date.setUTCDate(date.getUTCDate() + offset);
+    return {
+      date: date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' }),
+      day: offset === 0 ? 'Today' : date.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short' }),
+      id: dateKeyFromDate(date),
+    };
+  });
+}
 
 function LeagueRail({
   onSelect,
@@ -52,9 +78,11 @@ function LeagueRail({
 }
 
 function DateRail({
+  chips,
   onSelect,
   selected,
 }: {
+  chips: DateChip[];
   onSelect: (dateId: string) => void;
   selected: string;
 }) {
@@ -62,7 +90,7 @@ function DateRail({
 
   return (
     <ScrollView contentContainerStyle={styles.railContent} horizontal showsHorizontalScrollIndicator={false} style={styles.rail}>
-      {dateChips.map((chip) => {
+      {chips.map((chip) => {
         const active = chip.id === selected;
         return (
           <PressableScale
@@ -119,13 +147,13 @@ function MatchRow({ match }: { match: MatchCardData }) {
 export default function MatchesScreen() {
   const router = useRouter();
   const theme = useAppTheme();
+  const dateChipOptions = useMemo(() => buildDateChips(), []);
   const [selectedLeague, setSelectedLeague] = useState('all');
-  const [selectedDate, setSelectedDate] = useState('today');
-  const leagueDateRange = selectedDate === 'today' ? 'today' : selectedDate === 'tomorrow' ? 'tomorrow' : 'week';
-  const leagueList = useLeagues({
-    dateRange: leagueDateRange,
-    windowDays: selectedDate === 'today' ? 1 : 3,
-  });
+  const [selectedDate, setSelectedDate] = useState(dateChipOptions[0].id);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const trimmedQuery = query.trim();
+  const leagueList = useLeagues({ date: selectedDate, windowDays: 1 });
   const leagueOptions = useMemo<LeagueRailOption[]>(
     () => [
       { id: 'all', label: 'All' },
@@ -138,26 +166,47 @@ export default function MatchesScreen() {
   );
   const activeLeague = leagueOptions.some((league) => league.id === selectedLeague) ? selectedLeague : 'all';
   const homeFeed = useHomeFeed({
+    date: selectedDate,
     leagueKey: activeLeague !== 'all' ? activeLeague : undefined,
     limit: 48,
-    windowDays: selectedDate === 'today' ? 1 : 3,
+    query: trimmedQuery || undefined,
+    windowDays: 1,
   });
   const visibleMatches = useMemo(() => flattenHomeFeed(homeFeed.data), [homeFeed.data]);
-  const sectionTitle = leagueOptions.find((league) => league.id === activeLeague)?.label ?? 'All leagues';
+  const sectionTitle = trimmedQuery
+    ? `Results for "${trimmedQuery}"`
+    : leagueOptions.find((league) => league.id === activeLeague)?.label ?? 'All leagues';
 
   return (
     <Screen onRefresh={() => void homeFeed.refetch()} refreshing={homeFeed.isRefetching}>
       <Animated.View entering={enterUp(0)} style={styles.header}>
         <IconButton icon={ArrowLeft} label="Go back" onPress={() => router.back()} />
         <Text style={[styles.title, { color: theme.foregroundStrong }]}>Matches</Text>
-        <IconButton icon={Search} label="Search matches" />
+        <IconButton
+          icon={Search}
+          label={searchOpen ? 'Hide search' : 'Search matches'}
+          onPress={() => setSearchOpen((open) => !open)}
+        />
       </Animated.View>
+
+      {searchOpen ? (
+        <Animated.View entering={enterUp(1)}>
+          <DashboardPillField
+            autoFocus
+            icon={Search}
+            onChangeText={setQuery}
+            placeholder="Search teams or leagues"
+            returnKeyType="search"
+            value={query}
+          />
+        </Animated.View>
+      ) : null}
 
       <Animated.View entering={enterUp(1)}>
         <LeagueRail onSelect={setSelectedLeague} options={leagueOptions} selected={activeLeague} />
       </Animated.View>
       <Animated.View entering={enterUp(2)}>
-        <DateRail onSelect={setSelectedDate} selected={selectedDate} />
+        <DateRail chips={dateChipOptions} onSelect={setSelectedDate} selected={selectedDate} />
       </Animated.View>
 
       <Animated.View entering={enterUp(3)} style={styles.sectionHeader}>
@@ -172,7 +221,11 @@ export default function MatchesScreen() {
               {homeFeed.isLoading ? 'Loading fixtures' : 'No fixtures found'}
             </Text>
             <Text style={[styles.emptyCopy, { color: theme.muted }]}>
-              {homeFeed.isLoading ? 'Fetching the latest matchday slate.' : 'Try another league or date.'}
+              {homeFeed.isLoading
+                ? 'Fetching the latest matchday slate.'
+                : trimmedQuery
+                  ? `No matches for "${trimmedQuery}". Try another search.`
+                  : 'Try another league or date.'}
             </Text>
           </GlassCard>
         </Animated.View>

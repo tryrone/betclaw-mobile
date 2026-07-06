@@ -335,10 +335,16 @@ export type NotificationSummary = {
   unreadCount: number;
 };
 
+export type NotificationMetadata = {
+  ticketId?: string;
+  url?: string;
+} & Record<string, unknown>;
+
 export type NotificationItem = {
   createdAt: string | Date;
   description?: string | null;
   id: string;
+  metadata?: NotificationMetadata | null;
   readAt?: string | Date | null;
   title: string;
   type?: string;

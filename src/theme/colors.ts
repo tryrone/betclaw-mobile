@@ -3,10 +3,9 @@ import { createContext, createElement, useCallback, useContext, useEffect, useMe
 import { useColorScheme, type ColorSchemeName } from 'react-native';
 
 /**
- * The dashboard redesign is dark-only. A single palette is defined and mapped to
- * both scheme keys so existing theme plumbing (system/light/dark preference,
- * settings toggle) keeps working. If a real light theme ships later, replace the
- * `light` mapping with its own palette.
+ * Two palettes share the same token contract (identical keys) so every component
+ * that reads `useAppTheme()` recolors automatically. `light` and `dark` are wired
+ * to the theme controller (system / light / dark preference + Settings toggle).
  */
 const darkPalette = {
   background: '#020605',
@@ -56,8 +55,56 @@ const darkPalette = {
   inverse: '#02110f',
 } as const;
 
+const lightPalette: Record<keyof typeof darkPalette, string> = {
+  background: '#eef1f5',
+  backgroundAlt: '#e4e9ef',
+  panel: 'rgba(255,255,255,0.92)',
+  panelElevated: 'rgba(255,255,255,0.96)',
+  card: '#ffffff',
+  cardMuted: '#f4f7fa',
+  surface: 'rgba(15,23,32,0.05)',
+  surfaceHover: 'rgba(15,23,32,0.09)',
+  input: 'rgba(15,23,32,0.05)',
+  field: 'rgba(15,23,32,0.05)',
+  border: 'rgba(15,23,32,0.10)',
+  borderStrong: 'rgba(15,23,32,0.18)',
+  borderAccent: 'rgba(13,148,136,0.32)',
+  selectionBorder: 'rgba(13,148,136,0.5)',
+  foreground: '#243040',
+  foregroundStrong: '#0b1220',
+  muted: '#6b7684',
+  mutedLight: '#3f4a58',
+  primary: '#0d9488',
+  primaryDark: '#02231d',
+  primarySoft: '#0f766e',
+  primarySubtle: 'rgba(13,148,136,0.12)',
+  primaryMuted: 'rgba(13,148,136,0.16)',
+  primaryGlowStrong: 'rgba(13,148,136,0.20)',
+  primaryGlowSoft: 'rgba(13,148,136,0.06)',
+  accent: '#d97706',
+  accentMuted: 'rgba(217,119,6,0.14)',
+  accentGlowSoft: 'rgba(217,119,6,0.06)',
+  success: '#16a34a',
+  successSoft: 'rgba(22,163,74,0.14)',
+  warning: '#d97706',
+  warningSoft: 'rgba(217,119,6,0.14)',
+  danger: '#dc2626',
+  dangerSoft: 'rgba(220,38,38,0.12)',
+  live: '#ef2d5e',
+  progressFill: '#0d9488',
+  statTrack: 'rgba(15,23,32,0.10)',
+  statHome: '#0d9488',
+  statAway: '#d97706',
+  tabBar: '#ffffff',
+  overlay: 'rgba(15,23,32,0.35)',
+  shadow: 'rgba(15,23,32,0.20)',
+  white: '#ffffff',
+  black: '#000000',
+  inverse: '#ffffff',
+};
+
 export const colorPalettes = {
-  light: { mode: 'light', ...darkPalette },
+  light: { mode: 'light', ...lightPalette },
   dark: { mode: 'dark', ...darkPalette },
 } as const;
 

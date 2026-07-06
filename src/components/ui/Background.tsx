@@ -7,14 +7,15 @@ import { useAppGradients } from '@/theme/gradients';
 export function Background({ children }: { children: React.ReactNode }) {
   const theme = useAppTheme();
   const gradients = useAppGradients();
+  const glowOpacity = theme.mode === 'light' ? 0.12 : 0.35;
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <LinearGradient colors={gradients.appBackground} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={StyleSheet.absoluteFill} />
-      <View style={[styles.radialGlow, styles.tealGlow, { backgroundColor: theme.primarySubtle }]} />
-      <View style={[styles.radialGlow, styles.amberGlow, { backgroundColor: theme.accentMuted }]} />
+      <View style={[styles.radialGlow, styles.tealGlow, { backgroundColor: theme.primarySubtle, opacity: glowOpacity }]} />
+      <View style={[styles.radialGlow, styles.amberGlow, { backgroundColor: theme.accentMuted, opacity: glowOpacity }]} />
       <LinearGradient
-        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.30)']}
+        colors={theme.mode === 'light' ? ['rgba(255,255,255,0)', 'rgba(15,23,32,0.04)'] : ['rgba(0,0,0,0)', 'rgba(0,0,0,0.30)']}
         pointerEvents="none"
         style={StyleSheet.absoluteFill}
       />

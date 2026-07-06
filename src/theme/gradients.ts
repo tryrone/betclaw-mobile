@@ -1,6 +1,5 @@
 import { useThemeController } from '@/theme/colors';
 
-/** Dark-only design: one gradient set mapped to both scheme keys (see colors.ts). */
 const darkGradients = {
   appBackground: ['#020605', '#061813', '#020403'] as const,
   card: ['#0c1815', '#080e0d'] as const,
@@ -16,8 +15,21 @@ const darkGradients = {
   navActive: ['rgba(46,242,208,0.22)', 'rgba(46,242,208,0.06)'] as const,
 } as const;
 
+/** Light counterpart — same keys so components stay theme-agnostic. Kept neutral and low-chroma to avoid metallic/colour-banding on light surfaces. */
+const lightGradients = {
+  appBackground: ['#f4f6f9', '#eef1f5', '#f4f6f9'] as const,
+  card: ['#ffffff', '#f7f9fb'] as const,
+  hero: ['#ffffff', '#f2f8f7', '#eef3f6'] as const,
+  primaryButton: ['#3df0d2', '#0d9488'] as const,
+  amberCard: ['#fff9ef', '#f7f9fb'] as const,
+  matchHero: ['#ffffff', '#f3f8f7', '#eef3f6'] as const,
+  dock: ['rgba(255,255,255,0.94)', 'rgba(246,248,251,0.94)', 'rgba(255,255,255,0.94)'] as const,
+  sheet: ['rgba(244,250,249,0.97)', 'rgba(255,255,255,0.97)', 'rgba(244,247,250,0.97)'] as const,
+  navActive: ['rgba(13,148,136,0.16)', 'rgba(13,148,136,0.04)'] as const,
+} as const;
+
 export const gradientPalettes = {
-  light: darkGradients,
+  light: lightGradients,
   dark: darkGradients,
 } as const;
 

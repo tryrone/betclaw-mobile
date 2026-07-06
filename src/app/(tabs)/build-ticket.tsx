@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Bot, Check, Copy, Minus, Plus, Share2, SlidersHorizontal, Target, Trophy } from 'lucide-react-native';
+import { ArrowLeft, ArrowUpRight, Bot, Check, Copy, Minus, Plus, Share2, SlidersHorizontal, Target, Trophy } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -58,6 +58,14 @@ const dateOptions = [
 ];
 
 const LEAGUE_PREVIEW_COUNT = 8;
+const MIN_GAMES = 1;
+const MAX_GAMES = 25;
+const GAMES_STEP_FAST = 5;
+
+function clampGames(value: number) {
+  if (!Number.isFinite(value)) return MIN_GAMES;
+  return Math.max(MIN_GAMES, Math.min(MAX_GAMES, Math.round(value)));
+}
 
 function OptionPill({
   active,
@@ -182,7 +190,7 @@ export default function BuildTicketScreen() {
       {
         date: selectedDate,
         fixtureWindowDays: 7,
-        gameCount: Math.max(1, Math.min(40, Number(gameCount) || 5)),
+        gameCount: clampGames(Number(gameCount) || 5),
         leagueKeys,
         marketPresetIds: marketIds,
         notes: notes.trim() || undefined,
@@ -336,24 +344,39 @@ export default function BuildTicketScreen() {
               <View style={styles.stepperRow}>
                 <PressableScale
                   accessibilityLabel="Fewer games"
+                  accessibilityHint="Long-press to remove five at once"
                   accessibilityRole="button"
-                  onPress={() => setGameCount(String(Math.max(1, (Number(gameCount) || 5) - 1)))}
+                  delayLongPress={250}
+                  onLongPress={() => setGameCount(String(clampGames((Number(gameCount) || 5) - GAMES_STEP_FAST)))}
+                  onPress={() => setGameCount(String(clampGames((Number(gameCount) || 5) - 1)))}
                   style={[styles.stepperButton, { backgroundColor: theme.primarySubtle, borderColor: theme.border }]}>
                   <Minus color={theme.primarySoft} size={16} />
                 </PressableScale>
-                <Text style={[styles.stepperValue, { color: theme.foregroundStrong }]}>
-                  {Math.max(1, Math.min(10, Number(gameCount) || 5))}
-                </Text>
+                <TextInput
+                  accessibilityLabel="Number of games"
+                  keyboardType="number-pad"
+                  maxLength={2}
+                  onBlur={() => setGameCount(String(clampGames(Number(gameCount) || MIN_GAMES)))}
+                  onChangeText={(text) => setGameCount(text.replace(/[^0-9]/g, ''))}
+                  onEndEditing={() => setGameCount(String(clampGames(Number(gameCount) || MIN_GAMES)))}
+                  selectTextOnFocus
+                  style={[styles.stepperValueInput, { color: theme.foregroundStrong }]}
+                  textAlign="center"
+                  value={gameCount}
+                />
                 <PressableScale
                   accessibilityLabel="More games"
+                  accessibilityHint="Long-press to add five at once"
                   accessibilityRole="button"
-                  onPress={() => setGameCount(String(Math.min(10, (Number(gameCount) || 5) + 1)))}
+                  delayLongPress={250}
+                  onLongPress={() => setGameCount(String(clampGames((Number(gameCount) || 5) + GAMES_STEP_FAST)))}
+                  onPress={() => setGameCount(String(clampGames((Number(gameCount) || 5) + 1)))}
                   style={[styles.stepperButton, { backgroundColor: theme.primarySubtle, borderColor: theme.border }]}>
                   <Plus color={theme.primarySoft} size={16} />
                 </PressableScale>
               </View>
               <Text style={[styles.helper, { color: theme.muted }]}>
-                Historical screening may keep fewer legs to protect the win rate.
+                Up to {MAX_GAMES} legs. Screening may keep fewer.
               </Text>
             </View>
             <View style={[styles.inputBox, { backgroundColor: theme.field, borderColor: theme.border }]}>
@@ -511,6 +534,14 @@ export default function BuildTicketScreen() {
                 <Text style={[styles.actionText, { color: theme.foreground }]}>Share</Text>
               </PressableScale>
             </View>
+            <PressableScale
+              accessibilityLabel="View full ticket"
+              accessibilityRole="button"
+              onPress={() => doneTicket?.id && router.push(`/ticket/${doneTicket.id}` as never)}
+              style={[styles.actionButton, { borderColor: theme.selectionBorder, backgroundColor: theme.primarySubtle }]}>
+              <ArrowUpRight color={theme.primarySoft} size={16} />
+              <Text style={[styles.actionText, { color: theme.primarySoft }]}>View full ticket</Text>
+            </PressableScale>
             {generateCode.data?.bookingCode ? (
               <PressableScale accessibilityLabel="Copy generated code" accessibilityRole="button" onPress={() => handleCopyCode(generateCode.data?.bookingCode)} style={[styles.codeBox, { backgroundColor: theme.field, borderColor: theme.selectionBorder }]}>
                 <Text style={[styles.codeText, { color: theme.primarySoft }]}>{generateCode.data.bookingCode}</Text>
@@ -709,9 +740,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 40,
   },
-  stepperValue: {
+  stepperValueInput: {
+    flex: 1,
     fontFamily: fonts.extraBold,
     fontSize: 20,
+    padding: 0,
   },
   historyTag: {
     borderRadius: radius.pill,

@@ -621,7 +621,11 @@ function MatchHero({
   return (
     <GlassCard gradient="matchHero" style={styles.heroCard}>
       <LinearGradient
-        colors={['rgba(46,242,208,0.12)', 'rgba(251,191,36,0.08)', 'rgba(2,17,15,0)']}
+        colors={
+          theme.mode === 'light'
+            ? ['rgba(13,148,136,0.06)', 'rgba(13,148,136,0.02)', 'rgba(255,255,255,0)']
+            : ['rgba(46,242,208,0.12)', 'rgba(251,191,36,0.08)', 'rgba(2,17,15,0)']
+        }
         end={{ x: 1, y: 0 }}
         start={{ x: 0, y: 0 }}
         style={StyleSheet.absoluteFill}
@@ -638,26 +642,26 @@ function MatchHero({
       <View style={styles.heroTeamsRow}>
         <View style={styles.heroTeam}>
           <TeamLogo logoUrl={match.homeLogoUrl} name={match.home} size={58} />
-          <Text numberOfLines={2} style={styles.heroTeamName}>{match.home}</Text>
-          <Text style={styles.sideLabel}>Home</Text>
+          <Text numberOfLines={2} style={[styles.heroTeamName, { color: theme.foregroundStrong }]}>{match.home}</Text>
+          <Text style={[styles.sideLabel, { color: theme.muted }]}>Home</Text>
           <FormPills values={homeForm} />
         </View>
 
         <View style={styles.heroCenter}>
-          <Text adjustsFontSizeToFit numberOfLines={1} style={styles.scoreText}>{score}</Text>
+          <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.scoreText, { color: theme.foregroundStrong }]}>{score}</Text>
           <View style={styles.liveTimeRow}>
             {!isFinished(insight) ? (
               <View style={[styles.liveDot, { backgroundColor: isLiveMatch(match, insight) ? theme.live : theme.primary }]} />
             ) : null}
-            <Text numberOfLines={1} style={styles.liveClock}>{statusLabel(match, insight)}</Text>
+            <Text numberOfLines={1} style={[styles.liveClock, { color: theme.mutedLight }]}>{statusLabel(match, insight)}</Text>
           </View>
           <ConfidenceRing value={readinessScore} />
         </View>
 
         <View style={[styles.heroTeam, styles.heroTeamAway]}>
           <TeamLogo logoUrl={match.awayLogoUrl} name={match.away} size={58} />
-          <Text numberOfLines={2} style={[styles.heroTeamName, styles.heroAwayName]}>{match.away}</Text>
-          <Text style={styles.sideLabel}>Away</Text>
+          <Text numberOfLines={2} style={[styles.heroTeamName, styles.heroAwayName, { color: theme.foregroundStrong }]}>{match.away}</Text>
+          <Text style={[styles.sideLabel, { color: theme.muted }]}>Away</Text>
           <FormPills alignRight values={awayForm} />
         </View>
       </View>
@@ -1308,10 +1312,10 @@ export default function MatchDetailScreen() {
           accessibilityRole="button"
           onPress={() => router.push({ pathname: '/live-match', params: { fixtureId: match.id } } as any)}
           style={[styles.watchButton, { borderColor: live ? theme.selectionBorder : theme.border, backgroundColor: theme.field }]}>
-          <LinearGradient colors={live ? [theme.primaryGlowStrong, theme.accentMuted] : [theme.surface, theme.primarySubtle]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={StyleSheet.absoluteFill} />
-          {live ? <Video color={theme.accent} size={18} /> : <Radio color={theme.primary} size={18} />}
-          <Text style={[styles.watchButtonText, { color: live ? '#ffffff' : theme.primary }]}>{ctaLabel}</Text>
-          <ChevronRight color={live ? '#ffffff' : theme.primary} size={18} />
+          <LinearGradient colors={live ? [theme.primary, theme.primarySoft] : [theme.surface, theme.primarySubtle]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={StyleSheet.absoluteFill} />
+          {live ? <Video color={theme.primaryDark} size={18} /> : <Radio color={theme.primary} size={18} />}
+          <Text style={[styles.watchButtonText, { color: live ? theme.primaryDark : theme.primary }]}>{ctaLabel}</Text>
+          <ChevronRight color={live ? theme.primaryDark : theme.primary} size={18} />
         </PressableScale>
       </Animated.View>
 

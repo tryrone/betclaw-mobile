@@ -1,60 +1,39 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
-import * as Linking from 'expo-linking';
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import {
-  ArrowRight,
   Bell,
-  CalendarDays,
-  Gift,
+  ChevronLeft,
+  ChevronRight,
   LoaderCircle,
-  MessageCircle,
   Search,
-  ShieldCheck,
   Trophy,
-  UsersRound,
-  Wallet,
+  Zap,
 } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { FeedMatchCard } from '@/components/home/FeedMatchCard';
 import { LiveNowCarousel } from '@/components/home/LiveNowCarousel';
 import {
-  DashboardButton,
   DashboardChip,
   DashboardGlassCard,
-  DashboardMetric,
-  DashboardPillField,
-  DashboardSectionHeader,
   DashboardStatePanel,
   PressableScale,
   Screen,
-  useToast,
 } from '@/components/ui';
 import {
-  useCreateTelegramCommunityInviteMutation,
   useInfiniteHomeFeed,
   useLeagues,
   useMe,
   useNotificationSummary,
-  useSubscriptionCurrent,
-  useTelegramCommunityStatus,
 } from '@/lib/api/hooks';
-import type {
-  FeedMatch,
-  HomeFeed,
-  LeagueOption,
-  TelegramCommunityInvite,
-  TelegramCommunityStatus,
-} from '@/lib/api/types';
+import type { FeedMatch, HomeFeed, LeagueOption } from '@/lib/api/types';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
 const userAvatar = require('@/../assets/images/user_avatar.png');
 const ALL_LEAGUES_KEY = '__all_leagues__';
-const COMMUNITY_BANNER_HIDDEN_PREFIX = 'betclaw.community-banner.hidden.';
 
 type DateOption = {
   main: string;
@@ -62,19 +41,24 @@ type DateOption = {
   value: string;
 };
 
+type StatusFilter = 'all' | 'live' | 'upcoming';
+
 type LeagueSection = LeagueOption & {
   matches: FeedMatch[];
 };
+
+const statusTabs: { id: StatusFilter | 'today' | 'yesterday'; label: string }[] = [
+  { id: 'live', label: 'Live' },
+  { id: 'today', label: 'Today' },
+  { id: 'yesterday', label: 'Yesterday' },
+  { id: 'upcoming', label: 'Upcoming' },
+];
 
 function dateKeyFromDate(date: Date) {
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
   const day = String(date.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-function communityBannerHiddenKey(userId: string) {
-  return `${COMMUNITY_BANNER_HIDDEN_PREFIX}${userId}`;
 }
 
 function dateKey(offset: number) {
@@ -94,35 +78,25 @@ function shiftDateKey(key: string, offset: number) {
   return dateKeyFromDate(date);
 }
 
-function dateStripKeys(todayKey: string) {
-  return Array.from({ length: 7 }, (_, index) => shiftDateKey(todayKey, index - 3));
+/** Seven-day window centered on the anchor so the selected day stays in the middle. */
+function dateStripKeys(anchorKey: string) {
+  return Array.from({ length: 7 }, (_, index) => shiftDateKey(anchorKey, index - 3));
 }
 
-function formatDateStripMain(date: Date, todayKey = dateKey(0)) {
+function formatDateStripMain(date: Date, todayKey: string) {
   const value = dateKeyFromDate(date);
   if (value === todayKey) return 'Today';
-  if (value === shiftDateKey(todayKey, -1)) return 'Yesterday';
-  if (value === shiftDateKey(todayKey, 1)) return 'Tomorrow';
-  return date.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short' });
+  if (value === shiftDateKey(todayKey, -1)) return 'Yest';
+  if (value === shiftDateKey(todayKey, 1)) return 'Tmrw';
+  return date.toLocaleDateString('en-US', { day: 'numeric', timeZone: 'UTC' });
 }
 
 function formatDateStripSub(date: Date) {
-  return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  return date.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short' });
 }
 
-function formatSelectedDateLabel(key: string) {
-  return dateFromKey(key).toLocaleDateString('en-US', {
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-    weekday: 'short',
-    year: 'numeric',
-  });
-}
-
-function formatCompact(value?: number | null) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return 'Wallet';
-  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 1, notation: 'compact' }).format(value)} tokens`;
+function formatMonthLabel(key: string) {
+  return dateFromKey(key).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC', year: 'numeric' });
 }
 
 function matchKickoffTime(match: FeedMatch) {
@@ -130,32 +104,28 @@ function matchKickoffTime(match: FeedMatch) {
   return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
 }
 
+function matchStatusUpper(match: FeedMatch) {
+  return String(match.dataSnapshot?.status ?? match.status ?? '').toUpperCase();
+}
 
+function matchIsFinished(match: FeedMatch) {
+  return ['FT', 'AET', 'PEN', 'FINISHED'].includes(matchStatusUpper(match)) || match.dataSnapshot?.phase === 'finished';
+}
 
-
-
-
-function getConfidence(match: FeedMatch) {
-  return Math.max(
-    0,
-    Math.min(
-      99,
-      Math.round(
-        match.predictionView?.confidence ??
-          match.bestMarket?.confidence ??
-          match.predictionView?.edgeScore ??
-          match.bestMarket?.edgeScore ??
-          match.dataReadiness?.score ??
-          match.dataSnapshot?.readiness?.score ??
-          62,
-      ),
-    ),
+function matchIsLive(match: FeedMatch) {
+  const status = matchStatusUpper(match);
+  const elapsedMinute = match.elapsedMinute ?? match.dataSnapshot?.elapsedMinute;
+  if (matchIsFinished(match)) return false;
+  return (
+    match.dataSnapshot?.phase === 'live' ||
+    ['LIVE', '1H', '2H', 'HT', 'ET', 'BT', 'P', 'SUSP', 'INT'].includes(status) ||
+    (typeof elapsedMinute === 'number' && Number.isFinite(elapsedMinute))
   );
 }
 
-
-
-
+function matchIsUpcoming(match: FeedMatch) {
+  return !matchIsLive(match) && !matchIsFinished(match);
+}
 
 function compareLeagues(left: LeagueOption, right: LeagueOption) {
   return (right.matchCount ?? 0) - (left.matchCount ?? 0) || left.name.localeCompare(right.name);
@@ -188,7 +158,6 @@ function buildLeagueSections(feedPages: HomeFeed[]) {
         existing.matches.push(match);
       }
 
-      existing.matches.sort((left, right) => matchKickoffTime(left) - matchKickoffTime(right));
       sections.set(key, existing);
       seenMatches.set(key, seen);
     }
@@ -197,179 +166,86 @@ function buildLeagueSections(feedPages: HomeFeed[]) {
   return Array.from(sections.values()).filter((section) => section.matches.length > 0).sort(compareLeagues);
 }
 
-function DashboardUtilityBar({
+function GreetingHeader({
   image,
   name,
-  query,
-  tokenBalance,
   unreadCount,
-  onQueryChange,
+  onBell,
+  onSearch,
 }: {
   image?: string | null;
   name?: string | null;
-  query: string;
-  tokenBalance?: number | null;
   unreadCount: number;
-  onQueryChange: (value: string) => void;
+  onBell: () => void;
+  onSearch: () => void;
 }) {
-  const router = useRouter();
   const theme = useAppTheme();
 
   return (
-    <View style={styles.utility}>
-      <DashboardPillField icon={Search} placeholder="Search teams or leagues" value={query} onChangeText={onQueryChange} />
-      <View style={styles.utilityActions}>
-        <Link href="/(tabs)/wallet" asChild>
-          <PressableScale
-            accessibilityRole="button"
-            style={StyleSheet.flatten([styles.walletPill, { backgroundColor: theme.surface, borderColor: theme.border }])}>
-            <Text numberOfLines={1} style={[styles.walletText, { color: theme.foregroundStrong }]}>
-              {formatCompact(tokenBalance)}
-            </Text>
-            <Wallet color={theme.primary} size={15} />
-          </PressableScale>
-        </Link>
+    <View style={styles.greeting}>
+      <View style={styles.greetingLeft}>
+        <Image
+          source={image ? { uri: image } : userAvatar}
+          style={[styles.avatar, { borderColor: theme.border }]}
+          contentFit="cover"
+        />
+        <View style={styles.greetingCopy}>
+          <Text style={[styles.greetingEyebrow, { color: theme.muted }]}>Welcome Back</Text>
+          <Text numberOfLines={1} style={[styles.greetingName, { color: theme.foregroundStrong }]}>
+            {name?.split(' ').slice(0, 2).join(' ') ?? 'there'}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.greetingActions}>
+        <PressableScale
+          accessibilityLabel="Search teams or leagues"
+          accessibilityRole="button"
+          onPress={onSearch}
+          style={[styles.iconPill, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Search color={theme.foregroundStrong} size={17} />
+        </PressableScale>
         <PressableScale
           accessibilityLabel="Notifications"
           accessibilityRole="button"
-          onPress={() => router.push('/notifications' as any)}
+          onPress={onBell}
           style={[styles.iconPill, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Bell color={theme.foregroundStrong} size={17} />
           {unreadCount > 0 ? <View style={[styles.unreadDot, { backgroundColor: theme.live }]} /> : null}
         </PressableScale>
-        {image ? (
-          <Image source={{ uri: image }} style={[styles.avatar, { borderColor: theme.border }]} contentFit="cover" />
-        ) : (
-          <Image source={userAvatar} style={[styles.avatar, { borderColor: theme.border }]} contentFit="cover" />
-        )}
-        <Text numberOfLines={1} style={[styles.userName, { color: theme.mutedLight }]}>
-          {name?.split(' ')[0] ?? 'there'}
-        </Text>
       </View>
     </View>
   );
 }
 
-function PredictionHero({
-  bestAccuracy,
-  isLoading,
-  matchCount,
-  selectedDateLabel,
+function BuildSlipFab({ onPress }: { onPress: () => void }) {
+  const theme = useAppTheme();
+
+  return (
+    <PressableScale
+      accessibilityLabel="Build a slip with AI"
+      accessibilityRole="button"
+      onPress={onPress}
+      scaleTo={0.96}
+      style={[styles.buildFab, { backgroundColor: theme.primary, shadowColor: theme.shadow }]}>
+      <Zap color={theme.primaryDark} size={17} />
+      <Text style={[styles.buildFabText, { color: theme.primaryDark }]}>Build slip</Text>
+    </PressableScale>
+  );
+}
+
+function MonthDateStrip({
+  dates,
+  monthLabel,
+  selectedDate,
+  onSelect,
+  onShift,
 }: {
-  bestAccuracy: number;
-  isLoading: boolean;
-  matchCount: number;
-  selectedDateLabel: string;
+  dates: DateOption[];
+  monthLabel: string;
+  selectedDate: string;
+  onSelect: (date: string) => void;
+  onShift: (offset: number) => void;
 }) {
-  const router = useRouter();
-  const theme = useAppTheme();
-
-  return (
-    <DashboardGlassCard gradient="hero" style={styles.hero}>
-      <View style={styles.heroGlow} pointerEvents="none" />
-      <View style={styles.heroContent}>
-        <Text style={[styles.heroTitle, { color: theme.foregroundStrong }]}>
-          <Text style={{ color: theme.primary }}>AI</Text> Matchday Agent
-        </Text>
-        <Text style={[styles.heroCopy, { color: theme.mutedLight }]}>
-          Browse every verified fixture for the selected day, including live scores, final results, and available match context.
-        </Text>
-        <View style={styles.heroActions}>
-          <DashboardButton icon={ArrowRight} iconChip onPress={() => router.push('/(tabs)/build-ticket' as any)}>
-            Build Slip
-          </DashboardButton>
-          <View style={[styles.datePill, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <CalendarDays color={theme.primary} size={16} />
-            <Text style={[styles.datePillText, { color: theme.foregroundStrong }]}>{selectedDateLabel}</Text>
-          </View>
-        </View>
-      </View>
-      <View style={styles.metricsRow}>
-        <DashboardMetric icon={CalendarDays} label="Matches" value={isLoading ? '...' : String(matchCount)} />
-        <DashboardMetric icon={ShieldCheck} label="Accuracy" value={bestAccuracy ? `${bestAccuracy}%` : 'Pending'} />
-        <DashboardMetric icon={Trophy} label="Mode" value="Live" />
-      </View>
-    </DashboardGlassCard>
-  );
-}
-
-function TelegramCommunityCard({
-  invite,
-  isCreating,
-  isLoading,
-  onJoin,
-  status,
-}: {
-  invite: TelegramCommunityInvite | null;
-  isCreating: boolean;
-  isLoading: boolean;
-  onJoin: () => void;
-  status?: TelegramCommunityStatus;
-}) {
-  const theme = useAppTheme();
-  const ready = Boolean(status?.enabled && status.configured);
-  const communityName = status?.communityName ?? 'BetsClaw Community';
-  const inviteExpiry = invite
-    ? new Date(invite.expiresAt).toLocaleString(undefined, { day: 'numeric', hour: 'numeric', minute: '2-digit', month: 'short' })
-    : null;
-
-  return (
-    <DashboardGlassCard gradient="matchHero" style={styles.communityCard}>
-      <View style={styles.communityTop}>
-        <View style={[styles.communityIcon, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
-          <MessageCircle color={theme.primary} size={22} />
-        </View>
-        <View style={styles.communityCopy}>
-          <View style={styles.communityTitleRow}>
-            <Text numberOfLines={2} style={[styles.communityTitle, { color: theme.foregroundStrong }]}>
-              {communityName}
-            </Text>
-            <View style={[styles.privateBadge, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-              <UsersRound color={theme.mutedLight} size={12} />
-              <Text style={[styles.privateBadgeText, { color: theme.mutedLight }]}>Community</Text>
-            </View>
-          </View>
-          <Text style={[styles.communityText, { color: theme.mutedLight }]}>Talk slips, match context, and live reactions with other BetsClaw users.</Text>
-        </View>
-      </View>
-      <View style={styles.communityFooter}>
-        <DashboardButton icon={isCreating || isLoading ? LoaderCircle : MessageCircle} onPress={onJoin} style={styles.communityButton}>
-          {ready ? 'Join Community' : 'Setup Pending'}
-        </DashboardButton>
-        {inviteExpiry ? (
-          <Text numberOfLines={1} style={[styles.communityStatus, { color: theme.muted }]}>Expires {inviteExpiry}</Text>
-        ) : null}
-      </View>
-    </DashboardGlassCard>
-  );
-}
-
-function ReferralPrompt() {
-  const theme = useAppTheme();
-
-  return (
-    <Link href="/referrals" asChild>
-      <PressableScale
-        accessibilityRole="button"
-        style={StyleSheet.flatten([styles.referralCard, { backgroundColor: theme.surface, borderColor: theme.border }])}>
-        <View style={styles.referralLeft}>
-          <View style={[styles.referralIcon, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
-            <Gift color={theme.primary} size={17} />
-          </View>
-          <Text numberOfLines={2} style={[styles.referralText, { color: theme.mutedLight }]}>
-            <Text style={{ color: theme.foregroundStrong, fontFamily: fonts.extraBold }}>Invite friends, earn 20%</Text> commission on every first payment.
-          </Text>
-        </View>
-        <View style={styles.referralAction}>
-          <Text style={[styles.referralActionText, { color: theme.primary }]}>Get link</Text>
-          <ArrowRight color={theme.primary} size={15} />
-        </View>
-      </PressableScale>
-    </Link>
-  );
-}
-
-function DateStrip({ dates, selectedDate, onSelect }: { dates: DateOption[]; selectedDate: string; onSelect: (date: string) => void }) {
   const theme = useAppTheme();
   const { width: screenWidth } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
@@ -383,39 +259,107 @@ function DateStrip({ dates, selectedDate, onSelect }: { dates: DateOption[]; sel
   };
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.dateStripContent}
-      horizontal
-      ref={scrollRef}
-      showsHorizontalScrollIndicator={false}
-      style={styles.horizontalBleed}>
-      {dates.map((date) => {
-        const active = selectedDate === date.value;
+    <View style={styles.dateBlock}>
+      <View style={styles.monthRow}>
+        <Text style={[styles.monthLabel, { color: theme.foregroundStrong }]}>{monthLabel}</Text>
+        <View style={styles.monthArrows}>
+          <PressableScale
+            accessibilityLabel="Previous day"
+            accessibilityRole="button"
+            onPress={() => onShift(-1)}
+            style={[styles.arrowButton, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <ChevronLeft color={theme.foregroundStrong} size={16} />
+          </PressableScale>
+          <PressableScale
+            accessibilityLabel="Next day"
+            accessibilityRole="button"
+            onPress={() => onShift(1)}
+            style={[styles.arrowButton, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <ChevronRight color={theme.foregroundStrong} size={16} />
+          </PressableScale>
+        </View>
+      </View>
+      <ScrollView
+        contentContainerStyle={styles.dateStripContent}
+        horizontal
+        ref={scrollRef}
+        showsHorizontalScrollIndicator={false}
+        style={styles.horizontalBleed}>
+        {dates.map((date) => {
+          const active = selectedDate === date.value;
+          return (
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              key={date.value}
+              onLayout={(event) => {
+                chipLayouts.current[date.value] = {
+                  width: event.nativeEvent.layout.width,
+                  x: event.nativeEvent.layout.x,
+                };
+                if (active) centerOn(date.value);
+              }}
+              onPress={() => {
+                onSelect(date.value);
+                centerOn(date.value);
+              }}
+              style={[
+                styles.dateChip,
+                {
+                  backgroundColor: active ? theme.primary : theme.surface,
+                  borderColor: active ? theme.primary : theme.border,
+                },
+              ]}>
+              <Text style={[styles.dateChipMain, { color: active ? theme.primaryDark : theme.foregroundStrong }]}>{date.main}</Text>
+              <Text style={[styles.dateChipSub, { color: active ? theme.primaryDark : theme.muted }]}>{date.sub}</Text>
+            </PressableScale>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+function LiveMatchHeader({ onSeeAll }: { onSeeAll: () => void }) {
+  const theme = useAppTheme();
+
+  return (
+    <View style={styles.sectionRow}>
+      <Text style={[styles.sectionTitle, { color: theme.foregroundStrong }]}>Live Match</Text>
+      <PressableScale accessibilityLabel="See all matches" accessibilityRole="button" onPress={onSeeAll}>
+        <Text style={[styles.seeAll, { color: theme.mutedLight }]}>See All</Text>
+      </PressableScale>
+    </View>
+  );
+}
+
+function HomeStatusTabs({
+  activeTab,
+  onSelect,
+}: {
+  activeTab: string;
+  onSelect: (id: (typeof statusTabs)[number]['id']) => void;
+}) {
+  const theme = useAppTheme();
+
+  return (
+    <ScrollView contentContainerStyle={styles.tabsContent} horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalBleed}>
+      {statusTabs.map((tab) => {
+        const active = activeTab === tab.id;
         return (
           <PressableScale
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
-            key={date.value}
-            onLayout={(event) => {
-              chipLayouts.current[date.value] = {
-                width: event.nativeEvent.layout.width,
-                x: event.nativeEvent.layout.x,
-              };
-              if (active) centerOn(date.value);
-            }}
-            onPress={() => {
-              onSelect(date.value);
-              centerOn(date.value);
-            }}
+            key={tab.id}
+            onPress={() => onSelect(tab.id)}
             style={[
-              styles.dateChip,
+              styles.tab,
               {
                 backgroundColor: active ? theme.primary : theme.surface,
                 borderColor: active ? theme.primary : theme.border,
               },
             ]}>
-            <Text style={[styles.dateChipMain, { color: active ? theme.primaryDark : theme.foregroundStrong }]}>{date.main}</Text>
-            <Text style={[styles.dateChipSub, { color: active ? theme.primaryDark : theme.muted }]}>{date.sub}</Text>
+            <Text style={[styles.tabText, { color: active ? theme.primaryDark : theme.mutedLight }]}>{tab.label}</Text>
           </PressableScale>
         );
       })}
@@ -423,273 +367,134 @@ function DateStrip({ dates, selectedDate, onSelect }: { dates: DateOption[]; sel
   );
 }
 
-
-
-
-
-
-
-
-
-function LeagueFilterBar({
-  isLoading,
-  leagues,
-  selectedLeagueKey,
-  totalMatches,
-  onSelect,
-}: {
-  isLoading: boolean;
-  leagues: LeagueOption[];
-  selectedLeagueKey: string;
-  totalMatches: number;
-  onSelect: (value: string) => void;
-}) {
-  return (
-    <View style={styles.filterBlock}>
-      <DashboardSectionHeader eyebrow="Leagues" title="Fixture slate" description={`${leagues.length} leagues available`} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.leagueRail} style={styles.horizontalBleed}>
-        <DashboardChip active={selectedLeagueKey === ALL_LEAGUES_KEY} count={totalMatches} icon={Trophy} label="All leagues" onPress={() => onSelect(ALL_LEAGUES_KEY)} />
-        {isLoading
-          ? Array.from({ length: 4 }).map((_, index) => <View key={index} style={styles.leagueSkeleton} />)
-          : leagues.map((league) => (
-              <DashboardChip
-                active={selectedLeagueKey === league.key}
-                count={league.matchCount ?? 0}
-                key={league.key}
-                label={league.name}
-                onPress={() => onSelect(league.key)}
-              />
-            ))}
-      </ScrollView>
-    </View>
-  );
-}
-
-function LeagueLogoMark({ league }: { league: LeagueOption }) {
-  const theme = useAppTheme();
-
-  if (league.logoUrl) {
-    return (
-      <View style={[styles.leagueLogo, { backgroundColor: theme.white, borderColor: theme.border }]}>
-        <Image source={{ uri: league.logoUrl }} contentFit="contain" style={styles.leagueLogoImage} />
-      </View>
-    );
-  }
-
-  return (
-    <View style={[styles.leagueLogo, { backgroundColor: theme.primarySubtle, borderColor: theme.border }]}>
-      <Text style={[styles.leagueInitials, { color: theme.primary }]}>{league.name.slice(0, 2).toUpperCase()}</Text>
-    </View>
-  );
-}
-
-
-
-
-function LeagueMatchSection({ league }: { league: LeagueSection }) {
-  const theme = useAppTheme();
-
-  return (
-    <View style={styles.leagueSection}>
-      <View style={[styles.leagueHeader, { borderColor: theme.border }]}>
-        <View style={styles.leagueHeaderLeft}>
-          <LeagueLogoMark league={league} />
-          <View style={styles.leagueTitleCopy}>
-            <Text numberOfLines={1} style={[styles.leagueTitle, { color: theme.foregroundStrong }]}>{league.name}</Text>
-            {league.country ? <Text style={[styles.leagueCountry, { color: theme.muted }]}>{league.country}</Text> : null}
-          </View>
-        </View>
-        <View style={[styles.leagueCount, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.leagueCountText, { color: theme.mutedLight }]}>{league.matches.length} matches</Text>
-        </View>
-      </View>
-      <View style={styles.matchList}>
-        {league.matches.map((match) => (
-          <FeedMatchCard key={`${league.key}-${match.fixtureId}`} league={league} match={match} />
-        ))}
-      </View>
-    </View>
-  );
-}
-
 export default function DashboardScreen() {
   const theme = useAppTheme();
-  const { showToast } = useToast();
+  const router = useRouter();
   const initialDate = dateKey(0);
   const [todayKey, setTodayKey] = useState(initialDate);
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [selectedLeagueKey, setSelectedLeagueKey] = useState(ALL_LEAGUES_KEY);
-  const [query, setQuery] = useState('');
-  const [communityInvite, setCommunityInvite] = useState<TelegramCommunityInvite | null>(null);
-  const [communityBannerPreference, setCommunityBannerPreference] = useState<{
-    hidden: boolean;
-    key: string | null;
-  }>({ hidden: false, key: null });
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const nextToday = dateKey(0);
-      setTodayKey(nextToday);
-    }, 60_000);
+    const interval = setInterval(() => setTodayKey(dateKey(0)), 60_000);
     return () => clearInterval(interval);
   }, []);
 
   const dateOptions = useMemo(
     () =>
-      dateStripKeys(todayKey).map((value) => {
+      dateStripKeys(selectedDate).map((value) => {
         const date = dateFromKey(value);
         return { main: formatDateStripMain(date, todayKey), sub: formatDateStripSub(date), value };
       }),
-    [todayKey],
+    [selectedDate, todayKey],
   );
-  const selectedDateLabel = useMemo(() => formatSelectedDateLabel(selectedDate), [selectedDate]);
-  const debouncedQuery = query.trim();
+  const monthLabel = useMemo(() => formatMonthLabel(selectedDate), [selectedDate]);
+  const yesterdayKey = shiftDateKey(todayKey, -1);
   const activeLeagueKey = selectedLeagueKey === ALL_LEAGUES_KEY ? undefined : selectedLeagueKey;
+  const activeTab =
+    statusFilter === 'live'
+      ? 'live'
+      : statusFilter === 'upcoming'
+        ? 'upcoming'
+        : selectedDate === yesterdayKey
+          ? 'yesterday'
+          : 'today';
 
   const me = useMe();
-  const subscription = useSubscriptionCurrent();
   const notificationSummary = useNotificationSummary();
-  const communityStatus = useTelegramCommunityStatus();
-  const createCommunityInvite = useCreateTelegramCommunityInviteMutation();
   const leagues = useLeagues({ date: selectedDate, windowDays: 1 });
   const feed = useInfiniteHomeFeed({
     date: selectedDate,
     leagueKey: activeLeagueKey,
     limit: 24,
-    query: debouncedQuery || undefined,
     windowDays: 1,
   });
 
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.allSettled([
-      feed.refetch(),
-      leagues.refetch(),
-      notificationSummary.refetch(),
-      subscription.refetch(),
-    ]);
+    await Promise.allSettled([feed.refetch(), leagues.refetch(), notificationSummary.refetch()]);
     setRefreshing(false);
   };
 
-  const leagueOptions = useMemo(() => ((leagues.data ?? []).slice().sort(compareLeagues)), [leagues.data]);
+  const leagueOptions = useMemo(() => (leagues.data ?? []).slice().sort(compareLeagues), [leagues.data]);
   const feedPages = useMemo(() => feed.data?.pages ?? [], [feed.data?.pages]);
   const leagueSections = useMemo(() => buildLeagueSections(feedPages), [feedPages]);
-  const flatMatches = useMemo(() => leagueSections.flatMap((league) => league.matches), [leagueSections]);
+  const flatMatches = useMemo(
+    () =>
+      leagueSections
+        .flatMap((league) => league.matches.map((match) => ({ league, match })))
+        .sort((left, right) => matchKickoffTime(left.match) - matchKickoffTime(right.match)),
+    [leagueSections],
+  );
+  const filteredMatches = useMemo(() => {
+    if (statusFilter === 'live') return flatMatches.filter((entry) => matchIsLive(entry.match));
+    if (statusFilter === 'upcoming') return flatMatches.filter((entry) => matchIsUpcoming(entry.match));
+    return flatMatches;
+  }, [flatMatches, statusFilter]);
   const totalMatches = feedPages[0]?.totalMatches ?? flatMatches.length;
-  const bestAccuracy = flatMatches.reduce((max, match) => Math.max(max, getConfidence(match)), 0);
-  const tokenBalance = subscription.data?.researchTokensRemaining ?? me.data?.researchTokensRemaining ?? 0;
-  const communityPreferenceKey = me.data?.id ? communityBannerHiddenKey(me.data.id) : null;
-  const communityBannerPreferenceReady =
-    !me.isLoading && (!communityPreferenceKey || communityBannerPreference.key === communityPreferenceKey);
-  const communityBannerHidden = communityBannerPreference.key === communityPreferenceKey && communityBannerPreference.hidden;
 
-  useEffect(() => {
-    let mounted = true;
-
-    if (!communityPreferenceKey) {
-      return () => {
-        mounted = false;
-      };
-    }
-
-    AsyncStorage.getItem(communityPreferenceKey)
-      .then((value) => {
-        if (!mounted) return;
-        setCommunityBannerPreference({ hidden: value === '1', key: communityPreferenceKey });
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setCommunityBannerPreference({ hidden: false, key: communityPreferenceKey });
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [communityPreferenceKey]);
-
-  const hideCommunityBanner = useCallback(() => {
-    setCommunityBannerPreference({ hidden: true, key: communityPreferenceKey });
-    if (!communityPreferenceKey) return;
-    AsyncStorage.setItem(communityPreferenceKey, '1').catch(() => undefined);
-  }, [communityPreferenceKey]);
-
-  const handleDateSelect = (value: string) => {
+  const selectDate = (value: string) => {
     setSelectedDate(value);
+    setStatusFilter('all');
     setSelectedLeagueKey(ALL_LEAGUES_KEY);
   };
 
-  const handleTelegramJoin = () => {
-    createCommunityInvite.mutate(undefined, {
-      onError: (error) =>
-        showToast({
-          message: error.message,
-          title: 'Community invite failed',
-          tone: 'error',
-        }),
-      onSuccess: (invite) => {
-        setCommunityInvite(invite);
-        Linking.openURL(invite.inviteLink)
-          .then(() => {
-            hideCommunityBanner();
-            showToast({
-              message: 'Invite ready. Opening Telegram.',
-              title: 'Community invite',
-              tone: 'success',
-            });
-          })
-          .catch(() => {
-            showToast({
-              message: 'Open Telegram from the invite link.',
-              title: 'Could not open Telegram',
-              tone: 'error',
-            });
-          });
-      },
-    });
+  const handleTabSelect = (id: (typeof statusTabs)[number]['id']) => {
+    if (id === 'today') {
+      setSelectedDate(todayKey);
+      setStatusFilter('all');
+    } else if (id === 'yesterday') {
+      setSelectedDate(yesterdayKey);
+      setStatusFilter('all');
+    } else {
+      setStatusFilter(id);
+    }
   };
 
   return (
-    <Screen hasTabs onRefresh={handleRefresh} refreshing={refreshing} safeTop={false}>
-      <DashboardUtilityBar
+    <Screen
+      hasTabs
+      floatingAction={<BuildSlipFab onPress={() => router.push('/(tabs)/build-ticket' as never)} />}
+      onRefresh={handleRefresh}
+      refreshing={refreshing}
+      safeTop={false}>
+      <GreetingHeader
         image={me.data?.image}
         name={me.data?.name}
-        query={query}
-        tokenBalance={tokenBalance}
         unreadCount={notificationSummary.data?.unreadCount ?? 0}
-        onQueryChange={setQuery}
+        onBell={() => router.push('/notifications' as never)}
+        onSearch={() => router.push('/matches' as never)}
       />
 
-      <PredictionHero
-        bestAccuracy={bestAccuracy}
-        isLoading={feed.isLoading && feedPages.length === 0}
-        matchCount={totalMatches}
-        selectedDateLabel={selectedDateLabel}
+      <MonthDateStrip
+        dates={dateOptions}
+        monthLabel={monthLabel}
+        selectedDate={selectedDate}
+        onSelect={selectDate}
+        onShift={(offset) => selectDate(shiftDateKey(selectedDate, offset))}
       />
 
-      {communityBannerPreferenceReady && !communityBannerHidden ? (
-        <TelegramCommunityCard
-          invite={communityInvite}
-          isCreating={createCommunityInvite.isPending}
-          isLoading={communityStatus.isLoading}
-          status={communityStatus.data}
-          onJoin={handleTelegramJoin}
-        />
-      ) : null}
+      <LiveMatchHeader onSeeAll={() => router.push('/matches' as never)} />
+      <LiveNowCarousel showHeader={false} />
 
-      <ReferralPrompt />
+      <HomeStatusTabs activeTab={activeTab} onSelect={handleTabSelect} />
 
-      <DateStrip dates={dateOptions} selectedDate={selectedDate} onSelect={handleDateSelect} />
-
-      <LiveNowCarousel />
-
-      <LeagueFilterBar
-        isLoading={leagues.isLoading}
-        leagues={leagueOptions}
-        selectedLeagueKey={selectedLeagueKey}
-        totalMatches={totalMatches}
-        onSelect={setSelectedLeagueKey}
-      />
+      <ScrollView contentContainerStyle={styles.leagueRail} horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalBleed}>
+        <DashboardChip active={selectedLeagueKey === ALL_LEAGUES_KEY} count={totalMatches} icon={Trophy} label="All leagues" onPress={() => setSelectedLeagueKey(ALL_LEAGUES_KEY)} />
+        {leagues.isLoading
+          ? Array.from({ length: 4 }).map((_, index) => <View key={index} style={[styles.leagueSkeleton, { backgroundColor: theme.surface }]} />)
+          : leagueOptions.map((league) => (
+              <DashboardChip
+                active={selectedLeagueKey === league.key}
+                count={league.matchCount ?? 0}
+                key={league.key}
+                label={league.name}
+                onPress={() => setSelectedLeagueKey(league.key)}
+              />
+            ))}
+      </ScrollView>
 
       {feed.isLoading && feedPages.length === 0 ? (
         <View style={styles.loadingList}>
@@ -701,16 +506,16 @@ export default function DashboardScreen() {
             </DashboardGlassCard>
           ))}
         </View>
-      ) : flatMatches.length > 0 ? (
-        <View style={styles.sections}>
-          {leagueSections.map((league) => (
-            <LeagueMatchSection key={league.key} league={league} />
+      ) : filteredMatches.length > 0 ? (
+        <View style={styles.matchList}>
+          {filteredMatches.map(({ league, match }) => (
+            <FeedMatchCard caption={league.name} key={`${league.key}-${match.fixtureId}`} league={league} match={match} />
           ))}
           <View style={styles.loadMoreWrap}>
             <View style={[styles.loadMorePill, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               {feed.isFetchingNextPage ? <LoaderCircle color={theme.primary} size={15} /> : null}
               <Text style={[styles.loadMoreText, { color: theme.mutedLight }]}>
-                Showing {Math.min(flatMatches.length, totalMatches)} of {totalMatches} matches
+                Showing {filteredMatches.length} of {totalMatches} matches
               </Text>
               {feed.hasNextPage ? (
                 <PressableScale accessibilityRole="button" disabled={feed.isFetchingNextPage} onPress={() => feed.fetchNextPage()} style={styles.loadMoreButton}>
@@ -724,7 +529,11 @@ export default function DashboardScreen() {
         </View>
       ) : (
         <DashboardStatePanel icon={Search} title="No fixtures found">
-          {debouncedQuery ? `No fixtures match ${debouncedQuery}.` : 'Try another date or league for the next slate.'}
+          {statusFilter === 'live'
+            ? 'No matches are in play for this day yet.'
+            : statusFilter === 'upcoming'
+              ? 'No upcoming fixtures left for this day.'
+              : 'Try another date or league for the next slate.'}
         </DashboardStatePanel>
       )}
     </Screen>
@@ -732,161 +541,90 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  accuracyPill: {
+  arrowButton: {
     alignItems: 'center',
     borderRadius: radius.pill,
-    flexDirection: 'row',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  accuracyText: {
-    fontFamily: fonts.bold,
-    fontSize: 12,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
   },
   avatar: {
     borderRadius: radius.pill,
     borderWidth: 1,
-    height: 34,
-    width: 34,
+    height: 44,
+    width: 44,
   },
-  bookingCode: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: spacing.md,
-  },
-  bookingLabel: {
-    fontFamily: fonts.bold,
-    fontSize: 10,
-    textTransform: 'uppercase',
-  },
-  bookingValue: {
-    fontFamily: fonts.extraBold,
-    fontSize: 20,
-    letterSpacing: 0,
-    marginTop: 4,
-  },
-  communityButton: {
-    minWidth: 170,
-  },
-  communityCard: {
-    gap: spacing.lg,
-  },
-  communityCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  communityFooter: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    justifyContent: 'space-between',
-  },
-  communityIcon: {
+  buildFab: {
     alignItems: 'center',
     borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 48,
-    justifyContent: 'center',
-    width: 48,
-  },
-  communityStatus: {
-    flex: 1,
-    fontFamily: fonts.bold,
-    fontSize: 12,
-    minWidth: 110,
-  },
-  communityText: {
-    fontFamily: fonts.medium,
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 6,
-  },
-  communityTitle: {
-    flex: 1,
-    fontFamily: fonts.extraBold,
-    fontSize: 18,
-  },
-  communityTitleRow: {
-    alignItems: 'center',
+    elevation: 8,
     flexDirection: 'row',
     gap: spacing.sm,
+    height: 52,
+    paddingHorizontal: spacing.lg,
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.34,
+    shadowRadius: 16,
   },
-  communityTop: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
+  buildFabText: {
+    fontFamily: fonts.extraBold,
+    fontSize: 15,
+  },
+  dateBlock: {
     gap: spacing.md,
   },
   dateChip: {
     alignItems: 'center',
-    borderRadius: radius.pill,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    height: 62,
+    height: 68,
     justifyContent: 'center',
-    minWidth: 118,
-    paddingHorizontal: spacing.lg,
+    minWidth: 62,
+    paddingHorizontal: spacing.sm,
   },
   dateChipMain: {
     fontFamily: fonts.extraBold,
-    fontSize: 14,
+    fontSize: 18,
   },
   dateChipSub: {
     fontFamily: fonts.medium,
     fontSize: 12,
-    marginTop: 2,
-  },
-  datePill: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    height: 44,
-    paddingHorizontal: spacing.lg,
-  },
-  datePillText: {
-    fontFamily: fonts.bold,
-    fontSize: 13,
+    marginTop: 4,
   },
   dateStripContent: {
     gap: spacing.sm,
     paddingRight: spacing.md,
   },
-  filterBlock: {
-    gap: spacing.md,
-  },
-  hero: {
-    gap: spacing.xl,
-    paddingVertical: spacing.xl,
-  },
-  heroActions: {
-    alignItems: 'flex-start',
+  greeting: {
+    alignItems: 'center',
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.lg,
+    justifyContent: 'space-between',
   },
-  heroContent: {
+  greetingActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
     gap: spacing.sm,
   },
-  heroCopy: {
+  greetingCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  greetingEyebrow: {
     fontFamily: fonts.medium,
-    fontSize: 15,
-    lineHeight: 23,
+    fontSize: 13,
   },
-  heroGlow: {
-    backgroundColor: 'rgba(46,242,208,0.04)',
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
+  greetingLeft: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    minWidth: 0,
   },
-  heroTitle: {
+  greetingName: {
     fontFamily: fonts.extraBold,
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: 20,
+    marginTop: 2,
   },
   horizontalBleed: {
     marginRight: -spacing.md,
@@ -895,131 +633,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
-    height: 40,
+    height: 42,
     justifyContent: 'center',
-    width: 40,
-  },
-  leagueCount: {
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-  },
-  leagueCountText: {
-    fontFamily: fonts.bold,
-    fontSize: 12,
-  },
-  leagueCountry: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  leagueHeader: {
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.md,
-    justifyContent: 'space-between',
-    paddingBottom: spacing.md,
-  },
-  leagueHeaderLeft: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: spacing.md,
-    minWidth: 0,
-  },
-  leagueInitials: {
-    fontFamily: fonts.extraBold,
-    fontSize: 12,
-  },
-  leagueLogo: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: 'center',
-    overflow: 'hidden',
-    width: 44,
-  },
-  leagueLogoImage: {
-    height: 32,
-    width: 32,
+    width: 42,
   },
   leagueRail: {
     gap: spacing.sm,
     paddingRight: spacing.md,
   },
-  leagueSection: {
-    gap: spacing.md,
-  },
   leagueSkeleton: {
     borderRadius: radius.pill,
     height: 46,
     opacity: 0.5,
-    width: 150,
-  },
-  leagueTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 18,
-  },
-  leagueTitleCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  legCopy: {
-    flex: 1,
-    gap: 4,
-    minWidth: 0,
-  },
-  legMarket: {
-    fontFamily: fonts.bold,
-    fontSize: 12,
-    marginTop: 5,
-  },
-  legMeta: {
-    fontFamily: fonts.semibold,
-    fontSize: 11,
-  },
-  legReason: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  legRow: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.md,
-    padding: spacing.md,
-  },
-  legStat: {
-    alignItems: 'center',
-    borderRadius: radius.md,
-    borderWidth: 1,
-    minWidth: 62,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  legStatLabel: {
-    fontFamily: fonts.bold,
-    fontSize: 10,
-    textTransform: 'uppercase',
-  },
-  legStatValue: {
-    fontFamily: fonts.extraBold,
-    fontSize: 16,
-    marginTop: 2,
-  },
-  legStats: {
-    gap: spacing.sm,
-  },
-  legTeams: {
-    fontFamily: fonts.extraBold,
-    fontSize: 14,
-  },
-  legsList: {
-    gap: spacing.sm,
+    width: 140,
   },
   loadMoreButton: {
     paddingHorizontal: spacing.xs,
@@ -1047,277 +673,40 @@ const styles = StyleSheet.create({
   loadMoreWrap: {
     alignItems: 'center',
     paddingBottom: spacing.sm,
+    paddingTop: spacing.sm,
   },
   loadingList: {
     gap: spacing.md,
   },
-  lockPreview: {
-    alignItems: 'center',
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    justifyContent: 'center',
-    minHeight: 92,
-  },
-  lockPreviewText: {
-    fontFamily: fonts.extraBold,
-    fontSize: 13,
-  },
-  matchCard: {
-    gap: spacing.lg,
-  },
-  matchCenter: {
-    alignItems: 'center',
-    flex: 0.72,
-    gap: spacing.sm,
-    minWidth: 72,
-  },
-  matchCenterText: {
-    fontFamily: fonts.extraBold,
-    fontSize: 18,
-  },
-  matchDate: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    marginTop: 3,
-  },
-  matchDetailsButton: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    height: 44,
-    justifyContent: 'center',
-    minWidth: 190,
-    paddingHorizontal: spacing.lg,
-  },
-  matchDetailsIcon: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    height: 28,
-    justifyContent: 'center',
-    width: 28,
-  },
-  matchDetailsText: {
-    fontFamily: fonts.extraBold,
-    fontSize: 13,
-  },
-  matchLeague: {
-    fontFamily: fonts.extraBold,
-    fontSize: 14,
-  },
-  matchLeagueCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
   matchList: {
     gap: spacing.md,
   },
-  matchSummary: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    lineHeight: 19,
-  },
-  matchTeams: {
-    alignItems: 'flex-start',
+  monthArrows: {
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  matchTop: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: spacing.md,
-    justifyContent: 'space-between',
+  monthLabel: {
+    fontFamily: fonts.extraBold,
+    fontSize: 16,
   },
-  metricsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  ongoingCard: {
-    gap: spacing.md,
-  },
-  ongoingCardTop: {
+  monthRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  ongoingHint: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  ongoingHintText: {
-    fontFamily: fonts.bold,
-    fontSize: 11,
-  },
-  ongoingLeague: {
-    fontFamily: fonts.bold,
-    fontSize: 12,
-  },
-  ongoingLiveDot: {
-    borderRadius: radius.pill,
-    height: 7,
-    width: 7,
-  },
-  ongoingLiveMark: {
+  sectionRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.xs,
+    justifyContent: 'space-between',
   },
-  ongoingLiveText: {
+  sectionTitle: {
     fontFamily: fonts.extraBold,
-    fontSize: 11,
-    textTransform: 'uppercase',
+    fontSize: 20,
   },
-  ongoingMatchCard: {
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    gap: spacing.md,
-    minHeight: 184,
-    padding: spacing.md,
-    width: 278,
-  },
-  ongoingRail: {
-    gap: spacing.md,
-    paddingRight: spacing.md,
-  },
-  ongoingScore: {
-    alignItems: 'center',
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 4,
-    justifyContent: 'center',
-    minWidth: 76,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  ongoingScoreDivider: {
-    fontFamily: fonts.extraBold,
-    fontSize: 18,
-  },
-  ongoingScoreText: {
-    fontFamily: fonts.extraBold,
-    fontSize: 26,
-    fontVariant: ['tabular-nums'],
-  },
-  ongoingTeam: {
-    alignItems: 'flex-start',
-    flex: 1,
-    gap: spacing.xs,
-    minWidth: 0,
-  },
-  ongoingTeamName: {
+  seeAll: {
     fontFamily: fonts.bold,
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  ongoingTeamNameRight: {
-    textAlign: 'right',
-  },
-  ongoingTeamRight: {
-    alignItems: 'flex-end',
-  },
-  ongoingTeams: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  pick: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    flex: 1,
-    minHeight: 72,
-    padding: spacing.md,
-  },
-  pickGrid: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  pickLabel: {
-    fontFamily: fonts.bold,
-    fontSize: 10,
-    textTransform: 'uppercase',
-  },
-  pickValue: {
-    fontFamily: fonts.extraBold,
     fontSize: 13,
-    lineHeight: 18,
-    marginTop: 5,
-  },
-  privateBadge: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  privateBadgeText: {
-    fontFamily: fonts.bold,
-    fontSize: 10,
-  },
-  referralAction: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 4,
-  },
-  referralActionText: {
-    fontFamily: fonts.extraBold,
-    fontSize: 12,
-  },
-  referralCard: {
-    alignItems: 'center',
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.md,
-    justifyContent: 'space-between',
-    padding: spacing.md,
-  },
-  referralIcon: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 38,
-    justifyContent: 'center',
-    width: 38,
-  },
-  referralLeft: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    minWidth: 0,
-  },
-  referralText: {
-    flex: 1,
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  scoreBadge: {
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  scoreBadgeText: {
-    fontFamily: fonts.bold,
-    fontSize: 10,
-    textTransform: 'uppercase',
-  },
-  sections: {
-    gap: spacing.xl,
+    textDecorationLine: 'underline',
   },
   skeletonBlock: {
     borderRadius: radius.lg,
@@ -1333,77 +722,28 @@ const styles = StyleSheet.create({
     height: 14,
     width: '44%',
   },
-  teamName: {
-    fontFamily: fonts.extraBold,
-    fontSize: 13,
-    lineHeight: 18,
-    marginTop: spacing.sm,
-    textAlign: 'left',
-  },
-  teamNameRight: {
-    textAlign: 'right',
-  },
-  teamSide: {
-    flex: 1,
-    minWidth: 0,
-  },
-  teamSideRight: {
-    alignItems: 'flex-end',
-  },
-  ticketCopy: {
-    fontFamily: fonts.medium,
-    fontSize: 14,
-    lineHeight: 22,
-  },
-  ticketHeader: {
+  tab: {
     alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
   },
-  ticketMetrics: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+  tabText: {
+    fontFamily: fonts.bold,
+    fontSize: 13,
   },
-  ticketTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 24,
-    lineHeight: 30,
+  tabsContent: {
+    gap: spacing.sm,
+    paddingRight: spacing.md,
   },
   unreadDot: {
     borderRadius: radius.pill,
     height: 8,
     position: 'absolute',
-    right: 8,
-    top: 8,
+    right: 9,
+    top: 9,
     width: 8,
-  },
-  userName: {
-    display: 'none',
-    fontFamily: fonts.bold,
-    fontSize: 12,
-  },
-  utility: {
-    gap: spacing.md,
-  },
-  utilityActions: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  walletPill: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    flex: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    height: 40,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-  },
-  walletText: {
-    fontFamily: fonts.extraBold,
-    fontSize: 13,
   },
 });

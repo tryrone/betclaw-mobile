@@ -45,7 +45,7 @@ function isLiveMatch(match: FeedMatch) {
  * full-width reference-style live cards with swipe paging + dots.
  * Polls every 30s while mounted so scores and clocks stay fresh.
  */
-export function LiveNowCarousel() {
+export function LiveNowCarousel({ showHeader = true }: { showHeader?: boolean } = {}) {
   const theme = useAppTheme();
   const { width } = useWindowDimensions();
   const [pageIndex, setPageIndex] = useState(0);
@@ -81,7 +81,7 @@ export function LiveNowCarousel() {
     setPageIndex(Math.max(0, Math.min(liveEntries.length - 1, next)));
   };
 
-  const header = (
+  const header = showHeader ? (
     <View style={carouselStyles.header}>
       <View style={carouselStyles.headerCopy}>
         <View style={[carouselStyles.liveDot, { backgroundColor: liveEntries.length > 0 ? theme.live : theme.muted }]} />
@@ -92,7 +92,7 @@ export function LiveNowCarousel() {
         tone={liveEntries.length > 0 ? 'danger' : 'neutral'}
       />
     </View>
-  );
+  ) : null;
 
   if (liveEntries.length === 0) {
     return (

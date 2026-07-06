@@ -11,9 +11,9 @@ export const spacing = {
 export const layout = {
   /** Top gutter applied by Screen. */
   screenGutter: 3,
-  /** Outer horizontal gutter applied by Screen (12 -> 6 -> 3 -> 1.5 per design passes). */
-  screenHorizontalGutter: 1.5,
-  /** Shared phone content cap; widens the prior 390 cap so wide-phone gutters are roughly halved. */
+  /** Outer horizontal gutter applied by Screen — a little breathing room from the screen edges. */
+  screenHorizontalGutter: 14,
+  /** Shared phone content cap; content centers and gains side gutters beyond this width. */
   screenMaxWidth: 408,
 } as const;
 

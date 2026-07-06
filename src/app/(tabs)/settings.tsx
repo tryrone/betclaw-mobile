@@ -1,5 +1,6 @@
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
-import { Bell, ChevronRight, Copy, KeyRound, LogOut, Settings, ShieldCheck, SunMoon, UserRound } from 'lucide-react-native';
+import { Bell, ChevronRight, Copy, Gift, KeyRound, LogOut, MessageCircle, Settings, ShieldCheck, SunMoon, UserRound } from 'lucide-react-native';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -12,11 +13,14 @@ import {
   ScreenHeader,
   StatusBadge,
   ToggleSwitch,
+  useToast,
 } from '@/components/ui';
 import {
+  useCreateTelegramCommunityInviteMutation,
   useCreateTelegramTokenMutation,
   useLogoutMutation,
   useMe,
+  useTelegramCommunityStatus,
   useUpdatePreferencesMutation,
 } from '@/lib/api/hooks';
 import { useAppTheme, useThemeController } from '@/theme/colors';
@@ -86,11 +90,25 @@ function ActionRow({
 export default function SettingsScreen() {
   const router = useRouter();
   const theme = useAppTheme();
+  const { showToast } = useToast();
   const { mode, setThemeMode } = useThemeController();
   const me = useMe();
   const updatePreferences = useUpdatePreferencesMutation();
   const logout = useLogoutMutation();
   const telegramToken = useCreateTelegramTokenMutation();
+  const communityStatus = useTelegramCommunityStatus();
+  const createCommunityInvite = useCreateTelegramCommunityInviteMutation();
+
+  const handleCommunityJoin = () => {
+    createCommunityInvite.mutate(undefined, {
+      onError: (error) => showToast({ message: error.message, title: 'Community invite failed', tone: 'error' }),
+      onSuccess: (invite) => {
+        Linking.openURL(invite.inviteLink)
+          .then(() => showToast({ message: 'Invite ready. Opening Telegram.', title: 'Community invite', tone: 'success' }))
+          .catch(() => showToast({ message: 'Open Telegram from the invite link.', title: 'Could not open Telegram', tone: 'error' }));
+      },
+    });
+  };
   const darkModeEnabled = mode === 'dark';
   const profile = me.data;
   const displayName = profile?.name ?? 'BetClaw user';
@@ -183,6 +201,18 @@ export default function SettingsScreen() {
       </Animated.View>
 
       <Animated.View entering={enterUp(7)}>
+        <Text style={[styles.sectionTitle, { color: theme.foregroundStrong }]}>Community & rewards</Text>
+      </Animated.View>
+      <Animated.View entering={enterUp(8)} style={styles.settingList}>
+        <ActionRow
+          icon={MessageCircle}
+          label={communityStatus.data?.enabled && communityStatus.data?.configured ? 'Join the BetsClaw community' : 'Community (setup pending)'}
+          onPress={handleCommunityJoin}
+        />
+        <ActionRow icon={Gift} label="Invite friends, earn 20%" onPress={() => router.push('/referrals' as any)} />
+      </Animated.View>
+
+      <Animated.View entering={enterUp(9)}>
         <PressableScale
           accessibilityLabel="Sign out"
           accessibilityRole="button"

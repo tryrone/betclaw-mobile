@@ -78,12 +78,13 @@ export function DashboardBottomNav() {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreActive = moreItems.some((item) => isActive(pathname, item.activePaths));
   const bottomInset = Math.max(insets.bottom, 8);
+  const blurTint = theme.mode === 'light' ? 'light' : 'dark';
 
   return (
     <>
       <Modal transparent animationType="fade" visible={moreOpen} onRequestClose={() => setMoreOpen(false)}>
         <View style={navStyles.modalRoot}>
-          <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={18} tint={blurTint} style={StyleSheet.absoluteFill} />
           <Pressable
             accessibilityLabel="Close dashboard navigation menu"
             onPress={() => setMoreOpen(false)}
@@ -98,7 +99,7 @@ export function DashboardBottomNav() {
                 shadowColor: theme.shadow,
               },
             ]}>
-            <BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={34} tint={blurTint} style={StyleSheet.absoluteFill} />
             <LinearGradient
               colors={gradients.sheet}
               end={{ x: 1, y: 1 }}
