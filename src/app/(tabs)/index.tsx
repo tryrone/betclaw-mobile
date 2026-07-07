@@ -41,18 +41,9 @@ type DateOption = {
   value: string;
 };
 
-type StatusFilter = 'all' | 'live' | 'upcoming';
-
 type LeagueSection = LeagueOption & {
   matches: FeedMatch[];
 };
-
-const statusTabs: { id: StatusFilter | 'today' | 'yesterday'; label: string }[] = [
-  { id: 'live', label: 'Live' },
-  { id: 'today', label: 'Today' },
-  { id: 'yesterday', label: 'Yesterday' },
-  { id: 'upcoming', label: 'Upcoming' },
-];
 
 function dateKeyFromDate(date: Date) {
   const year = date.getUTCFullYear();
@@ -102,29 +93,6 @@ function formatMonthLabel(key: string) {
 function matchKickoffTime(match: FeedMatch) {
   const time = new Date(match.kickoffTime).getTime();
   return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
-}
-
-function matchStatusUpper(match: FeedMatch) {
-  return String(match.dataSnapshot?.status ?? match.status ?? '').toUpperCase();
-}
-
-function matchIsFinished(match: FeedMatch) {
-  return ['FT', 'AET', 'PEN', 'FINISHED'].includes(matchStatusUpper(match)) || match.dataSnapshot?.phase === 'finished';
-}
-
-function matchIsLive(match: FeedMatch) {
-  const status = matchStatusUpper(match);
-  const elapsedMinute = match.elapsedMinute ?? match.dataSnapshot?.elapsedMinute;
-  if (matchIsFinished(match)) return false;
-  return (
-    match.dataSnapshot?.phase === 'live' ||
-    ['LIVE', '1H', '2H', 'HT', 'ET', 'BT', 'P', 'SUSP', 'INT'].includes(status) ||
-    (typeof elapsedMinute === 'number' && Number.isFinite(elapsedMinute))
-  );
-}
-
-function matchIsUpcoming(match: FeedMatch) {
-  return !matchIsLive(match) && !matchIsFinished(match);
 }
 
 function compareLeagues(left: LeagueOption, right: LeagueOption) {
@@ -333,40 +301,6 @@ function LiveMatchHeader({ onSeeAll }: { onSeeAll: () => void }) {
   );
 }
 
-function HomeStatusTabs({
-  activeTab,
-  onSelect,
-}: {
-  activeTab: string;
-  onSelect: (id: (typeof statusTabs)[number]['id']) => void;
-}) {
-  const theme = useAppTheme();
-
-  return (
-    <ScrollView contentContainerStyle={styles.tabsContent} horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalBleed}>
-      {statusTabs.map((tab) => {
-        const active = activeTab === tab.id;
-        return (
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityState={{ selected: active }}
-            key={tab.id}
-            onPress={() => onSelect(tab.id)}
-            style={[
-              styles.tab,
-              {
-                backgroundColor: active ? theme.primary : theme.surface,
-                borderColor: active ? theme.primary : theme.border,
-              },
-            ]}>
-            <Text style={[styles.tabText, { color: active ? theme.primaryDark : theme.mutedLight }]}>{tab.label}</Text>
-          </PressableScale>
-        );
-      })}
-    </ScrollView>
-  );
-}
-
 export default function DashboardScreen() {
   const theme = useAppTheme();
   const router = useRouter();
@@ -374,7 +308,6 @@ export default function DashboardScreen() {
   const [todayKey, setTodayKey] = useState(initialDate);
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [selectedLeagueKey, setSelectedLeagueKey] = useState(ALL_LEAGUES_KEY);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   useEffect(() => {
     const interval = setInterval(() => setTodayKey(dateKey(0)), 60_000);
@@ -390,16 +323,7 @@ export default function DashboardScreen() {
     [selectedDate, todayKey],
   );
   const monthLabel = useMemo(() => formatMonthLabel(selectedDate), [selectedDate]);
-  const yesterdayKey = shiftDateKey(todayKey, -1);
   const activeLeagueKey = selectedLeagueKey === ALL_LEAGUES_KEY ? undefined : selectedLeagueKey;
-  const activeTab =
-    statusFilter === 'live'
-      ? 'live'
-      : statusFilter === 'upcoming'
-        ? 'upcoming'
-        : selectedDate === yesterdayKey
-          ? 'yesterday'
-          : 'today';
 
   const me = useMe();
   const notificationSummary = useNotificationSummary();
@@ -428,29 +352,11 @@ export default function DashboardScreen() {
         .sort((left, right) => matchKickoffTime(left.match) - matchKickoffTime(right.match)),
     [leagueSections],
   );
-  const filteredMatches = useMemo(() => {
-    if (statusFilter === 'live') return flatMatches.filter((entry) => matchIsLive(entry.match));
-    if (statusFilter === 'upcoming') return flatMatches.filter((entry) => matchIsUpcoming(entry.match));
-    return flatMatches;
-  }, [flatMatches, statusFilter]);
   const totalMatches = feedPages[0]?.totalMatches ?? flatMatches.length;
 
   const selectDate = (value: string) => {
     setSelectedDate(value);
-    setStatusFilter('all');
     setSelectedLeagueKey(ALL_LEAGUES_KEY);
-  };
-
-  const handleTabSelect = (id: (typeof statusTabs)[number]['id']) => {
-    if (id === 'today') {
-      setSelectedDate(todayKey);
-      setStatusFilter('all');
-    } else if (id === 'yesterday') {
-      setSelectedDate(yesterdayKey);
-      setStatusFilter('all');
-    } else {
-      setStatusFilter(id);
-    }
   };
 
   return (
@@ -479,8 +385,6 @@ export default function DashboardScreen() {
       <LiveMatchHeader onSeeAll={() => router.push('/matches' as never)} />
       <LiveNowCarousel showHeader={false} />
 
-      <HomeStatusTabs activeTab={activeTab} onSelect={handleTabSelect} />
-
       <ScrollView contentContainerStyle={styles.leagueRail} horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalBleed}>
         <DashboardChip active={selectedLeagueKey === ALL_LEAGUES_KEY} count={totalMatches} icon={Trophy} label="All leagues" onPress={() => setSelectedLeagueKey(ALL_LEAGUES_KEY)} />
         {leagues.isLoading
@@ -506,16 +410,16 @@ export default function DashboardScreen() {
             </DashboardGlassCard>
           ))}
         </View>
-      ) : filteredMatches.length > 0 ? (
+      ) : flatMatches.length > 0 ? (
         <View style={styles.matchList}>
-          {filteredMatches.map(({ league, match }) => (
+          {flatMatches.map(({ league, match }) => (
             <FeedMatchCard caption={league.name} key={`${league.key}-${match.fixtureId}`} league={league} match={match} />
           ))}
           <View style={styles.loadMoreWrap}>
             <View style={[styles.loadMorePill, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               {feed.isFetchingNextPage ? <LoaderCircle color={theme.primary} size={15} /> : null}
               <Text style={[styles.loadMoreText, { color: theme.mutedLight }]}>
-                Showing {filteredMatches.length} of {totalMatches} matches
+                Showing {flatMatches.length} of {totalMatches} matches
               </Text>
               {feed.hasNextPage ? (
                 <PressableScale accessibilityRole="button" disabled={feed.isFetchingNextPage} onPress={() => feed.fetchNextPage()} style={styles.loadMoreButton}>
@@ -529,11 +433,7 @@ export default function DashboardScreen() {
         </View>
       ) : (
         <DashboardStatePanel icon={Search} title="No fixtures found">
-          {statusFilter === 'live'
-            ? 'No matches are in play for this day yet.'
-            : statusFilter === 'upcoming'
-              ? 'No upcoming fixtures left for this day.'
-              : 'Try another date or league for the next slate.'}
+          Try another date or league for the next slate.
         </DashboardStatePanel>
       )}
     </Screen>
@@ -721,22 +621,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     height: 14,
     width: '44%',
-  },
-  tab: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 40,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  tabText: {
-    fontFamily: fonts.bold,
-    fontSize: 13,
-  },
-  tabsContent: {
-    gap: spacing.sm,
-    paddingRight: spacing.md,
   },
   unreadDot: {
     borderRadius: radius.pill,

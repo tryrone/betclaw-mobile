@@ -12,7 +12,7 @@ export const layout = {
   /** Top gutter applied by Screen. */
   screenGutter: 3,
   /** Outer horizontal gutter applied by Screen — a little breathing room from the screen edges. */
-  screenHorizontalGutter: 14,
+  screenHorizontalGutter: 2.5,
   /** Shared phone content cap; content centers and gains side gutters beyond this width. */
   screenMaxWidth: 408,
 } as const;
