@@ -20,7 +20,7 @@ export function ScreenHeader({
     <View style={styles.row}>
       {leadingAction}
       <View style={styles.copy}>
-        <Text style={[styles.eyebrow, { color: theme.muted }]}>{eyebrow}</Text>
+        <Text style={[styles.eyebrow, { color: theme.primary }]}>{eyebrow}</Text>
         <Text numberOfLines={1} style={[styles.title, { color: theme.foregroundStrong }]}>
           {title}
         </Text>
@@ -37,8 +37,8 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: fonts.semibold,
-    fontSize: 11,
-    letterSpacing: 1.2,
+    fontSize: 10,
+    letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
   row: {
@@ -49,8 +49,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: fonts.extraBold,
-    fontSize: 24,
-    letterSpacing: 0,
-    lineHeight: 29,
+    fontSize: 25,
+    letterSpacing: -0.35,
+    lineHeight: 30,
   },
 });

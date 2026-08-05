@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { BrandLogo, Screen } from '@/components/ui';
+import { ScoreSyncAuthScreen } from '@/components/auth/ScoreSyncAuth';
 import { mobileSessionFromOAuthUrl } from '@/lib/api/oauth';
 import { useAuthStore } from '@/store/auth-store';
 import { useAppTheme } from '@/theme/colors';
@@ -10,9 +10,9 @@ import { spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
 export default function OAuthCallbackScreen() {
+  const theme = useAppTheme();
   const params = useLocalSearchParams();
   const router = useRouter();
-  const theme = useAppTheme();
   const setSession = useAuthStore((state) => state.setSession);
 
   useEffect(() => {
@@ -33,12 +33,12 @@ export default function OAuthCallbackScreen() {
   }, [params, router, setSession]);
 
   return (
-    <Screen>
+    <ScoreSyncAuthScreen back={false} subtitle="Your secure session is being prepared." title="Finishing sign in">
       <View style={styles.root}>
-        <BrandLogo markSize={52} textSize={26} />
-        <Text style={[styles.copy, { color: theme.mutedLight }]}>Finishing sign in...</Text>
+        <View style={[styles.loaderDot, { backgroundColor: theme.success }]} />
+        <Text style={[styles.copy, { color: theme.muted }]}>Connecting your BetClaw account...</Text>
       </View>
-    </Screen>
+    </ScoreSyncAuthScreen>
   );
 }
 
@@ -49,8 +49,13 @@ const styles = StyleSheet.create({
   },
   root: {
     alignItems: 'center',
-    flex: 1,
     gap: spacing.lg,
+    minHeight: 160,
     justifyContent: 'center',
+  },
+  loaderDot: {
+    borderRadius: 999,
+    height: 12,
+    width: 12,
   },
 });

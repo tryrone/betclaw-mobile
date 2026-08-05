@@ -128,7 +128,7 @@ export function DashboardChip({
         {label}
       </Text>
       {typeof count === 'number' ? (
-        <View style={[primitiveStyles.chipCount, { backgroundColor: active ? 'rgba(2,17,15,0.12)' : 'rgba(0,0,0,0.24)' }]}>
+        <View style={[primitiveStyles.chipCount, { backgroundColor: active ? 'rgba(255,255,255,0.16)' : theme.primarySubtle }]}>
           <Text style={[primitiveStyles.chipCountText, { color: active ? theme.primaryDark : theme.foregroundStrong }]}>{count}</Text>
         </View>
       ) : null}
@@ -299,11 +299,11 @@ export function useDashboardNavigation() {
 const primitiveStyles = StyleSheet.create({
   button: {
     alignItems: 'center',
-    borderRadius: radius.pill,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 8,
-    height: 44,
+    minHeight: 48,
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
@@ -319,27 +319,27 @@ const primitiveStyles = StyleSheet.create({
     fontSize: 14,
   },
   card: {
-    borderRadius: radius.xl,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: spacing.md,
     overflow: 'hidden',
     padding: spacing.lg,
-    shadowOffset: { height: 22, width: 0 },
-    shadowOpacity: 0.34,
-    shadowRadius: 34,
+    shadowOffset: { height: 0, width: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
   },
   chip: {
     alignItems: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
-    elevation: 2,
+    elevation: 0,
     flexDirection: 'row',
     gap: 7,
-    height: 46,
+    minHeight: 44,
     paddingHorizontal: spacing.md,
-    shadowOffset: { height: 10, width: 0 },
-    shadowOpacity: 0.16,
-    shadowRadius: 18,
+    shadowOffset: { height: 0, width: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
   },
   chipCount: {
     borderRadius: radius.pill,
@@ -362,11 +362,11 @@ const primitiveStyles = StyleSheet.create({
   },
   field: {
     alignItems: 'center',
-    borderRadius: radius.pill,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 9,
-    height: 46,
+    height: 50,
     paddingHorizontal: spacing.md,
   },
   input: {
@@ -378,7 +378,7 @@ const primitiveStyles = StyleSheet.create({
   },
   linkButton: {
     alignItems: 'center',
-    borderRadius: radius.pill,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 8,
@@ -391,7 +391,7 @@ const primitiveStyles = StyleSheet.create({
     fontSize: 13,
   },
   metric: {
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flex: 1,
     gap: spacing.sm,
@@ -425,7 +425,7 @@ const primitiveStyles = StyleSheet.create({
   },
   odds: {
     alignItems: 'center',
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flex: 1,
     flexDirection: 'row',

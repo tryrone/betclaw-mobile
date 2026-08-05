@@ -1,22 +1,12 @@
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { CreditCard, Download, FileText, ShieldCheck, Trophy, WalletCards, Zap } from 'lucide-react-native';
+import { Check, Coins, Download, ReceiptText, ShieldCheck, WalletCards, Zap } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import {
-  enterUp,
-  GlassCard,
-  GradientButton,
-  IconButton,
-  PressableScale,
-  ProgressBar,
-  Screen,
-  ScreenHeader,
-  StatusBadge,
-} from '@/components/ui';
+import { enterUp, GlassCard, GradientButton, PressableScale, ProgressBar, Screen, ScreenHeader, StatusBadge } from '@/components/ui';
 import { tokenPacks, type BillingItemData, type TokenPackData } from '@/data/mock';
 import { getErrorMessage } from '@/lib/api/client';
 import {
@@ -33,78 +23,82 @@ import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
-function TokenPack({ onPress, pack, selected }: { onPress: () => void; pack: TokenPackData; selected: boolean }) {
+function TokenPackRow({ onPress, pack, selected }: { onPress: () => void; pack: TokenPackData; selected: boolean }) {
   const theme = useAppTheme();
-
   return (
     <PressableScale
-      accessibilityLabel={`${pack.label} pack, ${pack.tokens} tokens for ${pack.price}`}
-      accessibilityRole="button"
+      accessibilityLabel={`${pack.label}, ${pack.tokens} tokens for ${pack.price}`}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
       onPress={onPress}
-      style={styles.packWrap}>
-      <GlassCard style={[styles.packCard, { borderColor: selected ? theme.selectionBorder : theme.border }]}>
-        <View style={styles.packTop}>
-          <View style={[styles.packIcon, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
-            <Trophy color={theme.primarySoft} size={17} />
-          </View>
+      scaleTo={0.99}
+      style={[styles.packRow, { backgroundColor: selected ? theme.primarySubtle : theme.card, borderColor: selected ? theme.selectionBorder : theme.border }]}>
+      <View style={[styles.packIcon, { backgroundColor: selected ? theme.primary : theme.field }]}>
+        <Coins color={selected ? theme.primaryDark : theme.primarySoft} size={19} strokeWidth={2} />
+      </View>
+      <View style={styles.packCopy}>
+        <View style={styles.packTitleRow}>
+          <Text numberOfLines={1} style={[styles.packTitle, { color: theme.foregroundStrong }]}>{pack.label}</Text>
           {pack.featured ? <StatusBadge label="Best value" tone="accent" /> : null}
         </View>
-        <Text style={[styles.packTitle, { color: theme.foregroundStrong }]}>{pack.label}</Text>
-        <Text style={[styles.packMeta, { color: theme.mutedLight }]}>{pack.tokens} tokens</Text>
-        <Text style={[styles.packPrice, { color: theme.primarySoft }]}>{pack.price}</Text>
-      </GlassCard>
+        <Text style={[styles.packMeta, { color: theme.muted }]}>{pack.tokens} research tokens</Text>
+      </View>
+      <View style={styles.packRight}>
+        <Text style={[styles.packPrice, { color: theme.foregroundStrong }]}>{pack.price}</Text>
+        <View style={[styles.radio, { borderColor: selected ? theme.primary : theme.borderStrong, backgroundColor: selected ? theme.primary : 'transparent' }]}>
+          {selected ? <Check color={theme.primaryDark} size={12} strokeWidth={3} /> : null}
+        </View>
+      </View>
     </PressableScale>
   );
 }
 
 type BillingRowData = BillingItemData & {
+  createdAt: Date;
   providerReference?: string | null;
   receiptUrl?: string | null;
 };
 
-function BillingRow({
-  item,
-  onOpenReceipt,
-  receiptPending,
-}: {
-  item: BillingRowData;
-  onOpenReceipt: (item: BillingRowData) => void;
-  receiptPending?: boolean;
-}) {
+type BillingGroup = { items: BillingRowData[]; key: string; label: string };
+
+function normalizePurchaseLabel(label: string) {
+  return label.replace(/^token purchase:\s*/i, '').replace(/\s+/g, ' ').trim() || 'Token purchase';
+}
+
+function BillingRow({ item, onOpenReceipt, receiptPending, showDivider }: { item: BillingRowData; onOpenReceipt: (item: BillingRowData) => void; receiptPending?: boolean; showDivider: boolean }) {
   const theme = useAppTheme();
   const canOpenReceipt = item.status === 'Paid';
-
-  return (
-    <GlassCard style={styles.billingRow}>
-      <View style={[styles.billingIcon, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
-        <FileText color={theme.primarySoft} size={15} />
+  const content = (
+    <View style={[styles.billingRow, showDivider ? { borderBottomColor: theme.border, borderBottomWidth: 1 } : null]}>
+      <View style={[styles.billingIcon, { backgroundColor: canOpenReceipt ? theme.successSoft : theme.warningSoft }]}>
+        <ReceiptText color={canOpenReceipt ? theme.success : theme.warning} size={18} strokeWidth={1.9} />
       </View>
       <View style={styles.billingCopy}>
-        <Text numberOfLines={2} style={[styles.billingTitle, { color: theme.foregroundStrong }]}>
-          {item.label}
-        </Text>
+        <Text numberOfLines={2} style={[styles.billingTitle, { color: theme.foregroundStrong }]}>{normalizePurchaseLabel(item.label)}</Text>
         <View style={styles.billingMetaRow}>
           <Text style={[styles.billingDate, { color: theme.muted }]}>{item.date}</Text>
-          <StatusBadge label={item.status} tone={item.status === 'Paid' ? 'success' : 'warning'} />
+          <View style={[styles.statusDot, { backgroundColor: canOpenReceipt ? theme.success : theme.warning }]} />
+          <Text style={[styles.billingStatus, { color: canOpenReceipt ? theme.success : theme.warning }]}>{item.status}</Text>
         </View>
       </View>
       <View style={styles.billingRight}>
         <Text style={[styles.billingAmount, { color: theme.foregroundStrong }]}>{item.amount}</Text>
-        {canOpenReceipt ? (
-          <PressableScale
-            accessibilityLabel={`Open receipt for ${item.label}`}
-            accessibilityRole="button"
-            onPress={() => onOpenReceipt(item)}
-            style={[styles.receiptButton, { backgroundColor: theme.field, borderColor: theme.border }]}>
-            <Download color={theme.primarySoft} size={13} />
-            <Text style={[styles.receiptText, { color: theme.primarySoft }]}>
-              {receiptPending ? 'Opening' : 'Receipt'}
-            </Text>
-          </PressableScale>
-        ) : null}
+        {canOpenReceipt ? <Download color={theme.primarySoft} size={17} strokeWidth={1.9} /> : null}
       </View>
-    </GlassCard>
+    </View>
   );
+
+  return canOpenReceipt ? (
+    <PressableScale
+      accessibilityHint="Opens the purchase receipt"
+      accessibilityLabel={`Receipt for ${normalizePurchaseLabel(item.label)}, ${item.amount}`}
+      accessibilityRole="button"
+      disabled={receiptPending}
+      onPress={() => onOpenReceipt(item)}
+      scaleTo={0.99}>
+      {content}
+    </PressableScale>
+  ) : content;
 }
 
 export default function WalletScreen() {
@@ -120,23 +114,23 @@ export default function WalletScreen() {
   const verifyReturnedPayment = verifyPayment.mutate;
   const verifiedReturnReference = useRef<string | null>(null);
   const returnedReference = Array.isArray(reference) ? reference[0] : reference;
+
   const availablePacks = useMemo<TokenPackData[]>(() => {
     const premiumPlan = plans.data?.find((plan: any) => plan.name === 'premium');
     const options = premiumPlan?.purchaseOptions;
     if (!Array.isArray(options) || options.length === 0) return tokenPacks;
-
     return options.map((option: any) => ({
+      featured: option.durationDays === 7,
       id: String(option.durationDays),
       label: option.label ?? `${option.durationDays} day access`,
       price: `₦${Math.round((option.amountKobo ?? 0) / 100).toLocaleString()}`,
       tokens: Number(option.researchTokens ?? 0).toLocaleString(),
-      featured: option.durationDays === 7,
     }));
   }, [plans.data]);
+
   const [selectedPack, setSelectedPack] = useState(availablePacks[0]?.id ?? 'weekly');
-  const activeSelectedPack = availablePacks.some((pack) => pack.id === selectedPack)
-    ? selectedPack
-    : availablePacks[0]?.id ?? 'weekly';
+  const activeSelectedPack = availablePacks.some((pack) => pack.id === selectedPack) ? selectedPack : availablePacks[0]?.id ?? 'weekly';
+  const selectedPackDetails = availablePacks.find((pack) => pack.id === activeSelectedPack) ?? availablePacks[0];
   const selectedDuration = Number(activeSelectedPack) === 1 || Number(activeSelectedPack) === 7 ? (Number(activeSelectedPack) as 1 | 7) : 7;
   const tokenBalance = subscription.data?.researchTokensRemaining ?? 0;
   const minimumBalance = subscription.data?.minimumActiveResearchTokens ?? 1;
@@ -144,27 +138,42 @@ export default function WalletScreen() {
   const freeLimit = usage.data?.creditsPerMonth ?? 0;
   const freeUsed = usage.data?.creditsUsed ?? usage.data?.requestsUsed ?? 0;
   const freeRemaining = usage.data?.creditsRemaining ?? usage.data?.requestsRemaining ?? 0;
-  const usagePercent =
-    typeof usage.data?.percentUsed === 'number'
-      ? usage.data.percentUsed
-      : freeLimit > 0
-        ? Math.min(100, Math.round((freeUsed / freeLimit) * 100))
-        : 0;
+  const usagePercent = typeof usage.data?.percentUsed === 'number' ? usage.data.percentUsed : freeLimit > 0 ? Math.min(100, Math.round((freeUsed / freeLimit) * 100)) : 0;
   const hasUnlimitedFreeUse = freeLimit === -1;
+  const accessLabel = subscription.data?.accessTier ? `${subscription.data.accessTier} access` : 'Account active';
+
   const billingItems = useMemo<BillingRowData[]>(() => {
     const items = billing.data?.items;
     if (!Array.isArray(items) || items.length === 0) return [];
-
-    return items.map((item: any) => ({
-      id: item.id,
-      label: item.description ?? 'Token purchase',
-      date: new Date(item.createdAt).toLocaleDateString(),
-      amount: formatCurrency(item.amount, item.currency ?? 'NGN'),
-      providerReference: item.providerReference,
-      receiptUrl: item.receiptUrl,
-      status: item.status === 'PAID' ? 'Paid' : 'Pending',
-    }));
+    return items.map((item: any) => {
+      const createdAt = new Date(item.createdAt);
+      return {
+        amount: formatCurrency(item.amount, item.currency ?? 'NGN'),
+        createdAt,
+        date: createdAt.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }),
+        id: item.id,
+        label: item.description ?? 'Token purchase',
+        providerReference: item.providerReference,
+        receiptUrl: item.receiptUrl,
+        status: item.status === 'PAID' ? 'Paid' : 'Pending',
+      };
+    });
   }, [billing.data]);
+
+  const billingGroups = useMemo<BillingGroup[]>(() => {
+    const groups = new Map<string, BillingGroup>();
+    billingItems.forEach((item) => {
+      const key = `${item.createdAt.getFullYear()}-${item.createdAt.getMonth()}`;
+      const current = groups.get(key) ?? {
+        items: [],
+        key,
+        label: item.createdAt.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+      };
+      current.items.push(item);
+      groups.set(key, current);
+    });
+    return Array.from(groups.values());
+  }, [billingItems]);
 
   useEffect(() => {
     if (returnedReference && verifiedReturnReference.current !== returnedReference) {
@@ -175,19 +184,13 @@ export default function WalletScreen() {
 
   const handleKoraCheckout = async () => {
     const returnUrl = Linking.createURL('/(tabs)/wallet');
-    const checkout = await createCheckout.mutateAsync({
-      durationDays: selectedDuration,
-      returnUrl,
-    });
+    const checkout = await createCheckout.mutateAsync({ durationDays: selectedDuration, returnUrl });
     const result = await WebBrowser.openAuthSessionAsync(checkout.url, returnUrl);
     if (result.type === 'success') {
       const parsed = Linking.parse(result.url);
       const parsedReference = parsed.queryParams?.reference;
-      const verificationReference =
-        checkout.providerReference ?? checkout.reference ?? (Array.isArray(parsedReference) ? parsedReference[0] : parsedReference);
-      if (verificationReference) {
-        verifyReturnedPayment({ reference: String(verificationReference) });
-      }
+      const verificationReference = checkout.providerReference ?? checkout.reference ?? (Array.isArray(parsedReference) ? parsedReference[0] : parsedReference);
+      if (verificationReference) verifyReturnedPayment({ reference: String(verificationReference) });
     }
   };
 
@@ -196,7 +199,7 @@ export default function WalletScreen() {
       const receiptUrl = item.receiptUrl ?? (await downloadReceipt.mutateAsync({ paymentId: item.id })).receiptUrl;
       await openExternalUrl(receiptUrl);
     } catch {
-      // downloadReceipt.error is surfaced to the user in the billing list below.
+      // The mutation error is rendered beneath purchase history.
     }
   };
 
@@ -211,304 +214,160 @@ export default function WalletScreen() {
       }}
       refreshing={subscription.isRefetching || billing.isRefetching}>
       <Animated.View entering={enterUp(0)}>
-        <ScreenHeader action={<IconButton icon={CreditCard} label="Payment methods" />} eyebrow="Billing" title="Wallet" />
+        <ScreenHeader eyebrow="Balance" title="Wallet" />
       </Animated.View>
 
       <Animated.View entering={enterUp(1)}>
-        <GlassCard gradient="hero" style={styles.balanceCard}>
+        <GlassCard style={[styles.balanceCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <View style={styles.balanceTop}>
-            <StatusBadge label="Premium active" tone="accent" />
-            <ShieldCheck color={theme.primarySoft} size={21} />
+            <View>
+              <Text style={[styles.balanceLabel, { color: theme.muted }]}>Available research tokens</Text>
+              <View style={styles.balanceValueRow}>
+                <Text style={[styles.balanceValue, { color: theme.foregroundStrong }]}>{Number(tokenBalance).toLocaleString()}</Text>
+                <Text style={[styles.balanceUnit, { color: theme.mutedLight }]}>tokens</Text>
+              </View>
+            </View>
+            <View style={[styles.shieldIcon, { backgroundColor: theme.primarySubtle }]}>
+              <ShieldCheck color={theme.primarySoft} size={22} />
+            </View>
           </View>
-          <View>
-            <Text style={[styles.balanceLabel, { color: theme.muted }]}>Token balance</Text>
-            <Text style={[styles.balanceValue, { color: theme.foregroundStrong }]}>{Number(tokenBalance).toLocaleString()}</Text>
-            <Text style={[styles.balanceSub, { color: theme.mutedLight }]}>tokens remaining</Text>
+          <View style={styles.accessRow}>
+            <StatusBadge label={accessLabel} tone="accent" />
+            <Text style={[styles.minimumText, { color: theme.muted }]}>Minimum active balance: {minimumBalance}</Text>
           </View>
           <ProgressBar value={balanceProgress} />
-        </GlassCard>
-      </Animated.View>
-
-      <Animated.View entering={enterUp(2)}>
-        <GlassCard>
-          <View style={styles.cardHeader}>
-            <View>
-              <Text style={[styles.cardTitle, { color: theme.foregroundStrong }]}>Usage and limits</Text>
-              <Text style={[styles.cardCaption, { color: theme.muted }]}>Free checks plus token-backed research activity.</Text>
-            </View>
-            <Zap color={theme.accent} size={22} />
-          </View>
-          <View style={styles.usageGrid}>
-            <View style={[styles.usageTile, { backgroundColor: theme.field, borderColor: theme.border }]}>
-              <Text style={[styles.usageValue, { color: theme.primarySoft }]}>
-                {hasUnlimitedFreeUse ? 'Unlimited' : Number(freeRemaining).toLocaleString()}
-              </Text>
+          <View style={[styles.usageRow, { borderTopColor: theme.border }]}>
+            <View style={styles.usageMetric}>
+              <Text style={[styles.usageValue, { color: theme.foregroundStrong }]}>{hasUnlimitedFreeUse ? 'Unlimited' : Number(freeRemaining).toLocaleString()}</Text>
               <Text style={[styles.usageLabel, { color: theme.muted }]}>Free remaining</Text>
             </View>
-            <View style={[styles.usageTile, { backgroundColor: theme.field, borderColor: theme.border }]}>
-              <Text style={[styles.usageValue, { color: theme.foregroundStrong }]}>
-                {hasUnlimitedFreeUse ? 'Premium' : `${Number(freeUsed).toLocaleString()}/${Number(freeLimit).toLocaleString()}`}
-              </Text>
-              <Text style={[styles.usageLabel, { color: theme.muted }]}>Free usage</Text>
+            <View style={[styles.usageDivider, { backgroundColor: theme.border }]} />
+            <View style={styles.usageMetric}>
+              <Text style={[styles.usageValue, { color: theme.foregroundStrong }]}>{hasUnlimitedFreeUse ? 'Premium' : `${Number(freeUsed).toLocaleString()}/${Number(freeLimit).toLocaleString()}`}</Text>
+              <Text style={[styles.usageLabel, { color: theme.muted }]}>Monthly usage</Text>
             </View>
+            <Zap color={subscription.data?.isBelowMinimumTokenBalance ? theme.warning : theme.primarySoft} size={19} />
           </View>
-          <ProgressBar
-            tone={subscription.data?.isBelowMinimumTokenBalance ? 'warning' : 'success'}
-            value={hasUnlimitedFreeUse ? 100 : usagePercent}
-          />
-          <Text style={[styles.cardCaption, { color: subscription.data?.isBelowMinimumTokenBalance ? theme.warning : theme.muted }]}>
-            {subscription.data?.isBelowMinimumTokenBalance
-              ? `Keep at least ${Number(minimumBalance).toLocaleString()} token${minimumBalance === 1 ? '' : 's'} for research actions.`
-              : usage.isLoading
-                ? 'Refreshing usage counters.'
-                : 'Fix Ticket and Build Ticket are available while your access and token balance are valid.'}
-          </Text>
+          {!hasUnlimitedFreeUse ? <ProgressBar tone={subscription.data?.isBelowMinimumTokenBalance ? 'warning' : 'success'} value={usagePercent} /> : null}
         </GlassCard>
       </Animated.View>
 
-      <Animated.View entering={enterUp(3)} style={styles.packGrid}>
+      <Animated.View entering={enterUp(2)} style={styles.sectionIntro}>
+        <Text style={[styles.sectionTitle, { color: theme.foregroundStrong }]}>Get more tokens</Text>
+        <Text style={[styles.sectionCaption, { color: theme.muted }]}>Choose the access period that fits your next research session.</Text>
+      </Animated.View>
+
+      <Animated.View entering={enterUp(3)} accessibilityRole="radiogroup" style={styles.packList}>
         {availablePacks.map((pack) => (
-          <TokenPack key={pack.id} onPress={() => setSelectedPack(pack.id)} pack={pack} selected={activeSelectedPack === pack.id} />
+          <TokenPackRow key={pack.id} onPress={() => setSelectedPack(pack.id)} pack={pack} selected={activeSelectedPack === pack.id} />
         ))}
       </Animated.View>
 
-      <Animated.View entering={enterUp(4)}>
-        <GlassCard>
-          <View style={styles.cardHeader}>
-            <Text style={[styles.cardTitle, { color: theme.foregroundStrong }]}>Payment paths</Text>
-            <StatusBadge label="Kora" tone="accent" />
-          </View>
-          <View style={styles.paymentGrid}>
-            {createCheckout.error ? <Text style={[styles.cardCaption, { color: theme.danger }]}>{getErrorMessage(createCheckout.error)}</Text> : null}
-            {verifyPayment.data ? <Text style={[styles.cardCaption, { color: theme.success }]}>Payment status: {verifyPayment.data.status}</Text> : null}
+      {selectedPackDetails ? (
+        <Animated.View entering={enterUp(4)}>
+          <GlassCard style={styles.checkoutCard}>
+            <View style={styles.checkoutSummary}>
+              <View>
+                <Text style={[styles.checkoutLabel, { color: theme.muted }]}>Selected pack</Text>
+                <Text style={[styles.checkoutTitle, { color: theme.foregroundStrong }]}>{selectedPackDetails.label}</Text>
+                <Text style={[styles.checkoutMeta, { color: theme.mutedLight }]}>{selectedPackDetails.tokens} tokens · Secure checkout by Kora</Text>
+              </View>
+              <Text style={[styles.checkoutPrice, { color: theme.primarySoft }]}>{selectedPackDetails.price}</Text>
+            </View>
+            {createCheckout.error ? <Text style={[styles.feedbackText, { color: theme.danger }]}>{getErrorMessage(createCheckout.error)}</Text> : null}
+            {verifyPayment.data ? <Text style={[styles.feedbackText, { color: theme.success }]}>Payment status: {verifyPayment.data.status}</Text> : null}
             <GradientButton icon={WalletCards} onPress={handleKoraCheckout}>
-              {createCheckout.isPending || verifyPayment.isPending ? 'Processing...' : 'Pay with Kora'}
+              {createCheckout.isPending || verifyPayment.isPending ? 'Processing…' : `Pay ${selectedPackDetails.price} with Kora`}
             </GradientButton>
-          </View>
-        </GlassCard>
-      </Animated.View>
-
-      <Animated.View entering={enterUp(5)} style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.foregroundStrong }]}>Purchase history</Text>
-        <Text style={[styles.sectionAction, { color: theme.primarySoft }]}>View all</Text>
-      </Animated.View>
-
-      {billingItems.length === 0 ? (
-        <Animated.View entering={enterUp(6)}>
-          <GlassCard style={styles.emptyCard}>
-            <Text style={[styles.emptyTitle, { color: theme.foregroundStrong }]}>
-              {billing.isLoading ? 'Loading purchase history' : 'No purchases yet'}
-            </Text>
-            <Text style={[styles.emptyCopy, { color: theme.muted }]}>
-              {billing.isLoading ? 'Fetching your wallet activity.' : 'Completed Kora purchases will appear here.'}
-            </Text>
           </GlassCard>
         </Animated.View>
       ) : null}
 
-      {billingItems.map((item, index) => (
-        <Animated.View entering={enterUp(7 + index)} key={item.id}>
-          <BillingRow item={item} onOpenReceipt={handleOpenReceipt} receiptPending={downloadReceipt.isPending} />
+      <Animated.View entering={enterUp(5)} style={styles.sectionIntro}>
+        <Text style={[styles.sectionTitle, { color: theme.foregroundStrong }]}>Purchase history</Text>
+        <Text style={[styles.sectionCaption, { color: theme.muted }]}>Receipts and token purchases, newest first.</Text>
+      </Animated.View>
+
+      {billingGroups.length === 0 ? (
+        <Animated.View entering={enterUp(6)}>
+          <GlassCard style={styles.emptyCard}>
+            <ReceiptText color={theme.muted} size={22} />
+            <Text style={[styles.emptyTitle, { color: theme.foregroundStrong }]}>{billing.isLoading ? 'Loading purchase history' : 'No purchases yet'}</Text>
+            <Text style={[styles.emptyCopy, { color: theme.muted }]}>{billing.isLoading ? 'Fetching your wallet activity.' : 'Completed Kora purchases will appear here.'}</Text>
+          </GlassCard>
+        </Animated.View>
+      ) : null}
+
+      {billingGroups.map((group, groupIndex) => (
+        <Animated.View entering={enterUp(6 + groupIndex)} key={group.key} style={styles.historyGroup}>
+          <Text style={[styles.monthLabel, { color: theme.muted }]}>{group.label}</Text>
+          <GlassCard style={styles.historyCard}>
+            {group.items.map((item, index) => (
+              <BillingRow
+                item={item}
+                key={item.id}
+                onOpenReceipt={handleOpenReceipt}
+                receiptPending={downloadReceipt.isPending}
+                showDivider={index < group.items.length - 1}
+              />
+            ))}
+          </GlassCard>
         </Animated.View>
       ))}
-      {downloadReceipt.error ? (
-        <Text style={[styles.emptyCopy, { color: theme.danger }]}>{getErrorMessage(downloadReceipt.error)}</Text>
-      ) : null}
+      {downloadReceipt.error ? <Text style={[styles.feedbackText, { color: theme.danger }]}>{getErrorMessage(downloadReceipt.error)}</Text> : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  balanceCard: {
-    gap: spacing.md,
-  },
-  balanceLabel: {
-    fontFamily: fonts.bold,
-    fontSize: 11,
-    textTransform: 'uppercase',
-  },
-  balanceSub: {
-    fontFamily: fonts.bold,
-    fontSize: 13,
-    marginTop: 5,
-  },
-  balanceTop: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  balanceValue: {
-    fontFamily: fonts.extraBold,
-    fontSize: 36,
-    letterSpacing: 0,
-    lineHeight: 41,
-    marginTop: 5,
-  },
-  billingAmount: {
-    fontFamily: fonts.bold,
-    fontSize: 12,
-  },
-  billingCopy: {
-    flex: 1,
-    gap: 4,
-    minWidth: 0,
-  },
-  billingMetaRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  billingDate: {
-    fontFamily: fonts.medium,
-    fontSize: 11,
-    marginTop: 4,
-  },
-  billingIcon: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 34,
-    justifyContent: 'center',
-    width: 34,
-  },
-  billingRight: {
-    alignItems: 'flex-end',
-    gap: 6,
-  },
-  billingRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-    padding: spacing.md,
-  },
-  billingTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 14,
-    lineHeight: 19,
-  },
-  cardCaption: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 4,
-    maxWidth: 220,
-  },
-  cardHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  cardTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 16,
-  },
-  emptyCard: {
-    gap: spacing.xs,
-    padding: spacing.lg,
-  },
-  emptyCopy: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  emptyTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 15,
-  },
-  packCard: {
-    flex: 1,
-    padding: spacing.md,
-  },
-  packGrid: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  packIcon: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
-  },
-  packMeta: {
-    fontFamily: fonts.semibold,
-    fontSize: 12,
-  },
-  packPrice: {
-    fontFamily: fonts.extraBold,
-    fontSize: 16,
-  },
-  packTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 16,
-  },
-  packTop: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-    justifyContent: 'space-between',
-  },
-  packWrap: {
-    flex: 1,
-  },
-  paymentGrid: {
-    gap: spacing.sm,
-  },
-  receiptButton: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 5,
-    minHeight: 28,
-    paddingHorizontal: 8,
-  },
-  receiptText: {
-    fontFamily: fonts.bold,
-    fontSize: 10,
-  },
-  sectionAction: {
-    fontFamily: fonts.bold,
-    fontSize: 12,
-  },
-  sectionHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  sectionTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 17,
-  },
-  storePay: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 46,
-    justifyContent: 'center',
-  },
-  storePayText: {
-    fontFamily: fonts.bold,
-    fontSize: 14,
-  },
-  usageGrid: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  usageLabel: {
-    fontFamily: fonts.semibold,
-    fontSize: 11,
-    marginTop: 3,
-  },
-  usageTile: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    flex: 1,
-    padding: spacing.md,
-  },
-  usageValue: {
-    fontFamily: fonts.extraBold,
-    fontSize: 18,
-  },
+  accessRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between' },
+  balanceCard: { gap: spacing.md, padding: spacing.lg },
+  balanceLabel: { fontFamily: fonts.bold, fontSize: 11, letterSpacing: 0.7, textTransform: 'uppercase' },
+  balanceTop: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
+  balanceUnit: { fontFamily: fonts.bold, fontSize: 13, paddingBottom: 5 },
+  balanceValue: { fontFamily: fonts.extraBold, fontSize: 38, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 44 },
+  balanceValueRow: { alignItems: 'flex-end', flexDirection: 'row', gap: spacing.xs, marginTop: 4 },
+  billingAmount: { fontFamily: fonts.extraBold, fontSize: 13, fontVariant: ['tabular-nums'] },
+  billingCopy: { flex: 1, gap: 5, minWidth: 0 },
+  billingDate: { fontFamily: fonts.medium, fontSize: 11 },
+  billingIcon: { alignItems: 'center', borderRadius: radius.pill, height: 38, justifyContent: 'center', width: 38 },
+  billingMetaRow: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  billingRight: { alignItems: 'flex-end', gap: spacing.sm },
+  billingRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, minHeight: 76, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  billingStatus: { fontFamily: fonts.bold, fontSize: 10 },
+  billingTitle: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 17 },
+  checkoutCard: { gap: spacing.md, padding: spacing.md },
+  checkoutLabel: { fontFamily: fonts.bold, fontSize: 10, letterSpacing: 0.6, textTransform: 'uppercase' },
+  checkoutMeta: { fontFamily: fonts.medium, fontSize: 11, marginTop: 3 },
+  checkoutPrice: { fontFamily: fonts.extraBold, fontSize: 18, fontVariant: ['tabular-nums'] },
+  checkoutSummary: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between' },
+  checkoutTitle: { fontFamily: fonts.extraBold, fontSize: 16, marginTop: 3 },
+  emptyCard: { alignItems: 'center', gap: spacing.xs, padding: spacing.xl },
+  emptyCopy: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  emptyTitle: { fontFamily: fonts.extraBold, fontSize: 15 },
+  feedbackText: { fontFamily: fonts.semibold, fontSize: 12, lineHeight: 17 },
+  historyCard: { gap: 0, overflow: 'hidden', padding: 0 },
+  historyGroup: { gap: spacing.sm },
+  minimumText: { fontFamily: fonts.medium, fontSize: 10 },
+  monthLabel: { fontFamily: fonts.extraBold, fontSize: 11, letterSpacing: 0.7, textTransform: 'uppercase' },
+  packCopy: { flex: 1, minWidth: 0 },
+  packIcon: { alignItems: 'center', borderRadius: radius.lg, height: 42, justifyContent: 'center', width: 42 },
+  packList: { gap: spacing.sm },
+  packMeta: { fontFamily: fonts.medium, fontSize: 11, marginTop: 4 },
+  packPrice: { fontFamily: fonts.extraBold, fontSize: 15, fontVariant: ['tabular-nums'] },
+  packRight: { alignItems: 'flex-end', gap: spacing.sm },
+  packRow: { alignItems: 'center', borderRadius: radius.xl, borderWidth: 1, flexDirection: 'row', gap: spacing.md, minHeight: 78, padding: spacing.md },
+  packTitle: { flexShrink: 1, fontFamily: fonts.extraBold, fontSize: 14 },
+  packTitleRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
+  radio: { alignItems: 'center', borderRadius: radius.pill, borderWidth: 1, height: 20, justifyContent: 'center', width: 20 },
+  sectionCaption: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, marginTop: 3 },
+  sectionIntro: { gap: 1 },
+  sectionTitle: { fontFamily: fonts.extraBold, fontSize: 18 },
+  shieldIcon: { alignItems: 'center', borderRadius: radius.pill, height: 44, justifyContent: 'center', width: 44 },
+  statusDot: { borderRadius: radius.pill, height: 6, width: 6 },
+  usageDivider: { height: 28, width: 1 },
+  usageLabel: { fontFamily: fonts.medium, fontSize: 10, marginTop: 2 },
+  usageMetric: { flex: 1 },
+  usageRow: { alignItems: 'center', borderTopWidth: 1, flexDirection: 'row', gap: spacing.md, paddingTop: spacing.md },
+  usageValue: { fontFamily: fonts.extraBold, fontSize: 14 },
 });

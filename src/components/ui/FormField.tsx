@@ -1,6 +1,6 @@
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
-import { useAppTheme } from '@/theme/colors';
+import { colorPalettes, useAppTheme } from '@/theme/colors';
 import { radius } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
@@ -15,6 +15,7 @@ export function FormField({
   placeholder,
   secure,
   value,
+  variant = 'default',
 }: {
   icon: IconComponent;
   label: string;
@@ -23,14 +24,16 @@ export function FormField({
   placeholder?: string;
   secure?: boolean;
   value?: string;
+  variant?: 'default' | 'light';
   autoCapitalize?: TextInputProps['autoCapitalize'];
 }) {
-  const theme = useAppTheme();
+  const appTheme = useAppTheme();
+  const theme = variant === 'light' ? colorPalettes.light : appTheme;
 
   return (
     <View style={styles.fieldGroup}>
       <Text style={[styles.label, { color: theme.foregroundStrong }]}>{label}</Text>
-      <View style={[styles.field, { backgroundColor: theme.backgroundAlt, borderColor: theme.borderStrong }]}>
+      <View style={[styles.field, { backgroundColor: theme.field, borderColor: theme.border }]}>
         <Icon color={theme.muted} size={20} strokeWidth={2} />
         <TextInput
           autoCapitalize={autoCapitalize}
@@ -50,11 +53,11 @@ export function FormField({
 const styles = StyleSheet.create({
   field: {
     alignItems: 'center',
-    borderRadius: radius.pill,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
-    minHeight: 54,
+    minHeight: 56,
     paddingHorizontal: 15,
   },
   fieldGroup: {

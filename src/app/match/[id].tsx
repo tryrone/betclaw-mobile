@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Activity,
@@ -161,14 +160,6 @@ function readinessTone(status?: string | null): BadgeTone {
   return 'neutral';
 }
 
-function matchStatusTone(match: MatchCardData, insight?: FixtureInsight | null): BadgeTone {
-  const status = `${insight?.status ?? match.status}`.toLowerCase();
-  if (match.status === 'Live' || /live|1h|2h/.test(status)) return 'danger';
-  if (/finished|final|ft/.test(status)) return 'neutral';
-  if (match.status === 'Today') return 'warning';
-  return 'accent';
-}
-
 function statusLabel(match: MatchCardData, insight?: FixtureInsight | null) {
   if (isFinished(insight)) return 'Full time';
   if (insight?.elapsedMinute) return `${insight.elapsedMinute}'`;
@@ -325,9 +316,9 @@ function MetricTile({ label, tone = 'neutral', value }: { label: string; tone?: 
 
 function HeroMetaPill({ icon: Icon, label, tone = 'neutral' }: { icon?: IconComponent; label: string; tone?: BadgeTone }) {
   const theme = useAppTheme();
-  const color = tone === 'accent' ? theme.primary : tone === 'warning' ? theme.warning : theme.mutedLight;
+  const color = tone === 'accent' ? theme.primarySoft : tone === 'warning' ? theme.warning : theme.mutedLight;
   return (
-    <View style={[styles.heroMetaPill, { backgroundColor: theme.surface, borderColor: tone === 'accent' ? theme.selectionBorder : theme.border }]}>
+    <View style={[styles.heroMetaPill, { backgroundColor: theme.field, borderColor: theme.border }]}>
       {Icon ? <Icon color={color} size={13} /> : null}
       <Text numberOfLines={1} style={[styles.heroMetaText, { color }]}>{label}</Text>
     </View>
@@ -353,17 +344,6 @@ function FormPills({ values, alignRight }: { alignRight?: boolean; values: strin
           </View>
         );
       })}
-    </View>
-  );
-}
-
-function ConfidenceRing({ value }: { value?: number | null }) {
-  const theme = useAppTheme();
-  const display = value == null ? '--' : `${Math.round(value)}%`;
-  return (
-    <View style={[styles.confidenceRing, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
-      <Text style={[styles.confidenceValue, { color: theme.primary }]}>{display}</Text>
-      <Text style={[styles.confidenceLabel, { color: theme.mutedLight }]}>Ready</Text>
     </View>
   );
 }
@@ -583,7 +563,7 @@ function MatchLoadingSkeleton() {
 function SectionSwitcher({ activeSection, onSelect }: { activeSection: DetailSection; onSelect: (tab: DetailSection) => void }) {
   const theme = useAppTheme();
   return (
-    <View style={[styles.sectionSwitcher, { backgroundColor: theme.cardMuted, borderColor: theme.border }]}>
+    <View style={[styles.sectionSwitcher, { borderBottomColor: theme.border }]}>
       {sections.map((section) => {
         const active = section === activeSection;
         return (
@@ -593,8 +573,9 @@ function SectionSwitcher({ activeSection, onSelect }: { activeSection: DetailSec
             accessibilityState={{ selected: active }}
             key={section}
             onPress={() => onSelect(section)}
-            style={[styles.sectionTab, { backgroundColor: active ? theme.primary : theme.field, borderColor: active ? theme.primary : theme.border }]}>
-            <Text numberOfLines={1} style={[styles.sectionTabText, { color: active ? theme.primaryDark : theme.mutedLight }]}>{section}</Text>
+            style={styles.sectionTab}>
+            <Text numberOfLines={1} style={[styles.sectionTabText, { color: active ? theme.primary : theme.muted }]}>{section}</Text>
+            {active ? <View style={[styles.sectionTabIndicator, { backgroundColor: theme.primary }]} /> : null}
           </PressableScale>
         );
       })}
@@ -619,21 +600,11 @@ function MatchHero({
   const score = match.homeScore !== undefined && match.awayScore !== undefined ? `${match.homeScore} : ${match.awayScore}` : match.time;
 
   return (
-    <GlassCard gradient="matchHero" style={styles.heroCard}>
-      <LinearGradient
-        colors={
-          theme.mode === 'light'
-            ? ['rgba(13,148,136,0.06)', 'rgba(13,148,136,0.02)', 'rgba(255,255,255,0)']
-            : ['rgba(46,242,208,0.12)', 'rgba(251,191,36,0.08)', 'rgba(2,17,15,0)']
-        }
-        end={{ x: 1, y: 0 }}
-        start={{ x: 0, y: 0 }}
-        style={StyleSheet.absoluteFill}
-      />
+    <GlassCard style={[styles.heroCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
       <View style={styles.leagueRibbon}>
         <View style={styles.leagueIdentity}>
           {match.leagueLogoUrl ? <TeamLogo logoUrl={match.leagueLogoUrl} name={match.league} size={20} /> : null}
-          <Text numberOfLines={1} style={[styles.leagueText, { color: theme.primary }]}>{match.league}</Text>
+          <Text numberOfLines={1} style={[styles.leagueText, { color: theme.foregroundStrong }]}>{match.league}</Text>
           {insight?.league?.country ? <Text numberOfLines={1} style={[styles.countryText, { color: theme.muted }]}>/ {insight.league.country}</Text> : null}
         </View>
         {insight?.round ? <StatusBadge label={insight.round} tone="neutral" /> : null}
@@ -648,14 +619,17 @@ function MatchHero({
         </View>
 
         <View style={styles.heroCenter}>
-          <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.scoreText, { color: theme.foregroundStrong }]}>{score}</Text>
+          <View style={[styles.venueLabel, { backgroundColor: theme.field }]}>
+            <Text numberOfLines={1} style={[styles.venueLabelText, { color: theme.foregroundStrong }]}>{match.venue}</Text>
+          </View>
+          <Text numberOfLines={1} style={[styles.scoreText, { color: theme.foregroundStrong }]}>{score}</Text>
           <View style={styles.liveTimeRow}>
             {!isFinished(insight) ? (
               <View style={[styles.liveDot, { backgroundColor: isLiveMatch(match, insight) ? theme.live : theme.primary }]} />
             ) : null}
-            <Text numberOfLines={1} style={[styles.liveClock, { color: theme.mutedLight }]}>{statusLabel(match, insight)}</Text>
+            <Text numberOfLines={1} style={[styles.liveClock, { color: theme.muted }]}>{statusLabel(match, insight)}</Text>
           </View>
-          <ConfidenceRing value={readinessScore} />
+          <Text style={[styles.weekLabel, { color: theme.muted }]}>Data ready {readinessScore}%</Text>
         </View>
 
         <View style={[styles.heroTeam, styles.heroTeamAway]}>
@@ -666,7 +640,7 @@ function MatchHero({
         </View>
       </View>
 
-      <View style={styles.heroMetaRow}>
+      <View style={[styles.heroMetaRow, { borderTopColor: theme.border }]}>
         <HeroMetaPill icon={CalendarDays} label={match.date} tone="accent" />
         <HeroMetaPill icon={Clock3} label={match.time} />
         <HeroMetaPill icon={MapPin} label={match.venue} />
@@ -694,7 +668,7 @@ function ContextStrip({
   return (
     <View style={[styles.contextStrip, { backgroundColor: theme.cardMuted, borderColor: theme.border }]}>
       <View style={styles.contextHeader}>
-        <Text style={[styles.contextTitle, { color: theme.muted }]}>Data readiness</Text>
+        <Text style={[styles.contextTitle, { color: theme.muted }]}>Match coverage</Text>
         <StatusBadge label={readinessStatus ?? 'Coverage'} tone={tone} />
       </View>
       <View style={styles.contextScoreRow}>
@@ -1290,36 +1264,31 @@ export default function MatchDetailScreen() {
 
   return (
     <Screen onRefresh={() => void insight.refetch()} refreshing={insight.isRefetching}>
-      <Animated.View entering={enterUp(0)} style={styles.header}>
-        <IconButton icon={ArrowLeft} label="Go back" onPress={goBack} />
-        <View style={styles.headerTitleWrap}>
-          <Text numberOfLines={1} style={[styles.title, { color: theme.foregroundStrong }]}>{headerTitle}</Text>
-          <View style={styles.headerBadges}>
-            <StatusBadge label={statusLabel(match, fixtureInsight)} tone={matchStatusTone(match, fixtureInsight)} />
-            <StatusBadge label={`${readinessScore}% ready`} tone={readinessTone(readinessStatus)} />
+      <Animated.View entering={enterUp(0)} style={styles.matchStage}>
+        <View style={styles.header}>
+          <IconButton icon={ArrowLeft} label="Go back" onPress={goBack} />
+          <View style={styles.headerTitleWrap}>
+            <Text numberOfLines={1} style={[styles.stageTitle, { color: theme.foregroundStrong }]}>{match.league}</Text>
+            <Text numberOfLines={1} style={[styles.stageSubtitle, { color: theme.muted }]}>{headerTitle}</Text>
           </View>
+          <IconButton icon={Bell} label="Match alerts" />
         </View>
-        <IconButton icon={Bell} label="Match alerts" />
-      </Animated.View>
-
-      <Animated.View entering={enterUp(1)}>
         <MatchHero awayForm={awayForm} homeForm={homeForm} insight={fixtureInsight} match={match} readinessScore={readinessScore} />
       </Animated.View>
 
-      <Animated.View entering={enterUp(2)}>
+      <Animated.View entering={enterUp(1)}>
         <PressableScale
           accessibilityLabel="Open match center"
           accessibilityRole="button"
           onPress={() => router.push({ pathname: '/live-match', params: { fixtureId: match.id } } as any)}
-          style={[styles.watchButton, { borderColor: live ? theme.selectionBorder : theme.border, backgroundColor: theme.field }]}>
-          <LinearGradient colors={live ? [theme.primary, theme.primarySoft] : [theme.surface, theme.primarySubtle]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={StyleSheet.absoluteFill} />
-          {live ? <Video color={theme.primaryDark} size={18} /> : <Radio color={theme.primary} size={18} />}
-          <Text style={[styles.watchButtonText, { color: live ? theme.primaryDark : theme.primary }]}>{ctaLabel}</Text>
-          <ChevronRight color={live ? theme.primaryDark : theme.primary} size={18} />
+          style={[styles.watchButton, { borderColor: theme.primary, backgroundColor: theme.primary }]}>
+          {live ? <Video color={theme.primaryDark} size={18} /> : <Radio color={theme.primaryDark} size={18} />}
+          <Text style={[styles.watchButtonText, { color: theme.primaryDark }]}>{ctaLabel}</Text>
+          <ChevronRight color={theme.primaryDark} size={18} />
         </PressableScale>
       </Animated.View>
 
-      <Animated.View entering={enterUp(3)}>
+      <Animated.View entering={enterUp(2)}>
         <ContextStrip
           h2hCount={h2h?.sampleSize ?? 0}
           readinessScore={readinessScore}
@@ -1328,7 +1297,8 @@ export default function MatchDetailScreen() {
         />
       </Animated.View>
 
-      <Animated.View entering={enterUp(4)}>
+      <Animated.View entering={enterUp(3)}>
+        <Text style={[styles.detailHeading, { color: theme.foregroundStrong }]}>Match details</Text>
         <SectionSwitcher activeSection={activeSection} onSelect={setActiveSection} />
       </Animated.View>
 
@@ -1415,7 +1385,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contextDivider: {
-    height: 26,
+    height: 22,
     width: 1,
   },
   contextHeader: {
@@ -1432,7 +1402,7 @@ const styles = StyleSheet.create({
   },
   contextScore: {
     fontFamily: fonts.extraBold,
-    fontSize: 26,
+    fontSize: 22,
     fontVariant: ['tabular-nums'],
     letterSpacing: -0.5,
   },
@@ -1449,8 +1419,8 @@ const styles = StyleSheet.create({
   contextStrip: {
     borderRadius: radius.xl,
     borderWidth: 1,
-    gap: spacing.md,
-    padding: spacing.lg,
+    gap: spacing.sm,
+    padding: spacing.md,
   },
   contextTile: {
     flex: 1,
@@ -1618,7 +1588,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   heroCard: {
-    gap: spacing.lg,
+    gap: spacing.md,
     overflow: 'hidden',
   },
   heroCenter: {
@@ -1639,9 +1609,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   heroMetaRow: {
+    borderTopWidth: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
+    paddingTop: spacing.md,
   },
   heroMetaText: {
     flexShrink: 1,
@@ -2042,10 +2014,11 @@ const styles = StyleSheet.create({
   scoreText: {
     color: '#ffffff',
     fontFamily: fonts.extraBold,
-    fontSize: 44,
+    fontSize: 30,
     fontVariant: ['tabular-nums'],
-    letterSpacing: -1,
-    lineHeight: 48,
+    letterSpacing: -0.6,
+    lineHeight: 36,
+    minWidth: 74,
     textAlign: 'center',
   },
   scrollableList: {
@@ -2064,21 +2037,24 @@ const styles = StyleSheet.create({
     width: 30,
   },
   sectionSwitcher: {
-    borderRadius: radius.pill,
-    borderWidth: 1,
+    borderBottomWidth: 1,
     flexDirection: 'row',
-    gap: spacing.xs,
-    padding: 3,
   },
   sectionTab: {
     alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
     flex: 1,
-    height: 36,
+    height: 46,
     justifyContent: 'center',
     minWidth: 0,
-    overflow: 'hidden',
+    position: 'relative',
+  },
+  sectionTabIndicator: {
+    borderRadius: radius.pill,
+    bottom: -1,
+    height: 3,
+    left: 10,
+    position: 'absolute',
+    right: 10,
   },
   sectionTabText: {
     fontFamily: fonts.extraBold,
@@ -2106,7 +2082,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   sideLabel: {
-    color: 'rgba(255,255,255,0.62)',
     fontFamily: fonts.medium,
     fontSize: 11,
     marginTop: 3,
@@ -2300,6 +2275,41 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: fonts.extraBold,
     fontSize: 18,
+    textAlign: 'center',
+  },
+  detailHeading: {
+    fontFamily: fonts.extraBold,
+    fontSize: 22,
+    marginBottom: spacing.sm,
+  },
+  matchStage: {
+    gap: spacing.md,
+  },
+  stageSubtitle: {
+    fontFamily: fonts.medium,
+    fontSize: 11,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  stageTitle: {
+    fontFamily: fonts.extraBold,
+    fontSize: 19,
+    textAlign: 'center',
+  },
+  venueLabel: {
+    borderRadius: radius.pill,
+    maxWidth: 112,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+  },
+  venueLabelText: {
+    fontFamily: fonts.medium,
+    fontSize: 10,
+    textAlign: 'center',
+  },
+  weekLabel: {
+    fontFamily: fonts.medium,
+    fontSize: 10,
     textAlign: 'center',
   },
   unavailableNotice: {

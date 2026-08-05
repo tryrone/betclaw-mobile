@@ -1,26 +1,26 @@
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Search } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { DashboardPillField, enterUp, GlassCard, IconButton, PressableScale, ProgressBar, Screen, StatusBadge, TeamLogo } from '@/components/ui';
-import { type MatchCardData } from '@/data/mock';
+import { FeedMatchCard } from '@/components/home/FeedMatchCard';
+import { DashboardPillField, enterUp, GlassCard, IconButton, PressableScale, Screen, ScreenHeader, StatusBadge, TeamLogo } from '@/components/ui';
 import { useHomeFeed, useLeagues } from '@/lib/api/hooks';
-import { flattenHomeFeed } from '@/lib/mobile-mappers';
+import type { FeedMatch, LeagueGroup } from '@/lib/api/types';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
-type LeagueRailOption = {
-  id: string;
-  label: string;
-};
-
-type DateChip = {
-  date: string;
-  day: string;
-  id: string;
+type LeagueRailOption = { id: string; label: string };
+type DateChip = { date: string; day: string; id: string };
+type MatchSection = {
+  country?: string | null;
+  data: FeedMatch[];
+  key: string;
+  logoUrl?: string | null;
+  name: string;
 };
 
 function dateKeyFromDate(date: Date) {
@@ -30,9 +30,8 @@ function dateKeyFromDate(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-/** Real calendar strip: today plus the next six days. */
 function buildDateChips(): DateChip[] {
-  return Array.from({ length: 7 }, (_, offset) => {
+  return Array.from({ length: 5 }, (_, offset) => {
     const date = new Date();
     date.setUTCDate(date.getUTCDate() + offset);
     return {
@@ -43,33 +42,21 @@ function buildDateChips(): DateChip[] {
   });
 }
 
-function LeagueRail({
-  onSelect,
-  options,
-  selected,
-}: {
-  onSelect: (leagueId: string) => void;
-  options: LeagueRailOption[];
-  selected: string;
-}) {
+function LeagueRail({ onSelect, options, selected }: { onSelect: (leagueId: string) => void; options: LeagueRailOption[]; selected: string }) {
   const theme = useAppTheme();
-
   return (
     <ScrollView contentContainerStyle={styles.railContent} horizontal showsHorizontalScrollIndicator={false} style={styles.rail}>
       {options.map((league) => {
         const active = league.id === selected;
         return (
           <PressableScale
-            accessibilityLabel={league.label}
+            accessibilityLabel={`Show ${league.label} fixtures`}
             accessibilityRole="button"
+            accessibilityState={{ selected: active }}
             key={league.id}
             onPress={() => onSelect(league.id)}
-            style={[
-              styles.leaguePill,
-              { backgroundColor: theme.card, borderColor: active ? theme.selectionBorder : theme.border },
-            ]}>
-            {active ? <View style={[styles.pillIndicator, { backgroundColor: theme.primarySoft }]} /> : null}
-            <Text style={[styles.leagueText, { color: active ? theme.foregroundStrong : theme.mutedLight }]}>{league.label}</Text>
+            style={[styles.leaguePill, { backgroundColor: active ? theme.primary : theme.card, borderColor: active ? theme.primary : theme.border }]}>
+            <Text style={[styles.leagueText, { color: active ? theme.primaryDark : theme.mutedLight }]}>{league.label}</Text>
           </PressableScale>
         );
       })}
@@ -77,32 +64,21 @@ function LeagueRail({
   );
 }
 
-function DateRail({
-  chips,
-  onSelect,
-  selected,
-}: {
-  chips: DateChip[];
-  onSelect: (dateId: string) => void;
-  selected: string;
-}) {
+function DateRail({ chips, onSelect, selected }: { chips: DateChip[]; onSelect: (dateId: string) => void; selected: string }) {
   const theme = useAppTheme();
-
   return (
-    <ScrollView contentContainerStyle={styles.railContent} horizontal showsHorizontalScrollIndicator={false} style={styles.rail}>
+    <ScrollView contentContainerStyle={styles.dateContent} horizontal showsHorizontalScrollIndicator={false} style={styles.rail}>
       {chips.map((chip) => {
         const active = chip.id === selected;
         return (
           <PressableScale
             accessibilityLabel={`${chip.day} ${chip.date}`}
             accessibilityRole="button"
+            accessibilityState={{ selected: active }}
             key={chip.id}
             onPress={() => onSelect(chip.id)}
-            style={[
-              styles.datePill,
-              { backgroundColor: active ? theme.primarySubtle : theme.field, borderColor: active ? theme.selectionBorder : theme.border },
-            ]}>
-            <Text style={[styles.dateDay, { color: active ? theme.primarySoft : theme.foregroundStrong }]}>{chip.day}</Text>
+            style={[styles.datePill, { backgroundColor: active ? theme.primarySubtle : theme.card, borderColor: active ? theme.selectionBorder : theme.border }]}>
+            <Text style={[styles.dateDay, { color: active ? theme.primary : theme.foregroundStrong }]}>{chip.day}</Text>
             <Text style={[styles.dateMeta, { color: theme.muted }]}>{chip.date}</Text>
           </PressableScale>
         );
@@ -111,56 +87,38 @@ function DateRail({
   );
 }
 
-function MatchRow({ match }: { match: MatchCardData }) {
-  const router = useRouter();
-  const theme = useAppTheme();
-
-  return (
-    <PressableScale accessibilityLabel={`${match.home} versus ${match.away}`} accessibilityRole="button" onPress={() => router.push(`/match/${match.id}` as any)} scaleTo={0.98}>
-      <GlassCard style={styles.matchRow}>
-        <View style={styles.matchTop}>
-          <View style={styles.teamSide}>
-            <Text numberOfLines={1} style={[styles.teamName, { color: theme.foregroundStrong }]}>{match.home}</Text>
-            <TeamLogo name={match.home} size={34} />
-          </View>
-          <View style={styles.timeBlock}>
-            <Text style={[styles.matchTime, { color: match.status === 'Live' ? theme.live : theme.accent }]}>{match.clock ?? match.time}</Text>
-            <Text style={[styles.matchDate, { color: theme.muted }]}>{match.date}</Text>
-          </View>
-          <View style={[styles.teamSide, styles.awaySide]}>
-            <TeamLogo name={match.away} size={34} />
-            <Text numberOfLines={1} style={[styles.teamName, { color: theme.foregroundStrong }]}>{match.away}</Text>
-          </View>
-        </View>
-
-        <View style={styles.rowMeta}>
-          <StatusBadge label={match.readiness} tone={match.readiness === 'Verified' ? 'success' : match.readiness === 'Partial' ? 'warning' : 'neutral'} />
-          <Text numberOfLines={1} style={[styles.trend, { color: theme.mutedLight }]}>{match.trend}</Text>
-          <Text style={[styles.confidence, { color: theme.primarySoft }]}>{match.confidence}%</Text>
-        </View>
-        <ProgressBar value={match.confidence} />
-      </GlassCard>
-    </PressableScale>
-  );
+function toSections(leagues?: LeagueGroup[]): MatchSection[] {
+  return (leagues ?? [])
+    .map((league) => ({
+      country: league.country,
+      data: league.matches ?? [],
+      key: league.key,
+      logoUrl: league.logoUrl,
+      name: league.name,
+    }))
+    .filter((section) => section.data.length > 0);
 }
 
 export default function MatchesScreen() {
   const router = useRouter();
   const theme = useAppTheme();
+  const insets = useSafeAreaInsets();
   const dateChipOptions = useMemo(() => buildDateChips(), []);
   const [selectedLeague, setSelectedLeague] = useState('all');
   const [selectedDate, setSelectedDate] = useState(dateChipOptions[0].id);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const trimmedQuery = query.trim();
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedQuery(query.trim()), 250);
+    return () => clearTimeout(timeout);
+  }, [query]);
+
   const leagueList = useLeagues({ date: selectedDate, windowDays: 1 });
   const leagueOptions = useMemo<LeagueRailOption[]>(
     () => [
-      { id: 'all', label: 'All' },
-      ...(leagueList.data ?? []).map((league) => ({
-        id: league.key,
-        label: league.name,
-      })),
+      { id: 'all', label: 'All competitions' },
+      ...(leagueList.data ?? []).map((league) => ({ id: league.key, label: league.name })),
     ],
     [leagueList.data],
   );
@@ -169,203 +127,133 @@ export default function MatchesScreen() {
     date: selectedDate,
     leagueKey: activeLeague !== 'all' ? activeLeague : undefined,
     limit: 48,
-    query: trimmedQuery || undefined,
+    query: debouncedQuery || undefined,
     windowDays: 1,
   });
-  const visibleMatches = useMemo(() => flattenHomeFeed(homeFeed.data), [homeFeed.data]);
-  const sectionTitle = trimmedQuery
-    ? `Results for "${trimmedQuery}"`
-    : leagueOptions.find((league) => league.id === activeLeague)?.label ?? 'All leagues';
+  const sections = useMemo(() => toSections(homeFeed.data?.leagues), [homeFeed.data?.leagues]);
+  const totalFixtures = useMemo(() => sections.reduce((total, section) => total + section.data.length, 0), [sections]);
 
   return (
-    <Screen onRefresh={() => void homeFeed.refetch()} refreshing={homeFeed.isRefetching}>
-      <Animated.View entering={enterUp(0)} style={styles.header}>
-        <IconButton icon={ArrowLeft} label="Go back" onPress={() => router.back()} />
-        <Text style={[styles.title, { color: theme.foregroundStrong }]}>Matches</Text>
-        <IconButton
-          icon={Search}
-          label={searchOpen ? 'Hide search' : 'Search matches'}
-          onPress={() => setSearchOpen((open) => !open)}
+    <Screen contentBottomPadding={0} scroll={false}>
+      <Animated.View entering={enterUp(0)}>
+        <ScreenHeader
+          eyebrow="Matchday"
+          leadingAction={<IconButton icon={ArrowLeft} label="Go back" onPress={() => router.back()} />}
+          title="Browse Matches"
         />
       </Animated.View>
 
-      {searchOpen ? (
-        <Animated.View entering={enterUp(1)}>
-          <DashboardPillField
-            autoFocus
-            icon={Search}
-            onChangeText={setQuery}
-            placeholder="Search teams or leagues"
-            returnKeyType="search"
-            value={query}
-          />
-        </Animated.View>
-      ) : null}
-
-      <Animated.View entering={enterUp(1)}>
+      <Animated.View entering={enterUp(1)} style={styles.controls}>
+        <DashboardPillField
+          icon={Search}
+          onChangeText={setQuery}
+          placeholder="Search competition or club"
+          returnKeyType="search"
+          value={query}
+        />
+        <DateRail chips={dateChipOptions} onSelect={setSelectedDate} selected={selectedDate} />
         <LeagueRail onSelect={setSelectedLeague} options={leagueOptions} selected={activeLeague} />
       </Animated.View>
-      <Animated.View entering={enterUp(2)}>
-        <DateRail chips={dateChipOptions} onSelect={setSelectedDate} selected={selectedDate} />
-      </Animated.View>
 
-      <Animated.View entering={enterUp(3)} style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.foregroundStrong }]}>{sectionTitle}</Text>
-        <StatusBadge label={`${visibleMatches.length} fixtures`} tone="accent" />
-      </Animated.View>
+      <View style={styles.resultSummary}>
+        <View>
+          <Text style={[styles.resultTitle, { color: theme.foregroundStrong }]}>{debouncedQuery ? 'Search results' : 'Match schedule'}</Text>
+          <Text numberOfLines={1} style={[styles.resultCaption, { color: theme.muted }]}>
+            {debouncedQuery ? `Showing matches for “${debouncedQuery}”` : 'Grouped by competition'}
+          </Text>
+        </View>
+        <StatusBadge label={`${totalFixtures} fixtures`} tone="accent" />
+      </View>
 
-      {visibleMatches.length === 0 ? (
-        <Animated.View entering={enterUp(4)}>
+      <SectionList<FeedMatch, MatchSection>
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: spacing.xl + insets.bottom },
+          sections.length === 0 ? styles.emptyListContent : null,
+        ]}
+        initialNumToRender={10}
+        keyExtractor={(match) => match.fixtureId}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={
           <GlassCard style={styles.emptyState}>
             <Text style={[styles.emptyTitle, { color: theme.foregroundStrong }]}>
-              {homeFeed.isLoading ? 'Loading fixtures' : 'No fixtures found'}
+              {homeFeed.isLoading ? 'Loading fixtures' : homeFeed.isError ? 'Fixtures unavailable' : 'No fixtures found'}
             </Text>
             <Text style={[styles.emptyCopy, { color: theme.muted }]}>
               {homeFeed.isLoading
                 ? 'Fetching the latest matchday slate.'
-                : trimmedQuery
-                  ? `No matches for "${trimmedQuery}". Try another search.`
-                  : 'Try another league or date.'}
+                : homeFeed.isError
+                  ? 'Pull to refresh and try the production feed again.'
+                  : debouncedQuery
+                    ? `No matches for “${debouncedQuery}”. Try another club or competition.`
+                    : 'Try another competition or date.'}
             </Text>
           </GlassCard>
-        </Animated.View>
-      ) : null}
-
-      {visibleMatches.map((match, index) => (
-        <Animated.View entering={enterUp(4 + index)} key={match.id}>
-          <MatchRow match={match} />
-        </Animated.View>
-      ))}
+        }
+        maxToRenderPerBatch={8}
+        refreshControl={
+          <RefreshControl
+            colors={[theme.primary]}
+            onRefresh={() => void homeFeed.refetch()}
+            progressBackgroundColor={theme.card}
+            refreshing={homeFeed.isRefetching}
+            tintColor={theme.primary}
+          />
+        }
+        renderItem={({ item, section }) => (
+          <View style={styles.matchCardWrap}>
+            <FeedMatchCard league={section} match={item} showCompetition={false} variant="compact" />
+          </View>
+        )}
+        renderSectionHeader={({ section }) => (
+          <View style={[styles.sectionHeader, { backgroundColor: theme.background }]}>
+            <TeamLogo logoUrl={section.logoUrl} name={section.name} size={26} />
+            <View style={styles.sectionCopy}>
+              <Text numberOfLines={1} style={[styles.sectionName, { color: theme.foregroundStrong }]}>{section.name}</Text>
+              {section.country ? <Text numberOfLines={1} style={[styles.sectionCountry, { color: theme.muted }]}>{section.country}</Text> : null}
+            </View>
+            <View style={[styles.sectionCountPill, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
+              <Text numberOfLines={1} style={[styles.sectionCount, { color: theme.primarySoft }]}>
+                {section.data.length} {section.data.length === 1 ? 'match' : 'matches'}
+              </Text>
+            </View>
+          </View>
+        )}
+        sections={sections}
+        showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled
+        style={styles.list}
+        windowSize={7}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  awaySide: {
-    justifyContent: 'flex-end',
-  },
-  confidence: {
-    fontFamily: fonts.extraBold,
-    fontSize: 13,
-  },
-  dateDay: {
-    fontFamily: fonts.extraBold,
-    fontSize: 13,
-  },
-  dateMeta: {
-    fontFamily: fonts.medium,
-    fontSize: 10,
-    marginTop: 2,
-  },
-  datePill: {
-    alignItems: 'center',
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minWidth: 68,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 7,
-  },
-  header: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  emptyCopy: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-  },
-  emptyState: {
-    gap: 4,
-    padding: spacing.md,
-  },
-  emptyTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 15,
-  },
-  leaguePill: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.xs,
-    height: 36,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-  },
-  leagueText: {
-    fontFamily: fonts.bold,
-    fontSize: 13,
-  },
-  matchDate: {
-    fontFamily: fonts.medium,
-    fontSize: 10,
-    marginTop: 2,
-  },
-  matchRow: {
-    gap: spacing.sm,
-    padding: spacing.md,
-  },
-  matchTime: {
-    fontFamily: fonts.extraBold,
-    fontSize: 14,
-  },
-  matchTop: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-    justifyContent: 'space-between',
-  },
-  rail: {
-    marginRight: -spacing.md,
-  },
-  railContent: {
-    gap: spacing.sm,
-    paddingRight: spacing.md,
-  },
-  rowMeta: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  sectionHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm,
-  },
-  sectionTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 18,
-  },
-  teamName: {
-    flexShrink: 1,
-    fontFamily: fonts.bold,
-    fontSize: 13,
-  },
-  teamSide: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    minWidth: 0,
-  },
-  timeBlock: {
-    alignItems: 'center',
-    width: 58,
-  },
-  title: {
-    fontFamily: fonts.extraBold,
-    fontSize: 24,
-  },
-  trend: {
-    flex: 1,
-    fontFamily: fonts.medium,
-    fontSize: 12,
-  },
-  pillIndicator: {
-    borderRadius: radius.pill,
-    height: 7,
-    width: 7,
-  },
+  controls: { gap: spacing.md },
+  dateContent: { gap: spacing.sm, paddingRight: spacing.md },
+  dateDay: { fontFamily: fonts.extraBold, fontSize: 12 },
+  dateMeta: { fontFamily: fonts.medium, fontSize: 10, marginTop: 2 },
+  datePill: { alignItems: 'center', borderRadius: radius.lg, borderWidth: 1, justifyContent: 'center', minHeight: 52, minWidth: 66, paddingHorizontal: spacing.sm },
+  emptyCopy: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  emptyListContent: { flexGrow: 1 },
+  emptyState: { alignItems: 'center', gap: spacing.xs, marginTop: spacing.xl, padding: spacing.xl },
+  emptyTitle: { fontFamily: fonts.extraBold, fontSize: 16 },
+  leaguePill: { alignItems: 'center', borderRadius: radius.pill, borderWidth: 1, justifyContent: 'center', minHeight: 36, paddingHorizontal: spacing.md },
+  leagueText: { fontFamily: fonts.bold, fontSize: 12 },
+  list: { flex: 1, marginTop: -spacing.xs },
+  listContent: {},
+  matchCardWrap: { marginBottom: spacing.sm },
+  rail: { marginRight: -spacing.md },
+  railContent: { gap: spacing.sm, paddingRight: spacing.md },
+  resultCaption: { fontFamily: fonts.medium, fontSize: 11, marginTop: 2, maxWidth: 240 },
+  resultSummary: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  resultTitle: { fontFamily: fonts.extraBold, fontSize: 17 },
+  sectionCopy: { flex: 1, minWidth: 0 },
+  sectionCount: { fontFamily: fonts.bold, fontSize: 11 },
+  sectionCountPill: { alignItems: 'center', borderRadius: radius.pill, borderWidth: 1, justifyContent: 'center', minHeight: 30, paddingHorizontal: spacing.sm },
+  sectionCountry: { fontFamily: fonts.medium, fontSize: 10, marginTop: 1 },
+  sectionHeader: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, paddingBottom: spacing.sm, paddingHorizontal: spacing.sm, paddingTop: spacing.md },
+  sectionName: { fontFamily: fonts.extraBold, fontSize: 13 },
 });
