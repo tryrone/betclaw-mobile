@@ -1,31 +1,31 @@
 import { useThemeController } from '@/theme/colors';
 
 const darkGradients = {
-  appBackground: ['#020605', '#061813', '#020403'] as const,
-  card: ['#0c1815', '#080e0d'] as const,
-  hero: ['#0b1516', '#0a0e13', '#1c0d11'] as const,
-  primaryButton: ['#5ff7dd', '#2ef2d0'] as const,
-  amberCard: ['#141207', '#080e0d'] as const,
-  matchHero: ['#0b1714', '#080c10', '#141105'] as const,
+  appBackground: ['#0d1030', '#11143b', '#0d1030'] as const,
+  card: ['#191e4d', '#15183f'] as const,
+  hero: ['#20255b', '#171b47', '#11143b'] as const,
+  primaryButton: ['#858ae2', '#7076d1'] as const,
+  amberCard: ['#201f46', '#171a40'] as const,
+  matchHero: ['#20265d', '#171b47', '#11143b'] as const,
   /** Floating bottom dock background. */
-  dock: ['rgba(4,16,14,0.96)', 'rgba(2,17,15,0.96)', 'rgba(46,242,208,0.08)'] as const,
+  dock: ['rgba(25,29,72,0.78)', 'rgba(17,20,59,0.74)', 'rgba(25,29,72,0.78)'] as const,
   /** "More" modal sheet background. */
-  sheet: ['rgba(46,242,208,0.10)', 'rgba(4,16,14,0.96)', 'rgba(255,211,77,0.06)'] as const,
+  sheet: ['rgba(17,28,70,0.98)', 'rgba(9,16,47,0.99)', 'rgba(77,107,254,0.08)'] as const,
   /** Active nav item highlight. */
-  navActive: ['rgba(46,242,208,0.22)', 'rgba(46,242,208,0.06)'] as const,
+  navActive: ['rgba(77,107,254,0.24)', 'rgba(77,107,254,0.07)'] as const,
 } as const;
 
 /** Light counterpart — same keys so components stay theme-agnostic. Kept neutral and low-chroma to avoid metallic/colour-banding on light surfaces. */
 const lightGradients = {
-  appBackground: ['#f4f6f9', '#eef1f5', '#f4f6f9'] as const,
-  card: ['#ffffff', '#f7f9fb'] as const,
-  hero: ['#ffffff', '#f2f8f7', '#eef3f6'] as const,
-  primaryButton: ['#3df0d2', '#0d9488'] as const,
-  amberCard: ['#fff9ef', '#f7f9fb'] as const,
-  matchHero: ['#ffffff', '#f3f8f7', '#eef3f6'] as const,
-  dock: ['rgba(255,255,255,0.94)', 'rgba(246,248,251,0.94)', 'rgba(255,255,255,0.94)'] as const,
-  sheet: ['rgba(244,250,249,0.97)', 'rgba(255,255,255,0.97)', 'rgba(244,247,250,0.97)'] as const,
-  navActive: ['rgba(13,148,136,0.16)', 'rgba(13,148,136,0.04)'] as const,
+  appBackground: ['#fafbfc', '#f6f7fa', '#f0f2f7'] as const,
+  card: ['#ffffff', '#fbfbfd'] as const,
+  hero: ['#ffffff', '#f8f8fc', '#f2f3f8'] as const,
+  primaryButton: ['#292d68', '#11143b'] as const,
+  amberCard: ['#fff8f9', '#fbfbfd'] as const,
+  matchHero: ['#ffffff', '#ffffff', '#f8f8fa'] as const,
+  dock: ['rgba(255,255,255,0.80)', 'rgba(247,248,252,0.72)', 'rgba(255,255,255,0.80)'] as const,
+  sheet: ['rgba(247,247,252,0.99)', 'rgba(255,255,255,0.99)', 'rgba(252,246,248,0.99)'] as const,
+  navActive: ['rgba(24,25,65,0.14)', 'rgba(24,25,65,0.04)'] as const,
 } as const;
 
 export const gradientPalettes = {
@@ -33,7 +33,7 @@ export const gradientPalettes = {
   dark: darkGradients,
 } as const;
 
-export const gradients = gradientPalettes.dark;
+export const gradients = gradientPalettes.light;
 
 export type GradientName = keyof typeof gradients;
 

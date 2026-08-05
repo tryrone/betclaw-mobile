@@ -1,7 +1,6 @@
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { ArrowUpRight, Trophy, Volleyball } from 'lucide-react-native';
+import { ArrowRight } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import {
   ScrollView,
@@ -12,89 +11,75 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BrandLogo, enterUp, PressableScale } from '@/components/ui';
+import {
+  ScoreSyncMatchPreview,
+  ScoreSyncOrbit,
+  scoreSyncColors,
+} from '@/components/auth/ScoreSyncAuth';
+import { BrandLogo, PressableScale } from '@/components/ui';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
-const heroImage = require('@/../assets/images/neymar_cutout.png');
-const WELCOME_HORIZONTAL_PADDING = spacing.xl / 2;
-
 const slides = [
   {
-    copy: 'Join the action, make your moves and claim your victory.',
-    titleLineOne: 'Step into the game',
-    titleLineTwo: 'Own the win',
+    copy: 'Catch every fixture, live signal, and researched angle in one calm matchday workspace.',
+    title: 'Never miss a moment with BetClaw',
   },
   {
-    copy: 'Follow fixtures, live pressure, and confidence at a glance.',
-    titleLineOne: 'Track matchday',
-    titleLineTwo: 'signals live',
+    copy: 'See data readiness, recent form, and match context before you make a decision.',
+    title: 'Know the match behind the market',
   },
   {
-    copy: 'Decode slips, compare risk, and keep your strongest ticket.',
-    titleLineOne: 'Fix tickets',
-    titleLineTwo: 'faster',
+    copy: 'Build, convert, and improve tickets without losing the exact market you selected.',
+    title: 'Move from insight to a stronger ticket',
   },
 ] as const;
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const theme = useAppTheme();
   const { width } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const isLast = activeIndex === slides.length - 1;
 
-  const goToLogin = () => {
-    router.replace('/(auth)/login');
-  };
-
-  const goToSignup = () => {
-    router.replace('/(auth)/signup');
-  };
-
   const goNext = () => {
     if (isLast) {
-      goToSignup();
+      router.replace('/(auth)/signup');
       return;
     }
-
-    const nextIndex = activeIndex + 1;
-    setActiveIndex(nextIndex);
-    scrollRef.current?.scrollTo({ animated: true, x: width * nextIndex });
+    const next = activeIndex + 1;
+    setActiveIndex(next);
+    scrollRef.current?.scrollTo({ animated: true, x: width * next });
   };
 
   const handleScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const pageWidth = event.nativeEvent.layoutMeasurement.width;
-    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
-    setActiveIndex(Math.max(0, Math.min(slides.length - 1, nextIndex)));
+    setActiveIndex(Math.round(event.nativeEvent.contentOffset.x / pageWidth));
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.black }]}>
-      <View pointerEvents="none" style={[styles.heroGlow, { backgroundColor: theme.primarySubtle }]} />
-      <Image contentFit="contain" contentPosition="top center" source={heroImage} style={styles.hero} />
-      <LinearGradient
-        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.6)', '#000000']}
-        locations={[0.35, 0.62, 0.88]}
-        pointerEvents="none"
-        style={StyleSheet.absoluteFill}
-      />
-
-      <View style={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.md), paddingTop: insets.top + spacing.md }]}>
-        <Animated.View entering={enterUp(0)} style={styles.topBar}>
-          <BrandLogo markSize={34} textSize={22} />
-          <PressableScale accessibilityLabel="Sign in" accessibilityRole="button" onPress={goToLogin} style={styles.skipButton}>
-            <Text style={[styles.skipText, { color: theme.mutedLight }]}>Sign in</Text>
+    <LinearGradient
+      colors={theme.mode === 'light' ? ['#ffffff', '#f7f9ff', '#e8edff'] : [theme.background, theme.backgroundAlt, '#1a1e4d']}
+      locations={[0, 0.54, 1]}
+      style={styles.root}>
+      <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
+        <View style={styles.topBar}>
+          <BrandLogo color={theme.mode === 'light' ? scoreSyncColors.navy : theme.foregroundStrong} markSize={32} textSize={20} />
+          <PressableScale accessibilityLabel="Sign in" accessibilityRole="button" onPress={() => router.replace('/(auth)/login')} style={styles.signInButton}>
+            <Text style={[styles.signInText, { color: theme.mode === 'light' ? scoreSyncColors.navy : theme.primarySoft }]}>Sign in</Text>
           </PressableScale>
-        </Animated.View>
+        </View>
 
-        <View style={styles.spacer} />
+        <View style={styles.visualStage}>
+          <ScoreSyncOrbit />
+          <View style={styles.previewWrap}>
+            <ScoreSyncMatchPreview />
+          </View>
+        </View>
 
         <ScrollView
           bounces={false}
@@ -103,195 +88,163 @@ export default function WelcomeScreen() {
           onMomentumScrollEnd={handleScrollEnd}
           pagingEnabled
           ref={scrollRef}
-          scrollEventThrottle={16}
           showsHorizontalScrollIndicator={false}
-          style={styles.carousel}>
-          {slides.map((slide, index) => (
-            <View key={slide.titleLineOne} style={[styles.slide, { width }]}>
-              <View style={styles.copyBlock}>
-                <Text style={[styles.title, { color: theme.white }]}>{slide.titleLineOne}</Text>
-                <View style={styles.titleRow}>
-                  <Text style={[styles.title, { color: theme.white }]}>{slide.titleLineTwo}</Text>
-                  {index === 0 ? (
-                    <View style={styles.emojiChips}>
-                      <View style={[styles.emojiChip, { backgroundColor: 'rgba(255,255,255,0.10)' }]}>
-                        <Volleyball color={theme.white} size={17} />
-                      </View>
-                      <View style={[styles.emojiChip, { backgroundColor: 'rgba(255,255,255,0.10)' }]}>
-                        <Trophy color={theme.accent} size={17} />
-                      </View>
-                    </View>
-                  ) : null}
-                </View>
-                <Text style={[styles.copy, { color: theme.mutedLight }]}>{slide.copy}</Text>
-              </View>
+          style={styles.copyCarousel}>
+          {slides.map((slide) => (
+            <View key={slide.title} style={[styles.slide, { width }]}>
+              <Text style={[styles.title, { color: theme.foregroundStrong }]}>{slide.title}</Text>
+              <Text style={[styles.copy, { color: theme.muted }]}>{slide.copy}</Text>
             </View>
           ))}
         </ScrollView>
 
-        <Animated.View entering={enterUp(2)} style={styles.footer}>
+        <View style={styles.footer}>
           <View style={styles.pagination}>
-            {slides.map((slide, index) => {
-              const active = activeIndex === index;
-              return (
-                <View
-                  key={slide.titleLineOne}
-                  style={[
-                    styles.dot,
-                    {
-                      backgroundColor: active ? theme.primary : 'rgba(255,255,255,0.22)',
-                      width: active ? 26 : 7,
-                    },
-                  ]}
-                />
-              );
-            })}
+            {slides.map((slide, index) => (
+              <View
+                key={slide.title}
+                style={[
+                  styles.dot,
+                  { backgroundColor: index === activeIndex ? theme.primary : theme.borderStrong },
+                  index === activeIndex ? styles.dotActive : null,
+                ]}
+              />
+            ))}
           </View>
-
           <PressableScale
-            accessibilityLabel={isLast ? 'Get started' : 'Next onboarding screen'}
+            accessibilityLabel={isLast ? 'Get started' : 'Continue onboarding'}
             accessibilityRole="button"
             onPress={goNext}
-            style={[styles.ctaButton, { backgroundColor: theme.primary }]}>
+            style={[styles.cta, { backgroundColor: theme.primary }]}>
             <Text style={[styles.ctaText, { color: theme.primaryDark }]}>{isLast ? 'Get started' : 'Next'}</Text>
-            <View style={[styles.ctaChip, { backgroundColor: 'rgba(0,0,0,0.14)' }]}>
-              <ArrowUpRight color={theme.primaryDark} size={16} strokeWidth={2.4} />
+            <View style={styles.ctaIcon}>
+              <ArrowRight color={theme.primaryDark} size={16} strokeWidth={2.3} />
             </View>
           </PressableScale>
-        </Animated.View>
-
-        {isLast ? (
-          <PressableScale accessibilityLabel="Sign in instead" accessibilityRole="button" onPress={goToLogin} style={styles.secondaryAuthButton}>
-            <Text style={[styles.secondaryAuthText, { color: theme.primarySoft }]}>Already have an account? Sign in</Text>
-          </PressableScale>
-        ) : null}
-      </View>
-    </View>
+          <Text style={[styles.legal, { color: theme.muted }]}>By continuing, you agree to BetClaw&apos;s Terms of Service and Privacy Policy.</Text>
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  carousel: {
-    flexGrow: 0,
-  },
-  content: {
-    flex: 1,
-  },
   copy: {
-    fontFamily: fonts.medium,
+    color: scoreSyncColors.muted,
+    fontFamily: fonts.regular,
     fontSize: 15,
     lineHeight: 22,
     marginTop: spacing.md,
+    maxWidth: 350,
+    textAlign: 'center',
   },
-  copyBlock: {
-    paddingHorizontal: WELCOME_HORIZONTAL_PADDING,
+  copyCarousel: {
+    flexGrow: 0,
+    maxHeight: 136,
   },
-  ctaButton: {
+  cta: {
     alignItems: 'center',
-    borderRadius: radius.pill,
+    backgroundColor: scoreSyncColors.navy,
+    borderRadius: radius.md,
     flexDirection: 'row',
-    gap: spacing.sm,
-    height: 52,
+    height: 54,
     justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
+    marginTop: spacing.lg,
+    width: '100%',
   },
-  ctaChip: {
+  ctaIcon: {
     alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: radius.pill,
     height: 28,
     justifyContent: 'center',
+    position: 'absolute',
+    right: spacing.md,
     width: 28,
   },
   ctaText: {
-    fontFamily: fonts.extraBold,
+    color: scoreSyncColors.white,
+    fontFamily: fonts.bold,
     fontSize: 15,
   },
   dot: {
+    backgroundColor: '#cfd2df',
     borderRadius: radius.pill,
-    height: 7,
+    height: 6,
+    width: 6,
   },
-  emojiChip: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    height: 34,
-    justifyContent: 'center',
-    width: 34,
-  },
-  emojiChips: {
-    flexDirection: 'row',
-    gap: spacing.xs,
+  dotActive: {
+    backgroundColor: scoreSyncColors.navy,
+    width: 22,
   },
   footer: {
     alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.md,
-    justifyContent: 'space-between',
-    marginTop: spacing.xl,
-    paddingHorizontal: WELCOME_HORIZONTAL_PADDING,
+    paddingHorizontal: spacing.xxl,
   },
-  hero: {
-    height: '64%',
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: '7%',
-  },
-  heroGlow: {
-    alignSelf: 'center',
-    borderRadius: 999,
-    height: 420,
-    opacity: 0.5,
-    position: 'absolute',
-    top: 60,
-    width: 420,
+  legal: {
+    color: '#777a8d',
+    fontFamily: fonts.regular,
+    fontSize: 11,
+    lineHeight: 17,
+    marginTop: spacing.md,
+    maxWidth: 320,
+    textAlign: 'center',
   },
   pagination: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 7,
+    gap: 6,
+    height: 8,
+  },
+  previewWrap: {
+    bottom: 4,
+    left: spacing.xxl,
+    position: 'absolute',
+    right: spacing.xxl,
   },
   root: {
     flex: 1,
   },
-  secondaryAuthButton: {
+  safe: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  signInButton: {
     alignItems: 'center',
+    minHeight: 44,
     justifyContent: 'center',
-    marginTop: spacing.sm,
-    minHeight: 34,
-  },
-  secondaryAuthText: {
-    fontFamily: fonts.bold,
-    fontSize: 13,
-  },
-  skipButton: {
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
   },
-  skipText: {
+  signInText: {
+    color: scoreSyncColors.navy,
     fontFamily: fonts.bold,
     fontSize: 13,
   },
   slide: {
-    justifyContent: 'flex-end',
-  },
-  spacer: {
-    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: spacing.xxl,
   },
   title: {
+    color: scoreSyncColors.ink,
     fontFamily: fonts.extraBold,
-    fontSize: 34,
-    letterSpacing: -0.5,
-    lineHeight: 40,
-  },
-  titleRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.md,
+    fontSize: 27,
+    letterSpacing: -0.4,
+    lineHeight: 33,
+    maxWidth: 350,
+    textAlign: 'center',
   },
   topBar: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: WELCOME_HORIZONTAL_PADDING,
+    paddingHorizontal: spacing.xxl,
+  },
+  visualStage: {
+    alignSelf: 'center',
+    flex: 1,
+    maxHeight: 400,
+    minHeight: 300,
+    overflow: 'hidden',
+    width: '100%',
   },
 });

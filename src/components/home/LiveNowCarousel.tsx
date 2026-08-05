@@ -126,7 +126,7 @@ export function LiveNowCarousel({ showHeader = true }: { showHeader?: boolean } 
         snapToAlignment="start">
         {liveEntries.map((entry) => (
           <View key={entry.match.fixtureId} style={[carouselStyles.page, { width: pageWidth }]}>
-            <FeedMatchCard caption={entry.league.name} league={entry.league} match={entry.match} />
+            <FeedMatchCard caption={entry.league.name} league={entry.league} match={entry.match} variant="featured" />
           </View>
         ))}
       </ScrollView>

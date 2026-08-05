@@ -13,9 +13,13 @@ import { useAppTheme } from '@/theme/colors';
 import { radius } from '@/theme/spacing';
 
 export function ToggleSwitch({
+  accessibilityLabel,
+  disabled,
   onChange,
   value,
 }: {
+  accessibilityLabel?: string;
+  disabled?: boolean;
   onChange?: (value: boolean) => void;
   value?: boolean;
 }) {
@@ -36,8 +40,10 @@ export function ToggleSwitch({
 
   return (
     <Pressable
+      accessibilityLabel={accessibilityLabel}
       accessibilityRole="switch"
       accessibilityState={{ checked }}
+      disabled={disabled}
       onPress={() => {
         if (Platform.OS !== 'web') {
           Haptics.selectionAsync().catch(() => undefined);
@@ -45,7 +51,8 @@ export function ToggleSwitch({
         const next = !checked;
         setInternalChecked(next);
         onChange?.(next);
-      }}>
+      }}
+      style={[styles.pressTarget, disabled ? styles.disabled : null]}>
       <Animated.View style={[styles.track, trackStyle]}>
         <Animated.View style={[styles.thumb, thumbStyle]} />
       </Animated.View>
@@ -54,6 +61,15 @@ export function ToggleSwitch({
 }
 
 const styles = StyleSheet.create({
+  disabled: {
+    opacity: 0.5,
+  },
+  pressTarget: {
+    alignItems: 'center',
+    height: 44,
+    justifyContent: 'center',
+    width: 56,
+  },
   thumb: {
     borderRadius: radius.pill,
     height: 22,

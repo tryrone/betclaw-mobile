@@ -10,17 +10,17 @@ export const spacing = {
 
 export const layout = {
   /** Top gutter applied by Screen. */
-  screenGutter: 3,
-  /** Outer horizontal gutter applied by Screen — a little breathing room from the screen edges. */
-  screenHorizontalGutter: 2.5,
+  screenGutter: 8,
+  /** ScoreSync-inspired edge gutter: airy, but still useful on compact phones. */
+  screenHorizontalGutter: 16,
   /** Shared phone content cap; content centers and gains side gutters beyond this width. */
-  screenMaxWidth: 408,
+  screenMaxWidth: 520,
 } as const;
 
 export const radius = {
   sm: 8,
   md: 12,
-  lg: 18,
-  xl: 24,
+  lg: 20,
+  xl: 28,
   pill: 999,
 } as const;

@@ -119,8 +119,8 @@ const styles = StyleSheet.create({
   },
   background: {
     borderRadius: 40,
-    backgroundColor: '#020605',
-    borderColor: 'rgba(169,232,40,0.28)',
+    backgroundColor: '#111337',
+    borderColor: 'rgba(143,148,255,0.30)',
     borderWidth: 1,
     width: 128,
     height: 128,
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   },
   backgroundSolidColor: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#020605',
+    backgroundColor: '#111337',
     zIndex: 1000,
   },
 });

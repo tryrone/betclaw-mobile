@@ -40,7 +40,7 @@ module.exports = {
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: 'betclaw',
-    userInterfaceStyle: 'dark',
+    userInterfaceStyle: 'automatic',
     ios: {
       bundleIdentifier: 'com.betclaw.app',
       buildNumber: '20',
@@ -52,7 +52,7 @@ module.exports = {
     android: {
       package: 'com.betclaw.app',
       adaptiveIcon: {
-        backgroundColor: '#020605',
+        backgroundColor: '#11143b',
         foregroundImage: './assets/images/android-icon-foreground.png',
         backgroundImage: './assets/images/android-icon-background.png',
         monochromeImage: './assets/images/android-icon-monochrome.png',
@@ -81,22 +81,22 @@ module.exports = {
           image: './assets/images/splash-mark.png',
           imageWidth: 150,
           resizeMode: 'contain',
-          backgroundColor: '#020605',
+          backgroundColor: '#f7f7f9',
           dark: {
-            image: './assets/images/splash-mark.png',
-            backgroundColor: '#020605',
+            image: './assets/images/splash-mark-dark.png',
+            backgroundColor: '#11143b',
           },
           ios: {
             image: './assets/images/splash-mark.png',
             imageWidth: 150,
             resizeMode: 'contain',
-            backgroundColor: '#020605',
+            backgroundColor: '#f7f7f9',
           },
           android: {
             image: './assets/images/splash-mark.png',
             imageWidth: 150,
             resizeMode: 'contain',
-            backgroundColor: '#020605',
+            backgroundColor: '#f7f7f9',
           },
         },
       ],

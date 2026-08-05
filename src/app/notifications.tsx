@@ -4,68 +4,225 @@ import {
   ArrowUpCircle,
   Bell,
   CheckCheck,
+  ChevronRight,
+  CreditCard,
   Sparkles,
   Target,
+  TrendingDown,
   Wallet,
   XCircle,
   type LucideIcon,
 } from 'lucide-react-native';
+import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { enterUp, GlassCard, IconButton, PressableScale, Screen, StatusBadge } from '@/components/ui';
-import {
-  useMarkAllNotificationsReadMutation,
-  useMarkNotificationReadMutation,
-  useNotifications,
-} from '@/lib/api/hooks';
+import { enterUp, GlassCard, IconButton, PressableScale, Screen, ScreenHeader } from '@/components/ui';
+import { useMarkAllNotificationsReadMutation, useMarkNotificationReadMutation, useNotifications } from '@/lib/api/hooks';
 import type { NotificationItem } from '@/lib/api/types';
 import { useAppTheme, type AppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
-function formatActivityDate(value: string | Date) {
-  return new Date(value).toLocaleString(undefined, {
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    month: 'short',
-  });
+type NotificationScope = 'all' | 'tickets' | 'wallet';
+type NotificationCategory = Exclude<NotificationScope, 'all'>;
+type NotificationVisual = { color: string; icon: LucideIcon; soft: string };
+type NotificationPresentation = NotificationVisual & {
+  actionLabel?: string;
+  category: NotificationCategory;
+  categoryLabel: string;
+  destination: string | null;
+  detail: string;
+};
+type NotificationGroup = { items: NotificationItem[]; key: string; label: string };
+
+const walletTypes = new Set([
+  'PLAN_UPGRADED',
+  'PLAN_DOWNGRADED',
+  'PLAN_CANCELLED',
+  'PAYMENT_RECEIVED',
+  'PAYMENT_FAILED',
+  'PAYMENT_RETRY',
+  'PAYMENT_REMINDER',
+  'SUBSCRIPTION_REMINDER',
+]);
+
+function relativeActivityDate(value: string | Date) {
+  const date = new Date(value);
+  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (seconds < 60) return 'Just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
-type NotificationVisual = { icon: LucideIcon; color: string; soft: string };
+function dayKey(value: string | Date) {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
 
-function visualForType(type: string | undefined, theme: AppTheme): NotificationVisual {
+function groupLabel(value: string | Date) {
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const key = dayKey(value);
+  if (key === dayKey(now)) return 'Today';
+  if (key === dayKey(yesterday)) return 'Yesterday';
+  return 'Earlier';
+}
+
+function groupNotifications(items: NotificationItem[]): NotificationGroup[] {
+  const order = ['Today', 'Yesterday', 'Earlier'];
+  return order
+    .map((label) => ({ items: items.filter((item) => groupLabel(item.createdAt) === label), key: label.toLowerCase(), label }))
+    .filter((group) => group.items.length > 0);
+}
+
+function resolveDestination(item: NotificationItem, category: NotificationCategory) {
+  const metadata = item.metadata;
+  if (metadata && typeof metadata.url === 'string' && metadata.url.startsWith('/')) return metadata.url;
+  if (metadata && typeof metadata.ticketId === 'string' && metadata.ticketId.length > 0) return `/ticket/${metadata.ticketId}`;
+  if (category === 'wallet') return '/(tabs)/wallet';
+  return item.type?.startsWith('TICKET_') ? '/(tabs)/history' : null;
+}
+
+function presentationFor(item: NotificationItem, theme: AppTheme): NotificationPresentation {
+  const description = item.description?.trim();
+  const type = item.type ?? '';
+  const category: NotificationCategory = walletTypes.has(type) ? 'wallet' : 'tickets';
+  const destination = resolveDestination(item, category);
+  let visual: NotificationVisual = { color: theme.primarySoft, icon: Bell, soft: theme.primarySubtle };
+  let detail = description || 'Open this update for more information.';
+  let actionLabel = destination ? 'View update' : undefined;
+  let categoryLabel = category === 'wallet' ? 'Wallet' : 'Tickets';
+
   switch (type) {
     case 'TICKET_BUILT':
-      return { icon: Sparkles, color: theme.primarySoft, soft: theme.primarySubtle };
+      visual = { color: theme.primarySoft, icon: Sparkles, soft: theme.primarySubtle };
+      detail = description ? `${description} ticket is ready for review.` : 'Your AI-built ticket is ready for review.';
+      actionLabel = 'View ticket';
+      break;
     case 'TICKET_OPTIMIZED':
-    case 'POLYMARKET_TRADE_OUTCOME':
-      return { icon: Target, color: theme.success, soft: theme.successSoft };
+      visual = { color: theme.success, icon: Target, soft: theme.successSoft };
+      detail = description ? `Booking code ${description} has been optimized.` : 'Your optimized ticket is ready.';
+      actionLabel = 'View changes';
+      break;
+    case 'MATCH_REMOVED':
+      visual = { color: theme.warning, icon: Target, soft: theme.warningSoft };
+      detail = description || 'A match was removed while improving the ticket.';
+      actionLabel = 'Review ticket';
+      break;
     case 'PLAN_UPGRADED':
-      return { icon: ArrowUpCircle, color: theme.success, soft: theme.successSoft };
+      visual = { color: theme.success, icon: ArrowUpCircle, soft: theme.successSoft };
+      detail = description || 'Your token access has been upgraded.';
+      actionLabel = 'View wallet';
+      break;
+    case 'PLAN_DOWNGRADED':
+      visual = { color: theme.warning, icon: TrendingDown, soft: theme.warningSoft };
+      detail = description || 'Your access plan has changed.';
+      actionLabel = 'View wallet';
+      break;
     case 'PLAN_CANCELLED':
-      return { icon: XCircle, color: theme.danger, soft: theme.dangerSoft };
+      visual = { color: theme.danger, icon: XCircle, soft: theme.dangerSoft };
+      detail = description || 'Your plan has been cancelled.';
+      actionLabel = 'View wallet';
+      break;
+    case 'PAYMENT_RECEIVED':
+      visual = { color: theme.success, icon: CreditCard, soft: theme.successSoft };
+      detail = description || 'Your payment was received successfully.';
+      actionLabel = 'View receipt';
+      break;
+    case 'PAYMENT_FAILED':
     case 'PAYMENT_RETRY':
+      visual = { color: theme.danger, icon: CreditCard, soft: theme.dangerSoft };
+      detail = description || 'Your payment needs attention.';
+      actionLabel = 'Review payment';
+      break;
     case 'PAYMENT_REMINDER':
     case 'SUBSCRIPTION_REMINDER':
-      return { icon: Wallet, color: theme.warning, soft: theme.warningSoft };
+      visual = { color: theme.warning, icon: Wallet, soft: theme.warningSoft };
+      detail = description || 'Review your token access and balance.';
+      actionLabel = 'View wallet';
+      break;
+    case 'POLYMARKET_TRADE_OUTCOME':
+      visual = { color: theme.success, icon: Target, soft: theme.successSoft };
+      categoryLabel = 'Result';
+      actionLabel = destination ? 'View result' : undefined;
+      break;
     default:
-      return { icon: Bell, color: theme.mutedLight, soft: theme.field };
+      break;
   }
+
+  return { ...visual, actionLabel, category, categoryLabel, destination, detail };
 }
 
-function resolveDeepLink(item: NotificationItem): string | null {
-  const metadata = item.metadata;
-  if (metadata) {
-    if (typeof metadata.url === 'string' && metadata.url.startsWith('/')) {
-      return metadata.url;
-    }
-    if (typeof metadata.ticketId === 'string' && metadata.ticketId.length > 0) {
-      return `/ticket/${metadata.ticketId}`;
-    }
-  }
-  return null;
+function ScopeControl({ onChange, value }: { onChange: (scope: NotificationScope) => void; value: NotificationScope }) {
+  const theme = useAppTheme();
+  const scopes: { key: NotificationScope; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'tickets', label: 'Tickets' },
+    { key: 'wallet', label: 'Wallet' },
+  ];
+  return (
+    <View accessibilityRole="tablist" style={[styles.scopeControl, { backgroundColor: theme.field, borderColor: theme.border }]}>
+      {scopes.map((scope) => {
+        const active = scope.key === value;
+        return (
+          <PressableScale
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            key={scope.key}
+            onPress={() => onChange(scope.key)}
+            style={[styles.scopeButton, active ? { backgroundColor: theme.card, borderColor: theme.border } : null]}>
+            <Text style={[styles.scopeText, { color: active ? theme.foregroundStrong : theme.muted }]}>{scope.label}</Text>
+          </PressableScale>
+        );
+      })}
+    </View>
+  );
+}
+
+function NotificationRow({ item, onPress, showDivider }: { item: NotificationItem; onPress: () => void; showDivider: boolean }) {
+  const theme = useAppTheme();
+  const presentation = presentationFor(item, theme);
+  const VisualIcon = presentation.icon;
+  const actionable = Boolean(presentation.destination) || !item.readAt;
+
+  const content = (
+    <View style={[styles.item, showDivider ? { borderBottomColor: theme.border, borderBottomWidth: 1 } : null]}>
+      <View style={[styles.unreadRail, { backgroundColor: item.readAt ? 'transparent' : theme.primary }]} />
+      <View style={[styles.itemIcon, { backgroundColor: presentation.soft }]}>
+        <VisualIcon color={presentation.color} size={18} strokeWidth={1.9} />
+      </View>
+      <View style={styles.itemCopy}>
+        <View style={styles.itemMetaRow}>
+          <Text style={[styles.categoryText, { color: presentation.color }]}>{presentation.categoryLabel}</Text>
+          <Text style={[styles.itemDate, { color: theme.muted }]}>{relativeActivityDate(item.createdAt)}</Text>
+        </View>
+        <Text numberOfLines={2} style={[styles.itemTitle, { color: item.readAt ? theme.mutedLight : theme.foregroundStrong }]}>{item.title}</Text>
+        <Text numberOfLines={3} style={[styles.itemText, { color: theme.mutedLight }]}>{presentation.detail}</Text>
+        {presentation.actionLabel ? (
+          <View style={styles.actionRow}>
+            <Text style={[styles.actionText, { color: theme.primarySoft }]}>{presentation.actionLabel}</Text>
+            <ChevronRight color={theme.primarySoft} size={14} strokeWidth={2.2} />
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+
+  return actionable ? (
+    <PressableScale
+      accessibilityHint={presentation.destination ? `Opens ${presentation.actionLabel?.toLowerCase() ?? 'the related update'}` : 'Marks this update as read'}
+      accessibilityLabel={`${item.title}. ${presentation.detail}`}
+      accessibilityRole="button"
+      onPress={onPress}
+      scaleTo={0.99}>
+      {content}
+    </PressableScale>
+  ) : content;
 }
 
 export default function NotificationsScreen() {
@@ -74,179 +231,91 @@ export default function NotificationsScreen() {
   const notifications = useNotifications(30);
   const markRead = useMarkNotificationReadMutation();
   const markAllRead = useMarkAllNotificationsReadMutation();
-  const items = notifications.data?.items ?? [];
+  const [scope, setScope] = useState<NotificationScope>('all');
+  const items = useMemo(() => notifications.data?.items ?? [], [notifications.data?.items]);
+  const visibleItems = useMemo(
+    () => items.filter((item) => scope === 'all' || presentationFor(item, theme).category === scope),
+    [items, scope, theme],
+  );
+  const groups = useMemo(() => groupNotifications(visibleItems), [visibleItems]);
+  const unreadCount = notifications.data?.unreadCount ?? 0;
 
   return (
     <Screen onRefresh={() => void notifications.refetch()} refreshing={notifications.isRefetching}>
-      <Animated.View entering={enterUp(0)} style={styles.header}>
-        <IconButton icon={ArrowLeft} label="Go back" onPress={() => router.back()} />
-        <Text style={[styles.title, { color: theme.foregroundStrong }]}>Notifications</Text>
-        <IconButton icon={CheckCheck} label="Mark all read" onPress={() => markAllRead.mutate()} />
+      <Animated.View entering={enterUp(0)}>
+        <ScreenHeader
+          action={<IconButton icon={CheckCheck} label="Mark all read" onPress={() => markAllRead.mutate()} />}
+          eyebrow="Activity"
+          leadingAction={<IconButton icon={ArrowLeft} label="Go back" onPress={() => router.back()} />}
+          title="Notifications"
+        />
       </Animated.View>
 
-      <Animated.View entering={enterUp(1)}>
-        <GlassCard style={styles.summary}>
-          <View style={[styles.summaryIcon, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
-            <Bell color={theme.primarySoft} size={18} />
-          </View>
-          <View style={styles.summaryCopy}>
-            <Text style={[styles.summaryTitle, { color: theme.foregroundStrong }]}>
-              {notifications.data?.unreadCount ?? 0} unread
-            </Text>
-            <Text style={[styles.summaryText, { color: theme.muted }]}>Ticket, wallet, and account updates from BetClaw.</Text>
-          </View>
-        </GlassCard>
+      <Animated.View entering={enterUp(1)} style={styles.summaryLine}>
+        <View style={styles.summaryCopy}>
+          <Text style={[styles.summaryTitle, { color: theme.foregroundStrong }]}>{unreadCount === 0 ? 'You’re all caught up' : `${unreadCount} unread update${unreadCount === 1 ? '' : 's'}`}</Text>
+          <Text style={[styles.summaryText, { color: theme.muted }]}>Tickets, payments, and account activity from BetClaw.</Text>
+        </View>
+        {unreadCount > 0 ? <View style={[styles.unreadCount, { backgroundColor: theme.primary }]}><Text style={[styles.unreadCountText, { color: theme.primaryDark }]}>{unreadCount}</Text></View> : null}
       </Animated.View>
 
-      {items.length === 0 ? (
-        <Animated.View entering={enterUp(2)}>
+      <Animated.View entering={enterUp(2)}>
+        <ScopeControl onChange={setScope} value={scope} />
+      </Animated.View>
+
+      {groups.length === 0 ? (
+        <Animated.View entering={enterUp(3)}>
           <GlassCard style={styles.empty}>
-            <Text style={[styles.summaryTitle, { color: theme.foregroundStrong }]}>
-              {notifications.isLoading ? 'Loading notifications' : 'No notifications yet'}
-            </Text>
-            <Text style={[styles.summaryText, { color: theme.muted }]}>
-              Activity from ticket jobs and payments will appear here.
-            </Text>
+            <Bell color={theme.muted} size={23} />
+            <Text style={[styles.emptyTitle, { color: theme.foregroundStrong }]}>{notifications.isLoading ? 'Loading notifications' : `No ${scope === 'all' ? '' : `${scope} `}updates`}</Text>
+            <Text style={[styles.summaryText, { color: theme.muted }]}>Activity from ticket jobs and payments will appear here.</Text>
           </GlassCard>
         </Animated.View>
       ) : null}
 
-      {items.map((item: NotificationItem, index: number) => {
-        const visual = visualForType(item.type, theme);
-        const VisualIcon = visual.icon;
-        const deepLink = resolveDeepLink(item);
-        const handlePress = () => {
-          if (!item.readAt) markRead.mutate(item.id);
-          if (deepLink) router.push(deepLink as never);
-        };
-
-        return (
-          <Animated.View entering={enterUp(2 + index)} key={item.id}>
-            <PressableScale
-              accessibilityHint={deepLink ? 'Opens the related ticket' : item.readAt ? undefined : 'Marks this notification as read'}
-              accessibilityLabel={item.title}
-              accessibilityRole="button"
-              onPress={handlePress}
-              scaleTo={0.98}>
-              <GlassCard
-                style={[
-                  styles.item,
-                  !item.readAt ? { borderColor: theme.selectionBorder } : null,
-                ]}>
-                <View style={styles.itemTop}>
-                  <View style={styles.itemTitleWrap}>
-                    <View style={[styles.itemIcon, { backgroundColor: visual.soft }]}>
-                      <VisualIcon color={visual.color} size={16} />
-                    </View>
-                    {!item.readAt ? <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} /> : null}
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.itemTitle, { color: item.readAt ? theme.mutedLight : theme.foregroundStrong }]}>
-                      {item.title}
-                    </Text>
-                  </View>
-                  {item.readAt ? (
-                    <CheckCheck color={theme.muted} size={15} />
-                  ) : (
-                    <StatusBadge label="New" tone="accent" />
-                  )}
-                </View>
-                {item.description ? (
-                  <Text style={[styles.itemText, { color: theme.mutedLight }]}>{item.description}</Text>
-                ) : null}
-                <Text style={[styles.itemDate, { color: theme.muted }]}>{formatActivityDate(item.createdAt)}</Text>
-              </GlassCard>
-            </PressableScale>
-          </Animated.View>
-        );
-      })}
+      {groups.map((group, groupIndex) => (
+        <Animated.View entering={enterUp(3 + groupIndex)} key={group.key} style={styles.group}>
+          <Text style={[styles.groupLabel, { color: theme.muted }]}>{group.label}</Text>
+          <GlassCard style={styles.groupCard}>
+            {group.items.map((item, index) => {
+              const presentation = presentationFor(item, theme);
+              const handlePress = () => {
+                if (!item.readAt) markRead.mutate(item.id);
+                if (presentation.destination) router.push(presentation.destination as never);
+              };
+              return <NotificationRow item={item} key={item.id} onPress={handlePress} showDivider={index < group.items.length - 1} />;
+            })}
+          </GlassCard>
+        </Animated.View>
+      ))}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  empty: {
-    gap: spacing.xs,
-    padding: spacing.lg,
-  },
-  header: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  item: {
-    gap: spacing.sm,
-    padding: spacing.md,
-  },
-  itemDate: {
-    fontFamily: fonts.medium,
-    fontSize: 11,
-  },
-  itemIcon: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    height: 30,
-    justifyContent: 'center',
-    width: 30,
-  },
-  itemText: {
-    fontFamily: fonts.medium,
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  itemTitle: {
-    flexShrink: 1,
-    fontFamily: fonts.extraBold,
-    fontSize: 15,
-  },
-  itemTop: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-    justifyContent: 'space-between',
-  },
-  itemTitleWrap: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    minWidth: 0,
-  },
-  summary: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.md,
-    padding: spacing.md,
-  },
-  summaryCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  summaryIcon: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 42,
-    justifyContent: 'center',
-    width: 42,
-  },
-  summaryText: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 3,
-  },
-  summaryTitle: {
-    fontFamily: fonts.extraBold,
-    fontSize: 17,
-  },
-  title: {
-    fontFamily: fonts.extraBold,
-    fontSize: 23,
-  },
-  unreadDot: {
-    borderRadius: radius.pill,
-    height: 8,
-    width: 8,
-  },
+  actionRow: { alignItems: 'center', flexDirection: 'row', gap: 2, marginTop: spacing.xs },
+  actionText: { fontFamily: fonts.bold, fontSize: 11 },
+  categoryText: { fontFamily: fonts.extraBold, fontSize: 9, letterSpacing: 0.7, textTransform: 'uppercase' },
+  empty: { alignItems: 'center', gap: spacing.xs, padding: spacing.xl },
+  emptyTitle: { fontFamily: fonts.extraBold, fontSize: 16 },
+  group: { gap: spacing.sm },
+  groupCard: { gap: 0, overflow: 'hidden', padding: 0 },
+  groupLabel: { fontFamily: fonts.extraBold, fontSize: 11, letterSpacing: 0.7, textTransform: 'uppercase' },
+  item: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.sm, minHeight: 116, padding: spacing.md, paddingLeft: spacing.lg, position: 'relative' },
+  itemCopy: { flex: 1, minWidth: 0 },
+  itemDate: { fontFamily: fonts.medium, fontSize: 10 },
+  itemIcon: { alignItems: 'center', borderRadius: radius.pill, height: 38, justifyContent: 'center', width: 38 },
+  itemMetaRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  itemText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 17, marginTop: 4 },
+  itemTitle: { fontFamily: fonts.extraBold, fontSize: 14, lineHeight: 18, marginTop: 5 },
+  scopeButton: { alignItems: 'center', borderColor: 'transparent', borderRadius: radius.pill, borderWidth: 1, flex: 1, minHeight: 40, justifyContent: 'center' },
+  scopeControl: { borderRadius: radius.pill, borderWidth: 1, flexDirection: 'row', padding: 3 },
+  scopeText: { fontFamily: fonts.bold, fontSize: 12 },
+  summaryCopy: { flex: 1, minWidth: 0 },
+  summaryLine: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
+  summaryText: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, marginTop: 3, textAlign: 'center' },
+  summaryTitle: { fontFamily: fonts.extraBold, fontSize: 17 },
+  unreadCount: { alignItems: 'center', borderRadius: radius.pill, height: 34, justifyContent: 'center', minWidth: 34, paddingHorizontal: 8 },
+  unreadCountText: { fontFamily: fonts.extraBold, fontSize: 12, fontVariant: ['tabular-nums'] },
+  unreadRail: { borderRadius: radius.pill, bottom: spacing.md, left: 6, position: 'absolute', top: spacing.md, width: 3 },
 });

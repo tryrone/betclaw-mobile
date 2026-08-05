@@ -23,7 +23,7 @@ export function IconButton({
       accessibilityRole="button"
       onPress={onPress}
       scaleTo={0.9}
-      style={[styles.button, { backgroundColor: theme.field, borderColor: theme.border, shadowColor: theme.shadow }]}>
+      style={[styles.button, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       <Icon color={theme.foreground} size={18} strokeWidth={2} />
     </PressableScale>
   );
@@ -34,12 +34,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
-    elevation: 2,
-    height: 40,
+    elevation: 0,
+    height: 44,
     justifyContent: 'center',
-    shadowOffset: { height: 6, width: 0 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    width: 40,
+    width: 44,
   },
 });

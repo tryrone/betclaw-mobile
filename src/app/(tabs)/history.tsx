@@ -1,5 +1,6 @@
+import { useFocusEffect } from 'expo-router';
 import { ChevronLeft, ChevronRight, Eye, Filter, Search } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -75,6 +76,10 @@ export default function HistoryScreen() {
   );
   const tickets = useTicketList(input);
   const items = tickets.data?.items ?? [];
+
+  useFocusEffect(
+    useCallback(() => () => setSelectedTicketId(null), []),
+  );
 
   const resetPaging = () => {
     setPageIndex(0);

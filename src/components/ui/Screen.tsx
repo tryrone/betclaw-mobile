@@ -5,11 +5,12 @@ import { Background } from '@/components/ui/Background';
 import { useAppTheme } from '@/theme/colors';
 import { layout, spacing } from '@/theme/spacing';
 
-/** Clearance for content above the anchored bottom nav bar (row 56 + padding + breathing room). */
-const NAV_CLEARANCE = 96;
+/** Clearance for content above the fixed 56pt bottom nav row plus breathing room. */
+const NAV_CLEARANCE = 68;
 
 export function Screen({
   children,
+  contentBottomPadding,
   floatingAction,
   hasTabs,
   onRefresh,
@@ -18,6 +19,8 @@ export function Screen({
   scroll = true,
 }: {
   children: React.ReactNode;
+  /** Override the wrapper's bottom clearance when a child virtualized list owns its insets. */
+  contentBottomPadding?: number;
   /** Optional element pinned above the bottom nav (e.g. a floating action button). */
   floatingAction?: React.ReactNode;
   hasTabs?: boolean;
@@ -30,7 +33,8 @@ export function Screen({
 }) {
   const insets = useSafeAreaInsets();
   const theme = useAppTheme();
-  const bottomPadding = (hasTabs ? NAV_CLEARANCE : 24) + insets.bottom + (floatingAction ? 64 : 0);
+  const defaultBottomPadding = (hasTabs ? NAV_CLEARANCE : 24) + insets.bottom + (floatingAction ? 64 : 0);
+  const bottomPadding = contentBottomPadding ?? defaultBottomPadding;
   const statusBarTop = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0;
   const manualTopInset = safeTop ? 0 : Math.max(insets.top, statusBarTop);
   const contentPadding = {

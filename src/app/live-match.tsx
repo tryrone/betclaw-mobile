@@ -38,7 +38,7 @@ export default function LiveMatchScreen() {
 
       <SafeAreaView edges={['top']} style={styles.safe}>
         <View style={styles.topBar}>
-          <PressableScale accessibilityLabel="Go back" accessibilityRole="button" onPress={() => router.back()} style={[styles.circleButton, { backgroundColor: theme.field, borderColor: theme.borderStrong }]}>
+          <PressableScale accessibilityLabel="Go back" accessibilityRole="button" onPress={() => router.back()} style={styles.circleButton}>
             <ChevronLeft color="#ffffff" size={23} />
           </PressableScale>
           <View style={styles.livePill}>
@@ -46,13 +46,13 @@ export default function LiveMatchScreen() {
             <Video color={theme.primaryDark} size={15} />
             <Text style={[styles.livePillText, { color: theme.primaryDark }]}>Live</Text>
           </View>
-          <PressableScale accessibilityLabel="Notifications" accessibilityRole="button" style={[styles.circleButton, { backgroundColor: theme.field, borderColor: theme.borderStrong }]}>
+          <PressableScale accessibilityLabel="Notifications" accessibilityRole="button" style={styles.circleButton}>
             <Bell color="#ffffff" size={20} />
           </PressableScale>
         </View>
 
         <View style={styles.pauseWrap}>
-          <View style={[styles.pauseButton, { backgroundColor: theme.primaryGlowStrong }]}>
+          <View style={styles.pauseButton}>
             <Pause color="#ffffff" fill="#ffffff" size={34} />
           </View>
         </View>
@@ -108,7 +108,9 @@ const styles = StyleSheet.create({
   },
   circleButton: {
     alignItems: 'center',
+    backgroundColor: 'rgba(17,20,59,0.58)',
     borderRadius: radius.pill,
+    borderColor: 'rgba(255,255,255,0.28)',
     borderWidth: 1,
     height: 48,
     justifyContent: 'center',
@@ -161,6 +163,7 @@ const styles = StyleSheet.create({
   },
   pauseButton: {
     alignItems: 'center',
+    backgroundColor: 'rgba(17,20,59,0.68)',
     borderColor: 'rgba(255,255,255,0.32)',
     borderRadius: 46,
     borderWidth: 1,

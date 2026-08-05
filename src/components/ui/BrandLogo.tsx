@@ -5,9 +5,11 @@ import { useAppTheme } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
 export function BrandLogo({
+  color,
   markSize = 42,
   textSize = 22,
 }: {
+  color?: string;
   markSize?: number;
   textSize?: number;
 }) {
@@ -15,8 +17,8 @@ export function BrandLogo({
 
   return (
     <View style={styles.logo}>
-      <BrandMark color={theme.primarySoft} size={markSize} />
-      <Text style={[styles.wordmark, { color: theme.primarySoft, fontSize: textSize }]}>BetClaw</Text>
+      <BrandMark color={color ?? theme.primarySoft} size={markSize} />
+      <Text style={[styles.wordmark, { color: color ?? theme.primarySoft, fontSize: textSize }]}>BetClaw</Text>
     </View>
   );
 }
