@@ -36,14 +36,14 @@ module.exports = {
   expo: {
     name: 'BetClaw',
     slug: 'betclaw-mobile',
-    version: '1.0.1',
+    version: '1.0.2',
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: 'betclaw',
     userInterfaceStyle: 'automatic',
     ios: {
       bundleIdentifier: 'com.betclaw.app',
-      buildNumber: '20',
+      buildNumber: '21',
       icon: './assets/images/ios-icon.png',
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
