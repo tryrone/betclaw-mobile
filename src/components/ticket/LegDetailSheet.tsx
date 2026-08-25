@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ArrowUpRight, ExternalLink, Sparkles } from 'lucide-react-native';
+import { ArrowUpRight, ExternalLink, Sparkles } from '@/components/modern-icons';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FormBadges } from '@/components/ticket/FormBadges';

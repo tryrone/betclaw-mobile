@@ -12,7 +12,7 @@ import {
   Wallet,
   XCircle,
   type LucideIcon,
-} from 'lucide-react-native';
+} from '@/components/modern-icons';
 import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';

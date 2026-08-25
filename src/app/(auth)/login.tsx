@@ -1,5 +1,5 @@
 import { Link, useRouter } from 'expo-router';
-import { Fingerprint, Lock, Mail } from 'lucide-react-native';
+import { Fingerprint, Lock, Mail } from '@/components/modern-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 

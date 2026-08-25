@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   Smartphone,
   UserRound,
-} from 'lucide-react-native';
+} from '@/components/modern-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 

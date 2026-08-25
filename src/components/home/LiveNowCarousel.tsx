@@ -9,7 +9,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 
-import { LoaderCircle, Radio } from 'lucide-react-native';
+import { LoaderCircle, Radio } from '@/components/modern-icons';
 
 import { FeedMatchCard } from '@/components/home/FeedMatchCard';
 import { DashboardGlassCard, DashboardStatePanel, StatusBadge } from '@/components/ui';

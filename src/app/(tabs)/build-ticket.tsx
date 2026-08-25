@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ArrowLeft, ArrowUpRight, Bot, Check, Copy, Minus, Plus, Share2, SlidersHorizontal, Target, Trophy } from 'lucide-react-native';
+import { ArrowLeft, ArrowUpRight, Bot, Check, Copy, Minus, Plus, Share2, SlidersHorizontal, Target, Trophy } from '@/components/modern-icons';
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';

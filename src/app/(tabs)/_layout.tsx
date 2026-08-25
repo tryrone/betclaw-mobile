@@ -18,14 +18,16 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{ headerShown: false }}
       tabBar={(props) => <TabBar {...props} />}>
-      <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="fix-ticket" options={{ title: 'Fix' }} />
-      <Tabs.Screen name="build-ticket" options={{ title: 'Build' }} />
-      <Tabs.Screen name="convert-ticket" options={{ title: 'Convert' }} />
-      <Tabs.Screen name="history" options={{ title: 'History' }} />
-      <Tabs.Screen name="wallet" options={{ title: 'Wallet' }} />
-      <Tabs.Screen name="referrals" options={{ title: 'Referrals' }} />
-      <Tabs.Screen name="settings" options={{ title: 'Me' }} />
+      <Tabs.Screen name="index" options={{ title: 'Today' }} />
+      <Tabs.Screen name="matches" options={{ title: 'Matches' }} />
+      <Tabs.Screen name="tools" options={{ title: 'Tools' }} />
+      <Tabs.Screen name="history" options={{ title: 'Activity' }} />
+      <Tabs.Screen name="settings" options={{ title: 'Account' }} />
+      <Tabs.Screen name="fix-ticket" options={{ href: null }} />
+      <Tabs.Screen name="build-ticket" options={{ href: null }} />
+      <Tabs.Screen name="convert-ticket" options={{ href: null }} />
+      <Tabs.Screen name="wallet" options={{ href: null }} />
+      <Tabs.Screen name="referrals" options={{ href: null }} />
     </Tabs>
   );
 }

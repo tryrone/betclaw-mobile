@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/immutability -- Reanimated shared values are mutable by design. */
-import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from 'lucide-react-native';
+import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from '@/components/modern-icons';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {

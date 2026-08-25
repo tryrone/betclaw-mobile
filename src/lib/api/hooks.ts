@@ -23,6 +23,7 @@ import type {
   NotificationFeed,
   NotificationSummary,
   Plan,
+  PublishedPrediction,
   ReferralReport,
   ShareLinkResult,
   SubscriptionCurrent,
@@ -31,12 +32,14 @@ import type {
   TelegramCommunityStatus,
   TelegramTokenResult,
   TicketDetail,
+  TicketStats,
   TicketJobState,
   TicketList,
   TicketMatchResult,
   TicketResult,
   UserProfile,
   VerifyPaymentResult,
+  WinRateTrendPoint,
 } from '@/lib/api/types';
 import type { SupportedPlatform } from '@/lib/bookmaker-platforms';
 import { signInWithMobileOAuth } from '@/lib/api/oauth';
@@ -60,6 +63,7 @@ export const queryKeys = {
   notifications: ['ticket', 'notifications'] as const,
   notificationSummary: ['ticket', 'notificationSummary'] as const,
   plans: ['subscription', 'plans'] as const,
+  recentPublished: (input?: unknown) => ['prediction', 'recentPublished', input] as const,
   recentActivity: ['ticket', 'recentActivity'] as const,
   referralLookup: (code?: string) => ['referral', 'lookup', code] as const,
   myReferral: ['referral', 'mine'] as const,
@@ -68,6 +72,8 @@ export const queryKeys = {
   telegramCommunityStatus: ['user', 'telegramCommunityStatus'] as const,
   ticketList: (input?: unknown) => ['ticket', 'list', input] as const,
   ticketStats: ['ticket', 'stats'] as const,
+  topEdges: (input?: unknown) => ['prediction', 'topEdges', input] as const,
+  winRateTrend: ['ticket', 'winRateTrend'] as const,
   ticket: (ticketId?: string | null) => ['ticket', 'detail', ticketId] as const,
 };
 
@@ -141,6 +147,26 @@ export function useDailyTicket(input?: {
   });
 }
 
+export function useTopEdgesToday(input?: { limit?: number; sport?: 'FOOTBALL' }) {
+  const status = useAuthStore((state) => state.status);
+  return useQuery<PublishedPrediction[]>({
+    enabled: status === 'authenticated',
+    queryKey: queryKeys.topEdges(input),
+    retry: false,
+    queryFn: () => callWithMobileRefresh(() => asPromise<PublishedPrediction[]>(trpc.prediction.getTopEdgesToday.query(input ?? { limit: 6, sport: 'FOOTBALL' }))),
+  });
+}
+
+export function useRecentPublished(input?: { limit?: number; sport?: 'FOOTBALL' }) {
+  const status = useAuthStore((state) => state.status);
+  return useQuery<PublishedPrediction[]>({
+    enabled: status === 'authenticated',
+    queryKey: queryKeys.recentPublished(input),
+    retry: false,
+    queryFn: () => callWithMobileRefresh(() => asPromise<PublishedPrediction[]>(trpc.prediction.getRecentPublished.query(input ?? { limit: 6, sport: 'FOOTBALL' }))),
+  });
+}
+
 export function useFixtureInsight(fixtureId?: string) {
   const status = useAuthStore((state) => state.status);
   return useQuery<FixtureInsight>({
@@ -161,10 +187,19 @@ export function useTelegramCommunityStatus() {
 
 export function useTicketStats() {
   const status = useAuthStore((state) => state.status);
-  return useQuery<unknown>({
+  return useQuery<TicketStats>({
     enabled: status === 'authenticated',
     queryKey: queryKeys.ticketStats,
-    queryFn: () => callWithMobileRefresh(() => asPromise<unknown>(trpc.ticket.getStats.query())),
+    queryFn: () => callWithMobileRefresh(() => asPromise<TicketStats>(trpc.ticket.getStats.query())),
+  });
+}
+
+export function useWinRateTrend() {
+  const status = useAuthStore((state) => state.status);
+  return useQuery<WinRateTrendPoint[]>({
+    enabled: status === 'authenticated',
+    queryKey: queryKeys.winRateTrend,
+    queryFn: () => callWithMobileRefresh(() => asPromise<WinRateTrendPoint[]>(trpc.ticket.getWinRateTrend.query())),
   });
 }
 

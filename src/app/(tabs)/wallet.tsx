@@ -1,7 +1,7 @@
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { Check, Coins, Download, ReceiptText, ShieldCheck, WalletCards, Zap } from 'lucide-react-native';
+import { Check, Coins, Download, ReceiptText, ShieldCheck, WalletCards, Zap } from '@/components/modern-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';

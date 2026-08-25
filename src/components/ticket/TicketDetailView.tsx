@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ChevronRight, Copy, ExternalLink, PencilLine, Share2, ShieldCheck, Sparkles, Trophy } from 'lucide-react-native';
+import { ChevronRight, Copy, ExternalLink, PencilLine, Share2, ShieldCheck, Sparkles, Trophy } from '@/components/modern-icons';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -47,6 +47,17 @@ function resultTone(result?: string | null) {
   if (result === 'WON') return 'success' as const;
   if (result === 'LOST') return 'danger' as const;
   return 'warning' as const;
+}
+
+function percentValue(value?: number | null) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  return `${Math.round(Math.abs(value) <= 1 ? value * 100 : value)}%`;
+}
+
+function signedPercentValue(value?: number | null) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const normalized = Math.abs(value) <= 1 ? value * 100 : value;
+  return `${normalized >= 0 ? '+' : ''}${normalized.toFixed(1)}%`;
 }
 
 function PlatformPill({
@@ -115,6 +126,17 @@ function MatchDetailRow({
       : null,
   ].filter((line): line is { label: string; value: string } => Boolean(line));
   const hasFormData = Boolean(match.homeForm || match.awayForm);
+  const modelProbability = percentValue(match.calibratedConfidence ?? match.confidence);
+  const impliedProbability = percentValue(match.impliedProb);
+  const expectedValue = signedPercentValue(match.expectedValue);
+  const closingLineValue = signedPercentValue(match.clvPercent);
+  const hasDecisionEvidence = Boolean(
+    modelProbability || impliedProbability || expectedValue || match.decisionMode || match.decisionModelVersion,
+  );
+  const hasPostmortem = Boolean(
+    match.matchResult && match.matchResult !== 'PENDING'
+      && (closingLineValue || typeof match.closingOdds === 'number' || match.lossClassification),
+  );
 
   const openMatch = () => {
     if (!match.fixtureId) return;
@@ -170,6 +192,45 @@ function MatchDetailRow({
         </View>
       ) : null}
       <ProgressBar tone={match.status === 'KEPT' ? 'success' : 'warning'} value={confidence} />
+
+      {hasDecisionEvidence ? (
+        <View style={[styles.decisionBlock, { backgroundColor: theme.field, borderColor: theme.border }]}>
+          <View style={styles.decisionHeader}>
+            <Text style={[styles.decisionTitle, { color: theme.foregroundStrong }]}>Why this leg</Text>
+            {match.decisionMode ? (
+              <StatusBadge
+                label={match.decisionMode === 'SHADOW' ? 'RESEARCH ONLY' : String(match.decisionMode)}
+                tone={match.decisionMode === 'ACTIVE' ? 'success' : 'neutral'}
+              />
+            ) : null}
+          </View>
+          <View style={styles.decisionGrid}>
+            {modelProbability ? (
+              <View style={styles.decisionMetric}>
+                <Text style={[styles.decisionValue, { color: theme.primarySoft }]}>{modelProbability}</Text>
+                <Text style={[styles.decisionLabel, { color: theme.muted }]}>Model probability</Text>
+              </View>
+            ) : null}
+            {impliedProbability ? (
+              <View style={styles.decisionMetric}>
+                <Text style={[styles.decisionValue, { color: theme.foregroundStrong }]}>{impliedProbability}</Text>
+                <Text style={[styles.decisionLabel, { color: theme.muted }]}>Market implied</Text>
+              </View>
+            ) : null}
+            {expectedValue ? (
+              <View style={styles.decisionMetric}>
+                <Text style={[styles.decisionValue, { color: (match.expectedValue ?? 0) >= 0 ? theme.success : theme.danger }]}>
+                  {expectedValue}
+                </Text>
+                <Text style={[styles.decisionLabel, { color: theme.muted }]}>Expected value</Text>
+              </View>
+            ) : null}
+          </View>
+          {match.decisionModelVersion ? (
+            <Text style={[styles.modelVersion, { color: theme.muted }]}>Decision model {match.decisionModelVersion}</Text>
+          ) : null}
+        </View>
+      ) : null}
 
       {evidence.slice(0, 2).map((item, index) => (
         <View key={`${match.id}-${index}`} style={styles.evidenceRow}>
@@ -233,6 +294,23 @@ function MatchDetailRow({
               </Text>
             </PressableScale>
           ))}
+        </View>
+      ) : null}
+
+      {hasPostmortem ? (
+        <View style={[styles.postmortemBlock, { backgroundColor: theme.field, borderColor: theme.border }]}>
+          <Text style={[styles.decisionTitle, { color: theme.foregroundStrong }]}>Settled evidence</Text>
+          <View style={styles.postmortemRow}>
+            {closingLineValue ? (
+              <Text style={[styles.postmortemText, { color: theme.mutedLight }]}>CLV {closingLineValue}</Text>
+            ) : null}
+            {typeof match.closingOdds === 'number' ? (
+              <Text style={[styles.postmortemText, { color: theme.mutedLight }]}>Closing odds {match.closingOdds.toFixed(2)}</Text>
+            ) : null}
+          </View>
+          {match.lossClassification ? (
+            <Text style={[styles.postmortemText, { color: theme.mutedLight }]}>Review: {match.lossClassification}</Text>
+          ) : null}
         </View>
       ) : null}
 
@@ -416,7 +494,20 @@ export function TicketDetailView({
                     <Text numberOfLines={1} style={[styles.tileLabel, { color: theme.muted }]}>Projected win</Text>
                   </View>
                 ) : null}
+                {typeof data.jointProbability === 'number' ? (
+                  <View style={[styles.metricTile, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
+                    <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.tileValue, { color: theme.primarySoft }]}>
+                      {percentValue(data.jointProbability)}
+                    </Text>
+                    <Text numberOfLines={1} style={[styles.tileLabel, { color: theme.muted }]}>Combined chance</Text>
+                  </View>
+                ) : null}
               </View>
+              {data.jointProbabilityWarning ? (
+                <View style={[styles.warningBlock, { backgroundColor: theme.warningSoft, borderColor: theme.warning }]}>
+                  <Text style={[styles.warningText, { color: theme.warning }]}>{data.jointProbabilityWarning}</Text>
+                </View>
+              ) : null}
               {typeof data.projectedWinRate === 'number' ? (
                 <Text style={[styles.summaryMeta, { color: theme.muted }]}>
                   Projected win is based on how often each leg&apos;s market has landed in its league historically.
@@ -559,6 +650,38 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     fontSize: 11,
   },
+  decisionBlock: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  decisionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  decisionHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  decisionLabel: {
+    fontFamily: fonts.medium,
+    fontSize: 10,
+  },
+  decisionMetric: {
+    minWidth: 84,
+  },
+  decisionTitle: {
+    fontFamily: fonts.bold,
+    fontSize: 12,
+  },
+  decisionValue: {
+    fontFamily: fonts.extraBold,
+    fontSize: 15,
+    fontVariant: ['tabular-nums'],
+  },
   codeBox: {
     alignItems: 'center',
     borderRadius: radius.lg,
@@ -699,6 +822,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
+  modelVersion: {
+    fontFamily: fonts.medium,
+    fontSize: 10,
+  },
   platformPill: {
     borderRadius: radius.pill,
     borderWidth: 1,
@@ -718,6 +845,22 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: fonts.semibold,
     fontSize: 13,
+  },
+  postmortemBlock: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  postmortemRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  postmortemText: {
+    fontFamily: fonts.medium,
+    fontSize: 11,
+    lineHeight: 16,
   },
   resultButton: {
     alignItems: 'center',
@@ -770,5 +913,15 @@ const styles = StyleSheet.create({
     fontFamily: fonts.extraBold,
     fontSize: 18,
     fontVariant: ['tabular-nums'],
+  },
+  warningBlock: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    padding: spacing.md,
+  },
+  warningText: {
+    fontFamily: fonts.semibold,
+    fontSize: 11,
+    lineHeight: 16,
   },
 });

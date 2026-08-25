@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, usePathname, useRouter } from 'expo-router';
-import { ArrowRight, type LucideIcon } from 'lucide-react-native';
+import { ArrowRight, type LucideIcon } from '@/components/modern-icons';
 import { StyleProp, StyleSheet, Text, TextInput, View, ViewStyle, type TextInputProps } from 'react-native';
 
 import { PressableScale } from '@/components/ui/PressableScale';

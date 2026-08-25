@@ -1,5 +1,5 @@
 import { Link } from 'expo-router';
-import { Compass, Home } from 'lucide-react-native';
+import { Compass, Home } from '@/components/modern-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 

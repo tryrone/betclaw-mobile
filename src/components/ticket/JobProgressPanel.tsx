@@ -1,4 +1,4 @@
-import { Bell, Check, Clock3 } from 'lucide-react-native';
+import { Bell, Check, Clock3 } from '@/components/modern-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { LiveDot, ProgressBar } from '@/components/ui';

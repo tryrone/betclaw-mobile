@@ -15,7 +15,7 @@ import {
   Users,
   Video,
   Zap,
-} from 'lucide-react-native';
+} from '@/components/modern-icons';
 import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import { ScrollView, StyleSheet, Text, View, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
@@ -563,7 +563,7 @@ function MatchLoadingSkeleton() {
 function SectionSwitcher({ activeSection, onSelect }: { activeSection: DetailSection; onSelect: (tab: DetailSection) => void }) {
   const theme = useAppTheme();
   return (
-    <View style={[styles.sectionSwitcher, { borderBottomColor: theme.border }]}>
+    <View style={[styles.sectionSwitcher, { backgroundColor: theme.cardMuted, borderColor: theme.border }]}>
       {sections.map((section) => {
         const active = section === activeSection;
         return (
@@ -573,9 +573,14 @@ function SectionSwitcher({ activeSection, onSelect }: { activeSection: DetailSec
             accessibilityState={{ selected: active }}
             key={section}
             onPress={() => onSelect(section)}
-            style={styles.sectionTab}>
+            style={[
+              styles.sectionTab,
+              {
+                backgroundColor: active ? theme.card : 'transparent',
+                borderColor: active ? theme.borderStrong : 'transparent',
+              },
+            ]}>
             <Text numberOfLines={1} style={[styles.sectionTabText, { color: active ? theme.primary : theme.muted }]}>{section}</Text>
-            {active ? <View style={[styles.sectionTabIndicator, { backgroundColor: theme.primary }]} /> : null}
           </PressableScale>
         );
       })}
@@ -597,11 +602,15 @@ function MatchHero({
   readinessScore: number;
 }) {
   const theme = useAppTheme();
+  const live = isLiveMatch(match, insight);
+  const finished = isFinished(insight);
   const score = match.homeScore !== undefined && match.awayScore !== undefined ? `${match.homeScore} : ${match.awayScore}` : match.time;
+  const statusColor = live ? theme.live : finished ? theme.mutedLight : theme.primarySoft;
+  const statusBackground = live ? theme.successSoft : finished ? theme.surface : theme.primarySubtle;
 
   return (
     <GlassCard style={[styles.heroCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={styles.leagueRibbon}>
+      <View style={[styles.leagueRibbon, { backgroundColor: theme.primarySubtle, borderColor: theme.border }]}>
         <View style={styles.leagueIdentity}>
           {match.leagueLogoUrl ? <TeamLogo logoUrl={match.leagueLogoUrl} name={match.league} size={20} /> : null}
           <Text numberOfLines={1} style={[styles.leagueText, { color: theme.foregroundStrong }]}>{match.league}</Text>
@@ -612,31 +621,30 @@ function MatchHero({
 
       <View style={styles.heroTeamsRow}>
         <View style={styles.heroTeam}>
-          <TeamLogo logoUrl={match.homeLogoUrl} name={match.home} size={58} />
+          <View style={[styles.heroLogoWell, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <TeamLogo logoUrl={match.homeLogoUrl} name={match.home} size={54} />
+          </View>
           <Text numberOfLines={2} style={[styles.heroTeamName, { color: theme.foregroundStrong }]}>{match.home}</Text>
           <Text style={[styles.sideLabel, { color: theme.muted }]}>Home</Text>
           <FormPills values={homeForm} />
         </View>
 
         <View style={styles.heroCenter}>
-          <View style={[styles.venueLabel, { backgroundColor: theme.field }]}>
-            <Text numberOfLines={1} style={[styles.venueLabelText, { color: theme.foregroundStrong }]}>{match.venue}</Text>
+          <View style={[styles.heroStatusPill, { backgroundColor: statusBackground }]}>
+            {!finished ? <View style={[styles.liveDot, { backgroundColor: live ? theme.live : theme.primary }]} /> : null}
+            <Text numberOfLines={1} style={[styles.heroStatusText, { color: statusColor }]}>{statusLabel(match, insight)}</Text>
           </View>
-          <Text numberOfLines={1} style={[styles.scoreText, { color: theme.foregroundStrong }]}>{score}</Text>
-          <View style={styles.liveTimeRow}>
-            {!isFinished(insight) ? (
-              <View style={[styles.liveDot, { backgroundColor: isLiveMatch(match, insight) ? theme.live : theme.primary }]} />
-            ) : null}
-            <Text numberOfLines={1} style={[styles.liveClock, { color: theme.muted }]}>{statusLabel(match, insight)}</Text>
-          </View>
-          <Text style={[styles.weekLabel, { color: theme.muted }]}>Data ready {readinessScore}%</Text>
+          <Text adjustsFontSizeToFit minimumFontScale={0.72} numberOfLines={1} style={[styles.scoreText, { color: theme.foregroundStrong }]}>{score}</Text>
+          <Text style={[styles.weekLabel, { color: theme.muted }]}>{finished ? 'Final score' : live ? 'Live score' : match.date}</Text>
         </View>
 
         <View style={[styles.heroTeam, styles.heroTeamAway]}>
-          <TeamLogo logoUrl={match.awayLogoUrl} name={match.away} size={58} />
+          <View style={[styles.heroLogoWell, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <TeamLogo logoUrl={match.awayLogoUrl} name={match.away} size={54} />
+          </View>
           <Text numberOfLines={2} style={[styles.heroTeamName, styles.heroAwayName, { color: theme.foregroundStrong }]}>{match.away}</Text>
           <Text style={[styles.sideLabel, { color: theme.muted }]}>Away</Text>
-          <FormPills alignRight values={awayForm} />
+          <FormPills values={awayForm} />
         </View>
       </View>
 
@@ -644,6 +652,7 @@ function MatchHero({
         <HeroMetaPill icon={CalendarDays} label={match.date} tone="accent" />
         <HeroMetaPill icon={Clock3} label={match.time} />
         <HeroMetaPill icon={MapPin} label={match.venue} />
+        <HeroMetaPill icon={ShieldCheck} label={`${readinessScore}% data ready`} tone="accent" />
         {insight?.apiFootballContext?.standingsSummary && insight.apiFootballContext.standingsSummary !== insight.round ? (
           <HeroMetaPill icon={Trophy} label={insight.apiFootballContext.standingsSummary} />
         ) : null}
@@ -1268,8 +1277,8 @@ export default function MatchDetailScreen() {
         <View style={styles.header}>
           <IconButton icon={ArrowLeft} label="Go back" onPress={goBack} />
           <View style={styles.headerTitleWrap}>
-            <Text numberOfLines={1} style={[styles.stageTitle, { color: theme.foregroundStrong }]}>{match.league}</Text>
-            <Text numberOfLines={1} style={[styles.stageSubtitle, { color: theme.muted }]}>{headerTitle}</Text>
+            <Text numberOfLines={1} style={[styles.stageTitle, { color: theme.foregroundStrong }]}>{headerTitle}</Text>
+            <Text numberOfLines={1} style={[styles.stageSubtitle, { color: theme.muted }]}>{match.league}</Text>
           </View>
           <IconButton icon={Bell} label="Match alerts" />
         </View>
@@ -1278,7 +1287,7 @@ export default function MatchDetailScreen() {
 
       <Animated.View entering={enterUp(1)}>
         <PressableScale
-          accessibilityLabel="Open match center"
+          accessibilityLabel={ctaLabel}
           accessibilityRole="button"
           onPress={() => router.push({ pathname: '/live-match', params: { fixtureId: match.id } } as any)}
           style={[styles.watchButton, { borderColor: theme.primary, backgroundColor: theme.primary }]}>
@@ -1298,7 +1307,11 @@ export default function MatchDetailScreen() {
       </Animated.View>
 
       <Animated.View entering={enterUp(3)}>
-        <Text style={[styles.detailHeading, { color: theme.foregroundStrong }]}>Match details</Text>
+        <View style={styles.detailHeader}>
+          <Text style={[styles.detailEyebrow, { color: theme.primary }]}>Match intelligence</Text>
+          <Text style={[styles.detailHeading, { color: theme.foregroundStrong }]}>Explore the match</Text>
+          <Text style={[styles.detailCaption, { color: theme.muted }]}>Prediction context, team form and confirmed lineup data.</Text>
+        </View>
         <SectionSwitcher activeSection={activeSection} onSelect={setActiveSection} />
       </Animated.View>
 
@@ -1515,6 +1528,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 4,
+    justifyContent: 'center',
     marginTop: spacing.xs,
   },
   formRowRight: {
@@ -1585,17 +1599,27 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   heroAwayName: {
-    textAlign: 'right',
+    textAlign: 'center',
   },
   heroCard: {
-    gap: spacing.md,
+    borderRadius: radius.xl,
+    gap: spacing.lg,
     overflow: 'hidden',
+    padding: spacing.md,
   },
   heroCenter: {
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: 6,
     justifyContent: 'center',
-    minWidth: 92,
+    minWidth: 96,
+  },
+  heroLogoWell: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    height: 66,
+    justifyContent: 'center',
+    width: 66,
   },
   heroMetaPill: {
     alignItems: 'center',
@@ -1613,6 +1637,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
+    justifyContent: 'center',
     paddingTop: spacing.md,
   },
   heroMetaText: {
@@ -1621,25 +1646,39 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   heroTeam: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flex: 1,
     minWidth: 0,
   },
   heroTeamAway: {
-    alignItems: 'flex-end',
+    alignItems: 'center',
   },
   heroTeamName: {
-    color: '#ffffff',
     fontFamily: fonts.extraBold,
-    fontSize: 15,
+    fontSize: 14,
     lineHeight: 18,
     marginTop: spacing.sm,
+    textAlign: 'center',
   },
   heroTeamsRow: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexDirection: 'row',
     gap: spacing.sm,
     justifyContent: 'space-between',
+  },
+  heroStatusPill: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: 6,
+    minHeight: 26,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  heroStatusText: {
+    fontFamily: fonts.bold,
+    fontSize: 10,
+    textTransform: 'uppercase',
   },
   insightText: {
     fontFamily: fonts.medium,
@@ -1660,9 +1699,13 @@ const styles = StyleSheet.create({
   },
   leagueRibbon: {
     alignItems: 'center',
+    borderRadius: radius.md,
+    borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.sm,
     justifyContent: 'space-between',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 7,
   },
   leagueText: {
     flexShrink: 1,
@@ -2012,13 +2055,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   scoreText: {
-    color: '#ffffff',
     fontFamily: fonts.extraBold,
-    fontSize: 30,
+    fontSize: 36,
     fontVariant: ['tabular-nums'],
-    letterSpacing: -0.6,
-    lineHeight: 36,
-    minWidth: 74,
+    letterSpacing: -1,
+    lineHeight: 41,
+    minWidth: 82,
     textAlign: 'center',
   },
   scrollableList: {
@@ -2037,24 +2079,20 @@ const styles = StyleSheet.create({
     width: 30,
   },
   sectionSwitcher: {
-    borderBottomWidth: 1,
+    borderRadius: radius.lg,
+    borderWidth: 1,
     flexDirection: 'row',
+    gap: spacing.xs,
+    padding: spacing.xs,
   },
   sectionTab: {
     alignItems: 'center',
+    borderRadius: radius.md,
+    borderWidth: 1,
     flex: 1,
-    height: 46,
+    height: 42,
     justifyContent: 'center',
     minWidth: 0,
-    position: 'relative',
-  },
-  sectionTabIndicator: {
-    borderRadius: radius.pill,
-    bottom: -1,
-    height: 3,
-    left: 10,
-    position: 'absolute',
-    right: 10,
   },
   sectionTabText: {
     fontFamily: fonts.extraBold,
@@ -2279,8 +2317,23 @@ const styles = StyleSheet.create({
   },
   detailHeading: {
     fontFamily: fonts.extraBold,
-    fontSize: 22,
-    marginBottom: spacing.sm,
+    fontSize: 21,
+    lineHeight: 26,
+  },
+  detailCaption: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  detailEyebrow: {
+    fontFamily: fonts.extraBold,
+    fontSize: 9,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  detailHeader: {
+    gap: 3,
+    marginBottom: spacing.md,
   },
   matchStage: {
     gap: spacing.md,

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ArrowRight, BarChart3, Sparkles, Star } from 'lucide-react-native';
+import { ArrowRight, BarChart3, Sparkles, Star } from '@/components/modern-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { DashboardOddsButton, PressableScale, TeamLogo } from '@/components/ui';

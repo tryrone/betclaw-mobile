@@ -25,6 +25,12 @@ function isUnauthorized(error: unknown) {
   );
 }
 
+export function getTrpcErrorCode(error: unknown) {
+  return error instanceof TRPCClientError
+    ? (error.data as { code?: string } | undefined)?.code ?? null
+    : null;
+}
+
 async function performMobileSessionRefresh() {
   const { refreshToken, setSession, clearSession } = useAuthStore.getState();
   if (!refreshToken) return false;

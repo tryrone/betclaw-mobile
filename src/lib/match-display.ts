@@ -54,9 +54,7 @@ export function formatMatchTime(value: string | Date) {
 export function matchConfidence(match: FeedMatch) {
   const value =
     match.predictionView?.confidence ??
-    match.bestMarket?.confidence ??
-    match.dataSnapshot?.readiness?.score ??
-    match.dataReadiness?.score;
+    match.bestMarket?.confidence;
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : null;
 }
 
@@ -65,7 +63,6 @@ export function matchSignalLabel(match: FeedMatch) {
     match.predictionView?.label ??
     match.predictionView?.marketLabel ??
     match.bestMarket?.label ??
-    match.dataSnapshot?.readiness?.label ??
     'Analysis pending'
   );
 }

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft } from '@/components/modern-icons';
 import Animated from 'react-native-reanimated';
 
 import { TicketDetailView } from '@/components/ticket/TicketDetailView';

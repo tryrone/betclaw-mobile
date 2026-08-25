@@ -1,5 +1,5 @@
 import { useFocusEffect } from 'expo-router';
-import { ChevronLeft, ChevronRight, Eye, Filter, Search } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Eye, Filter, Search } from '@/components/modern-icons';
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';

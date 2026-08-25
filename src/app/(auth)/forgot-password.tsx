@@ -1,5 +1,5 @@
 import { Link } from 'expo-router';
-import { Mail } from 'lucide-react-native';
+import { Mail } from '@/components/modern-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 

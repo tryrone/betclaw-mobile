@@ -27,7 +27,75 @@ export type HomeFeed = {
   date?: string;
   leagues?: LeagueGroup[];
   nextCursor?: string | null;
+  providerStatus?: ProviderStatus;
   totalMatches?: number;
+};
+
+export type ProviderStatus = {
+  bookmakerProviders: {
+    lastFetchedAt?: string | Date | null;
+    provider: string;
+    rows: number;
+  }[];
+  canonicalFixtures: number;
+  checkedAt: string | Date;
+  lastApiFootballSyncAt?: string | Date | null;
+  lastCanonicalUpdateAt?: string | Date | null;
+  lastEvidenceAt?: string | Date | null;
+  nextKickoff?: string | Date | null;
+  nextScheduledFixtureSyncAt?: string | Date | null;
+  primaryProvider: string;
+};
+
+export type PublishedPrediction = {
+  awayTeam: string;
+  bookmakerPlatform: string;
+  calibratedConfidence?: number | null;
+  confidence: number;
+  createdAt: string | Date;
+  dataReadiness?: {
+    evidence?: Record<string, boolean | number | string | null | undefined>;
+    score?: number | null;
+    status?: string | null;
+  } | null;
+  decisionMode?: 'BASELINE' | 'SHADOW' | 'ACTIVE' | string | null;
+  decisionModelVersion?: string | null;
+  edgeScore: number;
+  edgeSummary?: string | null;
+  eventId: string;
+  expectedValue?: number | null;
+  homeTeam: string;
+  id: string;
+  impliedProb?: number | null;
+  isVipPick: boolean;
+  kickoffTime?: string | Date | null;
+  league: string;
+  marketId: string;
+  modelSummary?: string | null;
+  odds?: number | null;
+  publishedAt?: string | Date | null;
+  result: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  selectionLabel?: string | null;
+  selectionTeam?: string | null;
+  staleFlag: boolean;
+  verdict: string;
+};
+
+export type TicketStats = {
+  accessTier?: string;
+  creditsRemaining?: number;
+  isPremiumExhausted?: boolean;
+  matchesRemoved: number;
+  premiumTokensRemaining?: number;
+  settledTickets: number;
+  ticketsOptimized: number;
+  winRate: number;
+};
+
+export type WinRateTrendPoint = {
+  month: string;
+  total: number;
+  winRate: number;
 };
 
 export type LeagueOption = {
@@ -434,6 +502,8 @@ export type TicketDetail = {
   bookingCode?: string | null;
   createdAt?: string | Date;
   id: string;
+  jointProbability?: number | null;
+  jointProbabilityWarning?: string | null;
   matches: {
     alternativeConfidence?: number | null;
     alternativeMarket?: string | null;
@@ -445,7 +515,10 @@ export type TicketDetail = {
     baseRateSample?: number | null;
     citations?: { snippet?: string | null; title?: string | null; url: string }[] | null;
     confidence?: number | null;
+    calibratedConfidence?: number | null;
     confidenceReason?: string | null;
+    closingOdds?: number | null;
+    clvPercent?: number | null;
     dataReadiness?: { missingFields?: string[]; score?: number; status?: string } | null;
     fixtureId?: string | null;
     h2hSummary?: string | null;
@@ -455,6 +528,11 @@ export type TicketDetail = {
     keyFactors?: string | null;
     kickoffTime?: string | Date | null;
     matchResult?: TicketMatchResult;
+    decisionMode?: string | null;
+    decisionModelVersion?: string | null;
+    expectedValue?: number | null;
+    impliedProb?: number | null;
+    lossClassification?: string | null;
     market: string;
     odds?: number | null;
     platformEventId?: string | null;

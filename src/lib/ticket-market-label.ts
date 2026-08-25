@@ -54,8 +54,10 @@ function firstLineValue(...values: (string | null | undefined)[]) {
 function overUnderSide(...values: (string | null | undefined)[]) {
   for (const value of values) {
     const normalized = comparable(value);
-    if (/\bover\b/.test(normalized)) return 'over' as const;
-    if (/\bunder\b/.test(normalized)) return 'under' as const;
+    if (!normalized) continue;
+    const hasOver = /\bover\b/.test(normalized);
+    const hasUnder = /\bunder\b/.test(normalized);
+    if (hasOver !== hasUnder) return hasOver ? 'over' : 'under';
   }
   return null;
 }
@@ -138,12 +140,16 @@ export function formatTicketMarketLabel(input: TicketMarketLabelInput) {
   const selection = clean(input.selectionLabel);
   const selectionIdLabel = readableSelectionId(input.platformSelectionId);
   const selectionCandidate = selection || selectionIdLabel;
-  const side = overUnderSide(selection, selectionIdLabel, input.platformSelectionId, market, input.selectionReason);
+  // Side + line come from structured fields only (selection, selection id,
+  // market, specifier). Free-text selectionReason is prose and routinely
+  // contains "over"/"under" as prepositions plus unrelated numbers, which
+  // would fabricate totals for non-total markets like Match Winner.
+  const side = overUnderSide(selection, selectionIdLabel, input.platformSelectionId, market);
   const totalLine =
     parseSpecifierValue(input.platformSpecifier, 'total') ??
     parseSpecifierValue(input.platformSpecifier, 'line') ??
     parseSpecifierValue(input.platformSpecifier, 'points') ??
-    firstLineValue(selection, selectionIdLabel, input.platformSelectionId, market, input.selectionReason);
+    firstLineValue(selection, selectionIdLabel, input.platformSelectionId, market);
 
   if (side && totalLine) {
     const teamPrefix = clean(input.selectionTeam);

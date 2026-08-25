@@ -43,7 +43,7 @@ module.exports = {
     userInterfaceStyle: 'automatic',
     ios: {
       bundleIdentifier: 'com.betclaw.app',
-      buildNumber: '21',
+      buildNumber: '22',
       icon: './assets/images/ios-icon.png',
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
@@ -101,7 +101,9 @@ module.exports = {
         },
       ],
       'expo-font',
+      'expo-image',
       'expo-notifications',
+      'expo-web-browser',
       './plugins/with-ios-version-sync',
       ...(googlePlugin ? [googlePlugin] : []),
     ],

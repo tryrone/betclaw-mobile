@@ -1,4 +1,6 @@
 export const fonts = {
+  display: 'Sora_700Bold',
+  displayExtraBold: 'Sora_800ExtraBold',
   regular: 'Inter_400Regular',
   medium: 'Inter_500Medium',
   semibold: 'Inter_600SemiBold',

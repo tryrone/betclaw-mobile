@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Search } from 'lucide-react-native';
+import { ArrowLeft, Search } from '@/components/modern-icons';
 import { useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -99,7 +99,7 @@ function toSections(leagues?: LeagueGroup[]): MatchSection[] {
     .filter((section) => section.data.length > 0);
 }
 
-export default function MatchesScreen() {
+export default function MatchesScreen({ embedded = false }: { embedded?: boolean }) {
   const router = useRouter();
   const theme = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -134,11 +134,11 @@ export default function MatchesScreen() {
   const totalFixtures = useMemo(() => sections.reduce((total, section) => total + section.data.length, 0), [sections]);
 
   return (
-    <Screen contentBottomPadding={0} scroll={false}>
+    <Screen contentBottomPadding={0} hasTabs={embedded} scroll={false}>
       <Animated.View entering={enterUp(0)}>
         <ScreenHeader
           eyebrow="Matchday"
-          leadingAction={<IconButton icon={ArrowLeft} label="Go back" onPress={() => router.back()} />}
+          leadingAction={embedded ? undefined : <IconButton icon={ArrowLeft} label="Go back" onPress={() => router.back()} />}
           title="Browse Matches"
         />
       </Animated.View>
@@ -168,7 +168,7 @@ export default function MatchesScreen() {
       <SectionList<FeedMatch, MatchSection>
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: spacing.xl + insets.bottom },
+          { paddingBottom: (embedded ? 76 : spacing.xl) + insets.bottom },
           sections.length === 0 ? styles.emptyListContent : null,
         ]}
         initialNumToRender={10}
@@ -207,16 +207,29 @@ export default function MatchesScreen() {
           </View>
         )}
         renderSectionHeader={({ section }) => (
-          <View style={[styles.sectionHeader, { backgroundColor: theme.background }]}>
-            <TeamLogo logoUrl={section.logoUrl} name={section.name} size={26} />
-            <View style={styles.sectionCopy}>
-              <Text numberOfLines={1} style={[styles.sectionName, { color: theme.foregroundStrong }]}>{section.name}</Text>
-              {section.country ? <Text numberOfLines={1} style={[styles.sectionCountry, { color: theme.muted }]}>{section.country}</Text> : null}
-            </View>
-            <View style={[styles.sectionCountPill, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
-              <Text numberOfLines={1} style={[styles.sectionCount, { color: theme.primarySoft }]}>
-                {section.data.length} {section.data.length === 1 ? 'match' : 'matches'}
-              </Text>
+          <View accessibilityRole="header" style={[styles.sectionHeaderShell, { backgroundColor: theme.background }]}>
+            <View
+              style={[
+                styles.sectionHeader,
+                {
+                  backgroundColor: theme.panelElevated,
+                  borderColor: theme.borderStrong,
+                  shadowColor: theme.shadow,
+                },
+              ]}>
+              <View style={[styles.sectionLogo, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <TeamLogo logoUrl={section.logoUrl} name={section.name} size={24} />
+              </View>
+              <View style={styles.sectionCopy}>
+                <Text style={[styles.sectionEyebrow, { color: theme.muted }]}>Competition</Text>
+                <Text numberOfLines={1} style={[styles.sectionName, { color: theme.foregroundStrong }]}>{section.name}</Text>
+                {section.country ? <Text numberOfLines={1} style={[styles.sectionCountry, { color: theme.mutedLight }]}>{section.country}</Text> : null}
+              </View>
+              <View style={[styles.sectionCountPill, { backgroundColor: theme.primarySubtle, borderColor: theme.borderAccent }]}>
+                <Text numberOfLines={1} style={[styles.sectionCount, { color: theme.primarySoft }]}>
+                  {section.data.length} {section.data.length === 1 ? 'match' : 'matches'}
+                </Text>
+              </View>
             </View>
           </View>
         )}
@@ -242,9 +255,9 @@ const styles = StyleSheet.create({
   emptyTitle: { fontFamily: fonts.extraBold, fontSize: 16 },
   leaguePill: { alignItems: 'center', borderRadius: radius.pill, borderWidth: 1, justifyContent: 'center', minHeight: 36, paddingHorizontal: spacing.md },
   leagueText: { fontFamily: fonts.bold, fontSize: 12 },
-  list: { flex: 1, marginTop: -spacing.xs },
-  listContent: {},
-  matchCardWrap: { marginBottom: spacing.sm },
+  list: { flex: 1 },
+  listContent: { paddingTop: spacing.xs },
+  matchCardWrap: { marginBottom: spacing.md },
   rail: { marginRight: -spacing.md },
   railContent: { gap: spacing.sm, paddingRight: spacing.md },
   resultCaption: { fontFamily: fonts.medium, fontSize: 11, marginTop: 2, maxWidth: 240 },
@@ -253,7 +266,23 @@ const styles = StyleSheet.create({
   sectionCopy: { flex: 1, minWidth: 0 },
   sectionCount: { fontFamily: fonts.bold, fontSize: 11 },
   sectionCountPill: { alignItems: 'center', borderRadius: radius.pill, borderWidth: 1, justifyContent: 'center', minHeight: 30, paddingHorizontal: spacing.sm },
-  sectionCountry: { fontFamily: fonts.medium, fontSize: 10, marginTop: 1 },
-  sectionHeader: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, paddingBottom: spacing.sm, paddingHorizontal: spacing.sm, paddingTop: spacing.md },
-  sectionName: { fontFamily: fonts.extraBold, fontSize: 13 },
+  sectionCountry: { fontFamily: fonts.medium, fontSize: 10, marginTop: 2 },
+  sectionEyebrow: { fontFamily: fonts.bold, fontSize: 9, letterSpacing: 0.8, marginBottom: 2, textTransform: 'uppercase' },
+  sectionHeader: {
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    elevation: 2,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    minHeight: 64,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+  },
+  sectionHeaderShell: { paddingBottom: spacing.sm, paddingTop: spacing.xs },
+  sectionLogo: { alignItems: 'center', borderRadius: radius.md, borderWidth: 1, height: 42, justifyContent: 'center', width: 42 },
+  sectionName: { fontFamily: fonts.extraBold, fontSize: 13, lineHeight: 16 },
 });

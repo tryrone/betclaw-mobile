@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { Copy, SlidersHorizontal, Target, Wand2 } from 'lucide-react-native';
+import { Copy, SlidersHorizontal, Target, Wand2 } from '@/components/modern-icons';
 import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';

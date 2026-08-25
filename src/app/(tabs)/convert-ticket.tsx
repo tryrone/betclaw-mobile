@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ArrowLeft, ArrowRightLeft, Check, Copy, Ticket } from 'lucide-react-native';
+import { ArrowLeft, ArrowRightLeft, Check, Copy, Ticket } from '@/components/modern-icons';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
