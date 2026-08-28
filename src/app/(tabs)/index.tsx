@@ -37,6 +37,7 @@ import {
   useWinRateTrend,
 } from '@/lib/api/hooks';
 import type { DailyTicketData, PublishedPrediction, ProviderStatus } from '@/lib/api/types';
+import { getPredictionPickDisplay } from '@/lib/prediction-pick-display';
 import {
   clampPercent,
   formatPercent,
@@ -186,6 +187,9 @@ function ProbabilityComparison({ prediction }: { prediction: PublishedPrediction
 
 function EdgeCard({ prediction }: { prediction: PublishedPrediction }) {
   const theme = useAppTheme();
+  const pick = getPredictionPickDisplay(prediction);
+  const odds = prediction.odds?.toFixed(2) ?? '—';
+  const edge = formatSignedPercent(prediction.expectedValue ?? prediction.edgeScore);
 
   return (
     <DashboardGlassCard style={styles.edgeCard}>
@@ -196,11 +200,27 @@ function EdgeCard({ prediction }: { prediction: PublishedPrediction }) {
         </View>
         <StatusBadge label={modeLabel(prediction)} tone={predictionTone(prediction)} />
       </View>
-      <View style={styles.selectionRow}>
-        <View style={[styles.selectionIcon, { backgroundColor: theme.primarySubtle }]}><Bot color={theme.primary} size={18} /></View>
-        <View style={styles.flex}>
-          <Text style={[styles.selection, { color: theme.foregroundStrong }]}>{prediction.selectionLabel ?? prediction.verdict}</Text>
-          <Text style={[styles.selectionMeta, { color: theme.mutedLight }]}>Odds {prediction.odds?.toFixed(2) ?? '—'} · Edge {formatSignedPercent(prediction.expectedValue ?? prediction.edgeScore)}</Text>
+      <View
+        accessible
+        accessibilityLabel={`BetClaw pick. ${pick.title}. ${pick.condition} Odds ${odds}. Model edge ${edge}.`}
+        style={[styles.selectionBlock, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <View style={styles.selectionRow}>
+          <View style={[styles.selectionIcon, { backgroundColor: theme.primarySubtle }]}><Bot color={theme.primary} size={18} /></View>
+          <View style={styles.flex}>
+            <Text style={[styles.selectionEyebrow, { color: theme.primary }]}>{pick.market}</Text>
+            <Text style={[styles.selection, { color: theme.foregroundStrong }]}>{pick.title}</Text>
+          </View>
+        </View>
+        <Text style={[styles.selectionCondition, { color: theme.mutedLight }]}>{pick.condition}</Text>
+        <View style={styles.selectionMetrics}>
+          <View style={[styles.selectionMetric, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Text style={[styles.selectionMetricLabel, { color: theme.muted }]}>ODDS</Text>
+            <Text style={[styles.selectionMetricValue, { color: theme.foregroundStrong }]}>{odds}</Text>
+          </View>
+          <View style={[styles.selectionMetric, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Text style={[styles.selectionMetricLabel, { color: theme.muted }]}>MODEL EDGE</Text>
+            <Text style={[styles.selectionMetricValue, { color: theme.foregroundStrong }]}>{edge}</Text>
+          </View>
         </View>
       </View>
       <ProbabilityComparison prediction={prediction} />
@@ -300,17 +320,20 @@ function SettledResults({ settled }: { settled: PublishedPrediction[] }) {
   return (
     <>
       <DashboardSectionHeader eyebrow="RECENTLY SETTLED" title="Result postmortems" />
-      {settled.map((prediction) => (
-        <DashboardGlassCard key={prediction.id} style={styles.resultCard}>
-          <View style={styles.resultRow}>
-            <View style={[styles.resultIcon, { backgroundColor: prediction.result === 'WON' ? theme.successSoft : theme.dangerSoft }]}>
-              {prediction.result === 'WON' ? <CheckCircle2 color={theme.success} size={18} /> : <Activity color={theme.danger} size={18} />}
+      {settled.map((prediction) => {
+        const pick = getPredictionPickDisplay(prediction);
+        return (
+          <DashboardGlassCard key={prediction.id} style={styles.resultCard}>
+            <View style={styles.resultRow}>
+              <View style={[styles.resultIcon, { backgroundColor: prediction.result === 'WON' ? theme.successSoft : theme.dangerSoft }]}>
+                {prediction.result === 'WON' ? <CheckCircle2 color={theme.success} size={18} /> : <Activity color={theme.danger} size={18} />}
+              </View>
+              <View style={styles.flex}><Text style={[styles.resultFixture, { color: theme.foregroundStrong }]}>{prediction.homeTeam} vs {prediction.awayTeam}</Text><Text style={[styles.resultMeta, { color: theme.mutedLight }]}>{pick.title} · {prediction.result}</Text></View>
+              <Text style={[styles.resultConfidence, { color: theme.foregroundStrong }]}>{formatPercent(prediction.calibratedConfidence ?? prediction.confidence)}</Text>
             </View>
-            <View style={styles.flex}><Text style={[styles.resultFixture, { color: theme.foregroundStrong }]}>{prediction.homeTeam} vs {prediction.awayTeam}</Text><Text style={[styles.resultMeta, { color: theme.mutedLight }]}>{prediction.selectionLabel ?? prediction.verdict} · {prediction.result}</Text></View>
-            <Text style={[styles.resultConfidence, { color: theme.foregroundStrong }]}>{formatPercent(prediction.calibratedConfidence ?? prediction.confidence)}</Text>
-          </View>
-        </DashboardGlassCard>
-      ))}
+          </DashboardGlassCard>
+        );
+      })}
     </>
   );
 }
@@ -341,7 +364,7 @@ export default function TodayScreen() {
         ticket={daily.data}
         unavailable={getTrpcErrorCode(daily.error) === 'FORBIDDEN' ? 'locked' : daily.error ? 'error' : null}
       />
-      <DashboardSectionHeader eyebrow="VERIFIED OPPORTUNITIES" title="Top value edges" description="Model confidence, market price and evidence are shown separately." />
+      <DashboardSectionHeader eyebrow="VERIFIED OPPORTUNITIES" title="Top value edges" description="Each pick names the exact market, winning condition, price and model edge." />
       {verifiedEdges.length
         ? verifiedEdges.map((prediction) => <EdgeCard key={prediction.id} prediction={prediction} />)
         : getTrpcErrorCode(edges.error) === 'FORBIDDEN'
@@ -426,9 +449,15 @@ const styles = StyleSheet.create({
   resultIcon: { alignItems: 'center', borderRadius: radius.pill, height: 38, justifyContent: 'center', width: 38 },
   resultMeta: { fontFamily: fonts.regular, fontSize: 11, marginTop: 3 },
   resultRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
-  selection: { fontFamily: fonts.semibold, fontSize: 14 },
+  selection: { fontFamily: fonts.display, fontSize: 17, lineHeight: 23, marginTop: 2 },
+  selectionBlock: { borderRadius: radius.lg, borderWidth: 1, gap: spacing.md, padding: spacing.md },
+  selectionCondition: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 18 },
+  selectionEyebrow: { fontFamily: fonts.bold, fontSize: 9, letterSpacing: 0.8 },
   selectionIcon: { alignItems: 'center', borderRadius: radius.md, height: 40, justifyContent: 'center', width: 40 },
-  selectionMeta: { fontFamily: fonts.medium, fontSize: 11, marginTop: 3 },
+  selectionMetric: { borderRadius: radius.md, borderWidth: 1, flexGrow: 1, minWidth: 104, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  selectionMetricLabel: { fontFamily: fonts.bold, fontSize: 9, letterSpacing: 0.6 },
+  selectionMetrics: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  selectionMetricValue: { fontFamily: fonts.bold, fontSize: 13, fontVariant: ['tabular-nums'], marginTop: 2 },
   selectionRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
   textButton: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: spacing.xs, marginTop: spacing.lg, minHeight: 44 },
   textButtonLabel: { fontFamily: fonts.bold, fontSize: 13 },

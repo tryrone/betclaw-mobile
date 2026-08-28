@@ -47,6 +47,67 @@ export type ProviderStatus = {
   primaryProvider: string;
 };
 
+export type MinuteDrawDayOffset = 0 | 1 | 2;
+export type MinuteDrawMode = 'recommended' | 'all';
+
+export type MinuteDrawResult = {
+  awayTeam: string;
+  bookmakerProbability: number;
+  dataCoverage: {
+    earlyGoalSignals: number;
+    hasLeaguePrior: boolean;
+    recentFormSignals: number;
+    siblingPrices: number;
+    xgSignals: number;
+  };
+  dataQuality: 'RATED' | 'UNRATED';
+  edge: number;
+  eventId: string;
+  expectedValue: number;
+  explanation: string;
+  fresh: boolean;
+  homeTeam: string;
+  intervalMinutes: 5 | 10;
+  kickoffTime: string | Date;
+  league: string;
+  leagueKey: string;
+  marketId: string;
+  marketName: string;
+  modelProbability: number;
+  modelVersion: string;
+  odds: number;
+  presetId: 'first_5_min_draw' | 'first_10_min_draw';
+  quoteFetchedAt: string | Date;
+  recommendationState: 'RECOMMENDED' | 'BELOW_THRESHOLD' | 'UNRATED' | 'STALE';
+  selectionId: string;
+  selectionLabel: string;
+  specifier: string;
+};
+
+export type MinuteDrawInventory = {
+  coverage: {
+    complete: boolean;
+    discoveredEvents: number;
+    message: string;
+  };
+  date: string;
+  experimental: boolean;
+  intervals: (5 | 10)[];
+  lastVerifiedAt: string | Date | null;
+  leagues: { key: string; matchCount: number; name: string }[];
+  mode: MinuteDrawMode;
+  nextCursor: string | null;
+  provider: {
+    error: string | null;
+    refreshAttempted: boolean;
+    stale: boolean;
+    status: 'FRESH' | 'STALE' | 'DEGRADED' | 'UNAVAILABLE';
+  };
+  results: MinuteDrawResult[];
+  staleAfterSeconds: number;
+  total: number;
+};
+
 export type PublishedPrediction = {
   awayTeam: string;
   bookmakerPlatform: string;
@@ -75,8 +136,10 @@ export type PublishedPrediction = {
   odds?: number | null;
   publishedAt?: string | Date | null;
   result: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  selectionId?: string | null;
   selectionLabel?: string | null;
   selectionTeam?: string | null;
+  specifier?: string | null;
   staleFlag: boolean;
   verdict: string;
 };
