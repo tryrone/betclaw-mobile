@@ -4,13 +4,14 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale } from '@/components/ui/PressableScale';
+import { TOOL_ACTIVE_PATHS } from '@/lib/tool-routes';
 import { useAppTheme } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
 const items = [
   { href: '/(tabs)' as const, active: ['/', '/(tabs)'], label: 'Today', Icon: Sparkle },
   { href: '/(tabs)/matches' as const, active: ['/matches'], label: 'Matches', Icon: CalendarDots },
-  { href: '/(tabs)/tools' as const, active: ['/tools', '/fix-ticket', '/build-ticket', '/convert-ticket'], label: 'Tools', Icon: Wrench },
+  { href: '/(tabs)/tools' as const, active: TOOL_ACTIVE_PATHS, label: 'Tools', Icon: Wrench },
   { href: '/(tabs)/history' as const, active: ['/history'], label: 'Activity', Icon: ClockCounterClockwise },
   { href: '/(tabs)/settings' as const, active: ['/settings', '/wallet', '/referrals'], label: 'Account', Icon: UserCircle },
 ] as const;

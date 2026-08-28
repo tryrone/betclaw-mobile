@@ -20,6 +20,9 @@ import type {
   LeagueOption,
   MobileAuthSession,
   MobileOAuthProvider,
+  MinuteDrawDayOffset,
+  MinuteDrawInventory,
+  MinuteDrawMode,
   NotificationFeed,
   NotificationSummary,
   Plan,
@@ -59,6 +62,7 @@ export const queryKeys = {
   homeFeed: (input?: unknown) => ['matchday', 'homeFeed', input] as const,
   infiniteHomeFeed: (input?: unknown) => ['matchday', 'homeFeedInfinite', input] as const,
   leagues: (input?: unknown) => ['matchday', 'leagues', input] as const,
+  minuteDraws: (input?: unknown) => ['minuteDraw', 'inventory', input] as const,
   me: ['user', 'me'] as const,
   notifications: ['ticket', 'notifications'] as const,
   notificationSummary: ['ticket', 'notificationSummary'] as const,
@@ -128,6 +132,35 @@ export function useLeagues(input?: { date?: string; dateRange?: 'today' | 'tomor
     enabled: status === 'authenticated',
     queryKey: queryKeys.leagues(input),
     queryFn: () => callWithMobileRefresh(() => asPromise<LeagueOption[]>(trpc.matchday.getLeagues.query(input ?? { dateRange: 'today' }))),
+  });
+}
+
+export function useMinuteDrawInventory(input: {
+  dayOffset: MinuteDrawDayOffset;
+  gameCount: number;
+  intervalMinutes: (5 | 10)[];
+  leagueKeys: string[];
+  mode: MinuteDrawMode;
+}) {
+  const status = useAuthStore((state) => state.status);
+  return useInfiniteQuery<MinuteDrawInventory>({
+    enabled: status === 'authenticated',
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    initialPageParam: undefined as string | undefined,
+    queryKey: queryKeys.minuteDraws(input),
+    queryFn: ({ pageParam }) =>
+      callWithMobileRefresh(() =>
+        asPromise<MinuteDrawInventory>(
+          trpc.minuteDraw.inventory.query({
+            ...input,
+            cursor: pageParam,
+            limit: 25,
+            refresh: pageParam === undefined,
+          }),
+        ),
+      ),
+    refetchInterval: 5 * 60 * 1_000,
+    retry: false,
   });
 }
 

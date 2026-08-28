@@ -1,6 +1,7 @@
 import { Redirect, Tabs } from 'expo-router';
 
 import { TabBar } from '@/components/ui';
+import { TOOL_ROUTES } from '@/lib/tool-routes';
 import { useAuthStore } from '@/store/auth-store';
 
 export default function TabLayout() {
@@ -23,9 +24,9 @@ export default function TabLayout() {
       <Tabs.Screen name="tools" options={{ title: 'Tools' }} />
       <Tabs.Screen name="history" options={{ title: 'Activity' }} />
       <Tabs.Screen name="settings" options={{ title: 'Account' }} />
-      <Tabs.Screen name="fix-ticket" options={{ href: null }} />
-      <Tabs.Screen name="build-ticket" options={{ href: null }} />
-      <Tabs.Screen name="convert-ticket" options={{ href: null }} />
+      {Object.values(TOOL_ROUTES).map((route) => (
+        <Tabs.Screen key={route.screen} name={route.screen} options={{ href: null }} />
+      ))}
       <Tabs.Screen name="wallet" options={{ href: null }} />
       <Tabs.Screen name="referrals" options={{ href: null }} />
     </Tabs>
