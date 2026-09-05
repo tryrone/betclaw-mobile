@@ -1,3 +1,5 @@
+import { SelectionReviewPanel, SelectionDecisionCard } from "@/components/ticket/SelectionReviewPanel";
+import { formatSelectionChance } from "@/lib/selection-display";
 import { useRouter } from 'expo-router';
 import { ArrowLeft, ArrowUpRight, Bot, Check, Copy, Minus, Plus, Share2, SlidersHorizontal, Target, Trophy } from '@/components/modern-icons';
 import { useEffect, useMemo, useState } from 'react';
@@ -113,10 +115,11 @@ function TicketMatchRow({ match }: { match: any }) {
         </View>
         <StatusBadge label={kept ? 'Keep' : 'Removed'} tone={kept ? 'success' : 'danger'} />
       </View>
+      <SelectionDecisionCard decision={match.selectionDecision} />
       <View style={styles.matchMetrics}>
         <Text style={[styles.metric, { color: theme.primarySoft }]}>Odds {Number(match.odds ?? 0).toFixed(2)}</Text>
         <Text style={[styles.metric, { color: theme.muted }]}>
-          {Math.round(match.confidence ?? 0)}% confidence
+          Estimated win chance: {formatSelectionChance(match.selectionDecision)}
         </Text>
         {typeof match.baseRate === 'number' ? (
           <View style={[styles.historyTag, { backgroundColor: theme.successSoft }]}>
@@ -552,6 +555,7 @@ export default function BuildTicketScreen() {
         </Animated.View>
       ) : null}
 
+      {doneTicket ? <SelectionReviewPanel runId={doneTicket.evaluationRunId} /> : null}
       {doneTicket?.matches?.map((match, index) => (
         <Animated.View entering={enterUp(7 + index)} key={match.id}>
           <TicketMatchRow match={match} />

@@ -1,3 +1,4 @@
+import type { SelectionDecision, SelectionReview } from "../selection-display";
 import type { MobileUser } from '@/store/auth-store';
 import type { SupportedPlatform } from '@/lib/bookmaker-platforms';
 
@@ -109,6 +110,7 @@ export type MinuteDrawInventory = {
 };
 
 export type PublishedPrediction = {
+  selectionDecision?: SelectionDecision | null;
   awayTeam: string;
   bookmakerPlatform: string;
   calibratedConfidence?: number | null;
@@ -170,6 +172,7 @@ export type LeagueOption = {
 };
 
 export type PredictionView = {
+  selectionDecision?: SelectionDecision | null;
   confidence?: number | null;
   edgeScore?: number | null;
   fallbackType?: 'predictionPick' | 'apiFootball' | 'marketFavorite' | string;
@@ -240,6 +243,7 @@ export type LeagueGroup = LeagueOption & {
 export type DailyTicketBookmakerPlatform = 'API_FOOTBALL' | 'SPORTYBET';
 
 export type DailyTicketLeg = {
+  selectionDecision?: SelectionDecision | null;
   awayTeam: string;
   bookmakerPlatform: DailyTicketBookmakerPlatform;
   confidence: number;
@@ -263,6 +267,8 @@ export type DailyTicketLeg = {
 };
 
 export type DailyTicketData = {
+  evaluationRunId?: string | null;
+  selectionReview?: SelectionReview | null;
   avgConfidence: number | null;
   bookmakerPlatform: DailyTicketBookmakerPlatform;
   bookingCode?: string | null;
@@ -561,6 +567,8 @@ export type TicketJobState =
     };
 
 export type TicketDetail = {
+  evaluationRunId?: string | null;
+  selectionReview?: SelectionReview | null;
   avgConfidence?: number | null;
   bookingCode?: string | null;
   createdAt?: string | Date;
@@ -568,6 +576,7 @@ export type TicketDetail = {
   jointProbability?: number | null;
   jointProbabilityWarning?: string | null;
   matches: {
+    selectionDecision?: SelectionDecision | null;
     alternativeConfidence?: number | null;
     alternativeMarket?: string | null;
     alternativeOdds?: number | null;

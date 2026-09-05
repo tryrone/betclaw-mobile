@@ -73,7 +73,7 @@ function SignalRow({ match }: { match: FeedMatch }) {
       </View>
       {confidence !== null ? (
         <View style={[styles.confidencePill, { backgroundColor: theme.primarySubtle, borderColor: theme.borderAccent }]}>
-          <Text style={[styles.confidenceText, { color: theme.primarySoft }]}>{confidence}%</Text>
+          <Text style={[styles.confidenceText, { color: theme.primarySoft }]}>Evidence: {matchReadinessLabel(match)}</Text>
         </View>
       ) : null}
     </View>

@@ -1,3 +1,5 @@
+import { SelectionReviewPanel } from "@/components/ticket/SelectionReviewPanel";
+import { formatSelectionChance, type SelectionDecision } from "@/lib/selection-display";
 import { useLocalSearchParams } from 'expo-router';
 import { Copy, SlidersHorizontal, Target, Wand2 } from '@/components/modern-icons';
 import { useMemo, useState } from 'react';
@@ -18,13 +20,14 @@ import {
   ScreenHeader,
   StatusBadge,
 } from '@/components/ui';
-import type { TicketRowData } from '@/data/mock';
+import type { TicketRowData as BaseTicketRowData } from '@/data/mock';
 import { getErrorMessage } from '@/lib/api/client';
 import { useFixTicketMutation, useJobStatus, useTicketById } from '@/lib/api/hooks';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
+type TicketRowData = BaseTicketRowData & { selectionDecision?: SelectionDecision | null };
 const riskLevels = ['Safe', 'Balanced', 'Bold'];
 const riskMap = {
   Balanced: 'moderate',
@@ -58,10 +61,10 @@ function TicketRow({ onPress, row }: { onPress?: () => void; row: TicketRowData 
         </View>
         <Text style={[styles.reason, { color: theme.mutedLight }]}>{row.reason}</Text>
         <View style={styles.confidenceRow}>
-          <Text style={[styles.confidenceLabel, { color: theme.muted }]}>Confidence</Text>
-          <Text style={[styles.confidenceValue, { color: keep ? theme.success : theme.warning }]}>{row.confidence}%</Text>
+          <Text style={[styles.confidenceLabel, { color: theme.muted }]}>Estimated win chance</Text>
+          <Text style={[styles.confidenceValue, { color: keep ? theme.success : theme.warning }]}>{formatSelectionChance(row.selectionDecision)}</Text>
         </View>
-        <ProgressBar tone={keep ? 'success' : 'warning'} value={row.confidence} />
+
       </GlassCard>
     </PressableScale>
   );
@@ -94,6 +97,7 @@ export default function FixTicketScreen() {
       teams: `${match.homeTeam} vs ${match.awayTeam}`,
       market: match.market,
       confidence: Math.round(match.confidence ?? 0),
+      selectionDecision: match.selectionDecision,
       status: match.status === 'KEPT' ? 'Keep' : 'Remove',
       reason: match.reason ?? match.selectionReason ?? 'Decision saved from BetClaw analysis.',
     }));
@@ -202,6 +206,7 @@ export default function FixTicketScreen() {
         </Animated.View>
       ) : null}
 
+      {ticket.data ? <SelectionReviewPanel runId={ticket.data.evaluationRunId} /> : null}
       {displayRows.map((row, index) => (
         <Animated.View entering={enterUp(6 + index)} key={row.id}>
           <TicketRow

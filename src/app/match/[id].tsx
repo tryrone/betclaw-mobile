@@ -1,3 +1,4 @@
+import { formatSelectionChance } from "@/lib/selection-display";
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Activity,
@@ -927,7 +928,7 @@ function OverviewSection({
         </Text>
         <View style={styles.outlookMetrics}>
           {typeof prediction?.confidence === 'number' ? (
-            <MetricTile label="Confidence" tone="accent" value={`${Math.round(prediction.confidence)}%`} />
+            <MetricTile label="Estimated win chance" tone="accent" value={formatSelectionChance(null)} />
           ) : null}
           {typeof prediction?.odds === 'number' ? (
             <MetricTile label="Odds" value={prediction.odds.toFixed(2)} />

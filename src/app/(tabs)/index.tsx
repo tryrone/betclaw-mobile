@@ -1,3 +1,5 @@
+import { SelectionReviewPanel, SelectionDecisionCard } from "@/components/ticket/SelectionReviewPanel";
+import { formatSelectionChance } from "@/lib/selection-display";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import {
@@ -132,13 +134,13 @@ function DailyTicketHero({ ticket, loading, unavailable }: { ticket?: DailyTicke
       style={styles.hero}>
       <View style={styles.heroTop}>
         <View style={styles.heroIcon}><Sparkles color="#FFFFFF" size={20} /></View>
-        <StatusBadge label={ready ? 'VERIFIED TODAY' : loading ? 'CHECKING' : unavailable === 'locked' ? 'PREMIUM' : unavailable === 'error' ? 'UNAVAILABLE' : 'NO VERIFIED TICKET'} tone={ready ? 'success' : 'warning'} />
+        <StatusBadge label={ready ? ticket?.selectionReview?.mode === 'on' ? 'REVIEWED TODAY' : 'CURRENT TICKET' : loading ? 'CHECKING' : unavailable === 'locked' ? 'PREMIUM' : unavailable === 'error' ? 'UNAVAILABLE' : 'NO VERIFIED TICKET'} tone={ready ? 'success' : 'warning'} />
       </View>
       <Text style={styles.heroEyebrow}>TICKET OF THE DAY</Text>
       <Text style={styles.heroTitle}>{ready ? `${ticket?.legCount} carefully screened legs` : unavailable === 'locked' ? 'Unlock the daily ticket' : unavailable === 'error' ? 'Ticket check unavailable' : 'No forced picks'}</Text>
       <Text style={styles.heroCopy}>
         {ready
-          ? 'Every leg passed lineage, price, freshness and evidence checks.'
+          ? ticket?.selectionReview?.mode === 'on' ? 'Every leg passed the shared selection policy. Open the review for evidence and remaining risks.' : 'This ticket uses the current selection process. Validated win estimates are unavailable without a complete decision trail.'
           : unavailable === 'locked'
             ? 'Premium access includes the verified daily ticket and its full evidence.'
             : unavailable === 'error'
@@ -148,7 +150,7 @@ function DailyTicketHero({ ticket, loading, unavailable }: { ticket?: DailyTicke
       {ready ? (
         <View style={styles.heroMetrics}>
           <View><Text style={styles.heroMetricLabel}>Total odds</Text><Text style={styles.heroMetricValue}>{ticket?.totalOdds?.toFixed(2) ?? '—'}</Text></View>
-          <View><Text style={styles.heroMetricLabel}>Avg confidence</Text><Text style={styles.heroMetricValue}>{formatPercent(ticket?.avgConfidence)}</Text></View>
+          <View><Text style={styles.heroMetricLabel}>Evidence quality</Text><Text style={styles.heroMetricValue}>See review</Text></View>
           <View><Text style={styles.heroMetricLabel}>Target</Text><Text style={styles.heroMetricValue}>{ticket?.targetOdds.toFixed(2)}</Text></View>
         </View>
       ) : null}
@@ -166,16 +168,15 @@ function DailyTicketHero({ ticket, loading, unavailable }: { ticket?: DailyTicke
 
 function ProbabilityComparison({ prediction }: { prediction: PublishedPrediction }) {
   const theme = useAppTheme();
-  const model = clampPercent(prediction.calibratedConfidence ?? prediction.confidence);
   const implied = clampPercent(prediction.impliedProb);
 
   return (
     <View style={styles.comparison}>
       <View style={styles.comparisonRow}>
-        <Text style={[styles.comparisonLabel, { color: theme.mutedLight }]}>BetClaw probability</Text>
-        <Text style={[styles.comparisonValue, { color: theme.foregroundStrong }]}>{model == null ? '—' : `${model.toFixed(0)}%`}</Text>
+        <Text style={[styles.comparisonLabel, { color: theme.mutedLight }]}>Estimated win chance</Text>
+        <Text style={[styles.comparisonValue, { color: theme.foregroundStrong }]}>{formatSelectionChance(prediction.selectionDecision)}</Text>
       </View>
-      <ProgressBar value={model ?? 0} />
+      <SelectionDecisionCard decision={prediction.selectionDecision} />
       <View style={styles.comparisonRow}>
         <Text style={[styles.comparisonLabel, { color: theme.mutedLight }]}>Market implied</Text>
         <Text style={[styles.comparisonValue, { color: theme.foregroundStrong }]}>{implied == null ? '—' : `${implied.toFixed(0)}%`}</Text>
@@ -364,6 +365,7 @@ export default function TodayScreen() {
         ticket={daily.data}
         unavailable={getTrpcErrorCode(daily.error) === 'FORBIDDEN' ? 'locked' : daily.error ? 'error' : null}
       />
+      {daily.data?.evaluationRunId ? <SelectionReviewPanel runId={daily.data.evaluationRunId} /> : null}
       <DashboardSectionHeader eyebrow="VERIFIED OPPORTUNITIES" title="Top value edges" description="Each pick names the exact market, winning condition, price and model edge." />
       {verifiedEdges.length
         ? verifiedEdges.map((prediction) => <EdgeCard key={prediction.id} prediction={prediction} />)

@@ -43,7 +43,7 @@ module.exports = {
     userInterfaceStyle: 'automatic',
     ios: {
       bundleIdentifier: 'com.betclaw.app',
-      buildNumber: '25',
+      buildNumber: '26',
       icon: './assets/images/ios-icon.png',
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,

@@ -1,3 +1,5 @@
+import { SelectionReviewPanel, SelectionDecisionCard, ReplacementSuggestions } from "./SelectionReviewPanel";
+import { formatSelectionChance } from "@/lib/selection-display";
 import { useRouter } from 'expo-router';
 import { ChevronRight, Copy, ExternalLink, PencilLine, Share2, ShieldCheck, Sparkles, Trophy } from '@/components/modern-icons';
 import { useEffect, useState } from 'react';
@@ -5,7 +7,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { FormBadges } from '@/components/ticket/FormBadges';
-import { enterUp, GlassCard, PressableScale, ProgressBar, StatusBadge, useToast } from '@/components/ui';
+import { enterUp, GlassCard, PressableScale, StatusBadge, useToast } from '@/components/ui';
 import { getErrorMessage } from '@/lib/api/client';
 import {
   useCreateShareLinkMutation,
@@ -99,7 +101,6 @@ function MatchDetailRow({
 }) {
   const router = useRouter();
   const theme = useAppTheme();
-  const confidence = Math.round(match.confidence ?? 0);
   const canOpenMatch = Boolean(match.fixtureId);
   const isInactive = isInactiveMatchStatus(match.status);
   const recommendedPick = formatTicketMarketLabel({
@@ -126,7 +127,7 @@ function MatchDetailRow({
       : null,
   ].filter((line): line is { label: string; value: string } => Boolean(line));
   const hasFormData = Boolean(match.homeForm || match.awayForm);
-  const modelProbability = percentValue(match.calibratedConfidence ?? match.confidence);
+  const modelProbability = formatSelectionChance(match.selectionDecision);
   const impliedProbability = percentValue(match.impliedProb);
   const expectedValue = signedPercentValue(match.expectedValue);
   const closingLineValue = signedPercentValue(match.clvPercent);
@@ -178,7 +179,7 @@ function MatchDetailRow({
 
       <View style={styles.metricRow}>
         <Text style={[styles.metric, { color: theme.primarySoft }]}>Odds {Number(match.odds ?? 0).toFixed(2)}</Text>
-        <Text style={[styles.metric, { color: theme.foreground }]}>{confidence}% confidence</Text>
+        <Text style={[styles.metric, { color: theme.foreground }]}>Estimated win chance: {formatSelectionChance(match.selectionDecision)}</Text>
         <StatusBadge label={match.matchResult ?? 'PENDING'} tone={resultTone(match.matchResult)} />
       </View>
       {typeof match.baseRate === 'number' ? (
@@ -191,7 +192,7 @@ function MatchDetailRow({
           </Text>
         </View>
       ) : null}
-      <ProgressBar tone={match.status === 'KEPT' ? 'success' : 'warning'} value={confidence} />
+      <SelectionDecisionCard decision={match.selectionDecision} />
 
       {hasDecisionEvidence ? (
         <View style={[styles.decisionBlock, { backgroundColor: theme.field, borderColor: theme.border }]}>
@@ -245,7 +246,7 @@ function MatchDetailRow({
             <Sparkles color={theme.warning} size={13} />
             <Text style={[styles.altTitle, { color: theme.warning }]}>Better researched angle</Text>
             {typeof match.alternativeConfidence === 'number' ? (
-              <Text style={[styles.altMeta, { color: theme.warning }]}>{Math.round(match.alternativeConfidence)}%</Text>
+              <Text style={[styles.altMeta, { color: theme.warning }]}>Unavailable</Text>
             ) : null}
             {typeof match.alternativeOdds === 'number' ? (
               <Text style={[styles.altMeta, { color: theme.warning }]}>Odds {match.alternativeOdds.toFixed(2)}</Text>
@@ -457,6 +458,7 @@ export function TicketDetailView({
 
       {data ? (
         <>
+          <SelectionReviewPanel runId={data.evaluationRunId} />
           <Animated.View entering={enterUp(1)}>
             <GlassCard gradient="hero" style={styles.summaryCard}>
               <View style={styles.summaryTop}>
@@ -475,8 +477,8 @@ export function TicketDetailView({
                   <Text numberOfLines={1} style={[styles.tileLabel, { color: theme.muted }]}>Legs kept</Text>
                 </View>
                 <View style={[styles.metricTile, { backgroundColor: theme.field, borderColor: theme.border }]}>
-                  <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.tileValue, { color: theme.foregroundStrong }]}>{data.avgConfidence != null ? `${data.avgConfidence.toFixed(0)}%` : '-'}</Text>
-                  <Text numberOfLines={1} style={[styles.tileLabel, { color: theme.muted }]}>Avg confidence</Text>
+                  <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.tileValue, { color: theme.foregroundStrong }]}>See review</Text>
+                  <Text numberOfLines={1} style={[styles.tileLabel, { color: theme.muted }]}>Evidence quality</Text>
                 </View>
                 <View style={[styles.metricTile, { backgroundColor: theme.field, borderColor: theme.border }]}>
                   <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.tileValue, { color: theme.mutedLight }]}>{data.originalOdds?.toFixed(2) ?? '-'}</Text>
@@ -491,15 +493,15 @@ export function TicketDetailView({
                     <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.tileValue, { color: theme.success }]}>
                       {Math.round(data.projectedWinRate * 100)}%
                     </Text>
-                    <Text numberOfLines={1} style={[styles.tileLabel, { color: theme.muted }]}>Projected win</Text>
+                    <Text numberOfLines={1} style={[styles.tileLabel, { color: theme.muted }]}>Historical market rate</Text>
                   </View>
                 ) : null}
-                {typeof data.jointProbability === 'number' ? (
+                {data.selectionReview?.mode === 'on' && typeof data.jointProbability === 'number' ? (
                   <View style={[styles.metricTile, { backgroundColor: theme.primarySubtle, borderColor: theme.selectionBorder }]}>
                     <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.tileValue, { color: theme.primarySoft }]}>
                       {percentValue(data.jointProbability)}
                     </Text>
-                    <Text numberOfLines={1} style={[styles.tileLabel, { color: theme.muted }]}>Combined chance</Text>
+                    <Text numberOfLines={1} style={[styles.tileLabel, { color: theme.muted }]}>Combined estimate (independent outcomes)</Text>
                   </View>
                 ) : null}
               </View>
@@ -510,7 +512,7 @@ export function TicketDetailView({
               ) : null}
               {typeof data.projectedWinRate === 'number' ? (
                 <Text style={[styles.summaryMeta, { color: theme.muted }]}>
-                  Projected win is based on how often each leg&apos;s market has landed in its league historically.
+                  Historical market rate is based on how often each leg&apos;s market has landed in its league historically.
                 </Text>
               ) : null}
             </GlassCard>
@@ -564,6 +566,7 @@ export function TicketDetailView({
           {data.matches?.map((match, index) => (
             <Animated.View entering={enterUp(3 + index)} key={match.id}>
               <MatchDetailRow match={match} onNavigate={onNavigate} onSetResult={handleSetResult} />
+              {match.status !== "KEPT" ? <ReplacementSuggestions ticketId={data.id} matchId={match.id} /> : null}
             </Animated.View>
           ))}
         </>

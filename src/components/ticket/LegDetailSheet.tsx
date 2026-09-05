@@ -1,3 +1,5 @@
+import { SelectionDecisionCard } from "./SelectionReviewPanel";
+import { formatSelectionChance } from "@/lib/selection-display";
 import { useRouter } from 'expo-router';
 import { ArrowUpRight, ExternalLink, Sparkles } from '@/components/modern-icons';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -86,9 +88,9 @@ export function LegDetailSheet({ leg, onClose }: { leg: TicketLeg | null; onClos
               </Text>
             </View>
             <View style={[sheetStyles.tile, { backgroundColor: theme.field, borderColor: theme.border }]}>
-              <Text style={[sheetStyles.tileLabel, { color: theme.muted }]}>Confidence</Text>
+              <Text style={[sheetStyles.tileLabel, { color: theme.muted }]}>Estimated win chance</Text>
               <Text adjustsFontSizeToFit numberOfLines={1} style={[sheetStyles.tileValue, { color: theme.foregroundStrong }]}>
-                {typeof leg.confidence === 'number' ? `${Math.round(leg.confidence)}%` : '-'}
+                {formatSelectionChance(leg.selectionDecision)}
               </Text>
             </View>
             <View style={[sheetStyles.tile, { backgroundColor: theme.field, borderColor: theme.border }]}>
@@ -106,6 +108,7 @@ export function LegDetailSheet({ leg, onClose }: { leg: TicketLeg | null; onClos
             </View>
           </View>
 
+          <SelectionDecisionCard decision={leg.selectionDecision} />
           {leg.selectionReason ?? leg.reason ? (
             <View style={sheetStyles.block}>
               <Text style={[sheetStyles.blockLabel, { color: theme.muted }]}>Why this pick</Text>
@@ -114,7 +117,7 @@ export function LegDetailSheet({ leg, onClose }: { leg: TicketLeg | null; onClos
           ) : null}
           {leg.confidenceReason ? (
             <View style={sheetStyles.block}>
-              <Text style={[sheetStyles.blockLabel, { color: theme.muted }]}>Why this confidence</Text>
+              <Text style={[sheetStyles.blockLabel, { color: theme.muted }]}>Evidence assessment</Text>
               <Text style={[sheetStyles.blockCopy, { color: theme.foreground }]}>{leg.confidenceReason}</Text>
             </View>
           ) : null}
@@ -146,9 +149,9 @@ export function LegDetailSheet({ leg, onClose }: { leg: TicketLeg | null; onClos
             <View style={[sheetStyles.altBlock, { backgroundColor: theme.warningSoft, borderColor: theme.warningSoft }]}>
               <View style={sheetStyles.altHeader}>
                 <Sparkles color={theme.warning} size={13} />
-                <Text style={[sheetStyles.altTitle, { color: theme.warning }]}>Better researched angle</Text>
+                <Text style={[sheetStyles.altTitle, { color: theme.warning }]}>Research alternative — eligibility not verified</Text>
                 {typeof leg.alternativeConfidence === 'number' ? (
-                  <Text style={[sheetStyles.altMeta, { color: theme.warning }]}>{Math.round(leg.alternativeConfidence)}%</Text>
+                  <Text style={[sheetStyles.altMeta, { color: theme.warning }]}>Unavailable</Text>
                 ) : null}
                 {typeof leg.alternativeOdds === 'number' ? (
                   <Text style={[sheetStyles.altMeta, { color: theme.warning }]}>Odds {leg.alternativeOdds.toFixed(2)}</Text>
