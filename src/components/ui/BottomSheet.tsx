@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/immutability -- Reanimated shared values are mutable by design. */
 import { X } from '@/components/modern-icons';
-import { useCallback, useEffect } from 'react';
+import { createContext, useCallback, useContext, useEffect } from 'react';
 import { Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
@@ -8,6 +8,7 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  useReducedMotion,
   withDelay,
   withSpring,
   withTiming,
@@ -21,6 +22,8 @@ import { fonts } from '@/theme/typography';
 
 const DISMISS_DISTANCE = 140;
 const DISMISS_VELOCITY = 900;
+const BottomSheetContext = createContext(false);
+export const useInsideBottomSheet = () => useContext(BottomSheetContext);
 
 /**
  * Reusable slide-up bottom sheet: the backdrop fades in first, then the sheet
@@ -43,21 +46,28 @@ export function BottomSheet({
   const { height } = useWindowDimensions();
   const translateY = useSharedValue(height);
   const backdrop = useSharedValue(0);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     if (visible) {
+      if (reducedMotion) {
+        translateY.value = 0;
+        backdrop.value = 1;
+        return;
+      }
       translateY.value = height;
       backdrop.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.quad) });
       translateY.value = withDelay(140, withSpring(0, { damping: 22, mass: 0.9, stiffness: 210 }));
     }
-  }, [backdrop, height, translateY, visible]);
+  }, [backdrop, height, reducedMotion, translateY, visible]);
 
   const requestClose = useCallback(() => {
+    if (reducedMotion) { onClose(); return; }
     backdrop.value = withTiming(0, { duration: 240 });
     translateY.value = withTiming(height, { duration: 240, easing: Easing.in(Easing.quad) }, (finished) => {
       if (finished) runOnJS(onClose)();
     });
-  }, [backdrop, height, onClose, translateY]);
+  }, [backdrop, height, onClose, reducedMotion, translateY]);
 
   const pan = Gesture.Pan()
     .onUpdate((event) => {
@@ -84,6 +94,7 @@ export function BottomSheet({
           <Pressable accessibilityLabel={`Close ${title}`} onPress={requestClose} style={StyleSheet.absoluteFill} />
         </Animated.View>
         <Animated.View
+          accessibilityViewIsModal
           style={[
             sheetStyles.sheet,
             {
@@ -99,7 +110,7 @@ export function BottomSheet({
             <View style={sheetStyles.grabArea}>
               <View style={[sheetStyles.handle, { backgroundColor: theme.borderStrong }]} />
               <View style={sheetStyles.header}>
-                <Text style={[sheetStyles.title, { color: theme.foregroundStrong }]}>{title}</Text>
+                <Text accessibilityRole="header" style={[sheetStyles.title, { color: theme.foregroundStrong }]}>{title}</Text>
                 <PressableScale
                   accessibilityLabel="Close"
                   accessibilityRole="button"
@@ -110,7 +121,7 @@ export function BottomSheet({
               </View>
             </View>
           </GestureDetector>
-          {children}
+          <BottomSheetContext.Provider value>{children}</BottomSheetContext.Provider>
         </Animated.View>
       </GestureHandlerRootView>
     </Modal>
@@ -122,9 +133,9 @@ const sheetStyles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
-    height: 34,
+    height: 48,
     justifyContent: 'center',
-    width: 34,
+    width: 48,
   },
   grabArea: {
     gap: spacing.sm,
@@ -154,6 +165,7 @@ const sheetStyles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   title: {
+    flex: 1,
     fontFamily: fonts.extraBold,
     fontSize: 16,
   },

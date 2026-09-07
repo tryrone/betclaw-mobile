@@ -1,5 +1,4 @@
 import { SelectionReviewPanel, SelectionDecisionCard } from "@/components/ticket/SelectionReviewPanel";
-import { formatSelectionChance } from "@/lib/selection-display";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import {
@@ -24,7 +23,6 @@ import {
   DashboardGlassCard,
   DashboardSectionHeader,
   PressableScale,
-  ProgressBar,
   Screen,
   StatusBadge,
 } from '@/components/ui';
@@ -41,10 +39,8 @@ import {
 import type { DailyTicketData, PublishedPrediction, ProviderStatus } from '@/lib/api/types';
 import { getPredictionPickDisplay } from '@/lib/prediction-pick-display';
 import {
-  clampPercent,
   formatPercent,
   formatRelativeTime,
-  formatSignedPercent,
   selectSettledPredictions,
   selectVerifiedEdges,
 } from '@/lib/today-intelligence';
@@ -63,12 +59,6 @@ function modeLabel(prediction: PublishedPrediction) {
   if (prediction.decisionMode === 'SHADOW') return 'RESEARCH ONLY';
   if (prediction.decisionMode === 'ACTIVE') return 'ACTIVE MODEL';
   return 'VERIFIED BASELINE';
-}
-
-function dataCoverage(prediction: PublishedPrediction) {
-  const status = prediction.dataReadiness?.status?.trim();
-  if (status) return status.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-  return prediction.dataReadiness?.score == null ? 'Coverage unavailable' : `${formatPercent(prediction.dataReadiness.score)} coverage`;
 }
 
 function Header({ unreadCount }: { unreadCount: number }) {
@@ -166,31 +156,10 @@ function DailyTicketHero({ ticket, loading, unavailable }: { ticket?: DailyTicke
   );
 }
 
-function ProbabilityComparison({ prediction }: { prediction: PublishedPrediction }) {
-  const theme = useAppTheme();
-  const implied = clampPercent(prediction.impliedProb);
-
-  return (
-    <View style={styles.comparison}>
-      <View style={styles.comparisonRow}>
-        <Text style={[styles.comparisonLabel, { color: theme.mutedLight }]}>Estimated win chance</Text>
-        <Text style={[styles.comparisonValue, { color: theme.foregroundStrong }]}>{formatSelectionChance(prediction.selectionDecision)}</Text>
-      </View>
-      <SelectionDecisionCard decision={prediction.selectionDecision} />
-      <View style={styles.comparisonRow}>
-        <Text style={[styles.comparisonLabel, { color: theme.mutedLight }]}>Market implied</Text>
-        <Text style={[styles.comparisonValue, { color: theme.foregroundStrong }]}>{implied == null ? '—' : `${implied.toFixed(0)}%`}</Text>
-      </View>
-      <ProgressBar delay={340} tone="warning" value={implied ?? 0} />
-    </View>
-  );
-}
-
 function EdgeCard({ prediction }: { prediction: PublishedPrediction }) {
   const theme = useAppTheme();
   const pick = getPredictionPickDisplay(prediction);
   const odds = prediction.odds?.toFixed(2) ?? '—';
-  const edge = formatSignedPercent(prediction.expectedValue ?? prediction.edgeScore);
 
   return (
     <DashboardGlassCard style={styles.edgeCard}>
@@ -203,7 +172,7 @@ function EdgeCard({ prediction }: { prediction: PublishedPrediction }) {
       </View>
       <View
         accessible
-        accessibilityLabel={`BetClaw pick. ${pick.title}. ${pick.condition} Odds ${odds}. Model edge ${edge}.`}
+        accessibilityLabel={`BetClaw pick. ${pick.title}. ${pick.condition} Odds ${odds}.`}
         style={[styles.selectionBlock, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <View style={styles.selectionRow}>
           <View style={[styles.selectionIcon, { backgroundColor: theme.primarySubtle }]}><Bot color={theme.primary} size={18} /></View>
@@ -218,18 +187,13 @@ function EdgeCard({ prediction }: { prediction: PublishedPrediction }) {
             <Text style={[styles.selectionMetricLabel, { color: theme.muted }]}>ODDS</Text>
             <Text style={[styles.selectionMetricValue, { color: theme.foregroundStrong }]}>{odds}</Text>
           </View>
-          <View style={[styles.selectionMetric, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Text style={[styles.selectionMetricLabel, { color: theme.muted }]}>MODEL EDGE</Text>
-            <Text style={[styles.selectionMetricValue, { color: theme.foregroundStrong }]}>{edge}</Text>
-          </View>
+
         </View>
       </View>
-      <ProbabilityComparison prediction={prediction} />
+      <SelectionDecisionCard decision={prediction.selectionDecision} presentation={prediction.selectionPresentation} title={`${prediction.homeTeam} vs ${prediction.awayTeam}`} market={pick.title} />
       <View style={[styles.evidenceRow, { borderTopColor: theme.border }]}>
-        <View style={styles.evidenceItem}><CheckCircle2 color={theme.success} size={15} /><Text style={[styles.evidenceText, { color: theme.mutedLight }]}>{dataCoverage(prediction)}</Text></View>
         <View style={styles.evidenceItem}><Clock3 color={theme.muted} size={15} /><Text style={[styles.evidenceText, { color: theme.mutedLight }]}>{formatRelativeTime(prediction.publishedAt ?? prediction.createdAt)}</Text></View>
       </View>
-      {prediction.edgeSummary || prediction.modelSummary ? <Text style={[styles.reason, { color: theme.mutedLight }]}>{prediction.edgeSummary ?? prediction.modelSummary}</Text> : null}
     </DashboardGlassCard>
   );
 }
@@ -365,7 +329,7 @@ export default function TodayScreen() {
         ticket={daily.data}
         unavailable={getTrpcErrorCode(daily.error) === 'FORBIDDEN' ? 'locked' : daily.error ? 'error' : null}
       />
-      {daily.data?.evaluationRunId ? <SelectionReviewPanel runId={daily.data.evaluationRunId} /> : null}
+      {daily.data?.evaluationRunId ? <SelectionReviewPanel runId={daily.data.evaluationRunId} initialReview={daily.data.selectionReview} /> : null}
       <DashboardSectionHeader eyebrow="VERIFIED OPPORTUNITIES" title="Top value edges" description="Each pick names the exact market, winning condition, price and model edge." />
       {verifiedEdges.length
         ? verifiedEdges.map((prediction) => <EdgeCard key={prediction.id} prediction={prediction} />)

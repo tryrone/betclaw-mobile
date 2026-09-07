@@ -1,5 +1,5 @@
 import { SelectionReviewPanel, SelectionDecisionCard } from "@/components/ticket/SelectionReviewPanel";
-import { formatSelectionChance } from "@/lib/selection-display";
+import { LegDetailSheet } from '@/components/ticket/LegDetailSheet';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, ArrowUpRight, Bot, Check, Copy, Minus, Plus, Share2, SlidersHorizontal, Target, Trophy } from '@/components/modern-icons';
 import { useEffect, useMemo, useState } from 'react';
@@ -101,6 +101,7 @@ function OptionPill({
 function TicketMatchRow({ match }: { match: any }) {
   const theme = useAppTheme();
   const kept = match.status === 'KEPT';
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
 
   return (
     <GlassCard style={styles.matchRow}>
@@ -115,12 +116,8 @@ function TicketMatchRow({ match }: { match: any }) {
         </View>
         <StatusBadge label={kept ? 'Keep' : 'Removed'} tone={kept ? 'success' : 'danger'} />
       </View>
-      <SelectionDecisionCard decision={match.selectionDecision} />
       <View style={styles.matchMetrics}>
         <Text style={[styles.metric, { color: theme.primarySoft }]}>Odds {Number(match.odds ?? 0).toFixed(2)}</Text>
-        <Text style={[styles.metric, { color: theme.muted }]}>
-          Estimated win chance: {formatSelectionChance(match.selectionDecision)}
-        </Text>
         {typeof match.baseRate === 'number' ? (
           <View style={[styles.historyTag, { backgroundColor: theme.successSoft }]}>
             <Text style={[styles.historyTagText, { color: theme.success }]}>
@@ -132,9 +129,8 @@ function TicketMatchRow({ match }: { match: any }) {
           </View>
         ) : null}
       </View>
-      {match.selectionReason || match.reason ? (
-        <Text style={[styles.matchReason, { color: theme.mutedLight }]}>{match.selectionReason ?? match.reason}</Text>
-      ) : null}
+      <SelectionDecisionCard decision={match.selectionDecision} presentation={match.selectionPresentation} title={`${match.homeTeam} vs ${match.awayTeam}`} market={match.market} onViewEvidence={() => setEvidenceOpen(true)} />
+      {evidenceOpen ? <LegDetailSheet leg={match} onClose={() => setEvidenceOpen(false)} /> : null}
     </GlassCard>
   );
 }
@@ -555,7 +551,7 @@ export default function BuildTicketScreen() {
         </Animated.View>
       ) : null}
 
-      {doneTicket ? <SelectionReviewPanel runId={doneTicket.evaluationRunId} /> : null}
+      {doneTicket ? <SelectionReviewPanel runId={doneTicket.evaluationRunId} initialReview={doneTicket.selectionReview} /> : null}
       {doneTicket?.matches?.map((match, index) => (
         <Animated.View entering={enterUp(7 + index)} key={match.id}>
           <TicketMatchRow match={match} />
@@ -670,11 +666,6 @@ const styles = StyleSheet.create({
   matchMetrics: {
     flexDirection: 'row',
     gap: spacing.md,
-  },
-  matchReason: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    lineHeight: 18,
   },
   matchRow: {
     gap: spacing.sm,

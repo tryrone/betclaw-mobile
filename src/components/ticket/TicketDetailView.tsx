@@ -1,12 +1,11 @@
 import { SelectionReviewPanel, SelectionDecisionCard, ReplacementSuggestions } from "./SelectionReviewPanel";
-import { formatSelectionChance } from "@/lib/selection-display";
+import { LegDetailSheet, LegSelectionEvidence } from './LegDetailSheet';
 import { useRouter } from 'expo-router';
-import { ChevronRight, Copy, ExternalLink, PencilLine, Share2, ShieldCheck, Sparkles, Trophy } from '@/components/modern-icons';
+import { ChevronRight, Copy, ExternalLink, PencilLine, Share2, ShieldCheck, Trophy } from '@/components/modern-icons';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { FormBadges } from '@/components/ticket/FormBadges';
 import { enterUp, GlassCard, PressableScale, StatusBadge, useToast } from '@/components/ui';
 import { getErrorMessage } from '@/lib/api/client';
 import {
@@ -17,7 +16,7 @@ import {
 } from '@/lib/api/hooks';
 import type { TicketMatchResult } from '@/lib/api/types';
 import { BOOKMAKER_PLATFORM_OPTIONS, DEFAULT_BOOKMAKER_PLATFORM, type SupportedPlatform } from '@/lib/bookmaker-platforms';
-import { copyOrShareText, formatDateTime, isRealUrl, openExternalUrl } from '@/lib/mobile-format';
+import { copyOrShareText, formatDateTime, openExternalUrl } from '@/lib/mobile-format';
 import { formatTicketMarketLabel } from '@/lib/ticket-market-label';
 import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
@@ -102,6 +101,7 @@ function MatchDetailRow({
   const router = useRouter();
   const theme = useAppTheme();
   const canOpenMatch = Boolean(match.fixtureId);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
   const isInactive = isInactiveMatchStatus(match.status);
   const recommendedPick = formatTicketMarketLabel({
     awayTeam: match.awayTeam,
@@ -113,27 +113,7 @@ function MatchDetailRow({
     selectionReason: match.selectionReason ?? match.reason,
     selectionTeam: match.selectionTeam,
   });
-  const evidence = [
-    match.selectionReason,
-    match.confidenceReason,
-    match.keyFactors,
-    match.reason,
-  ].filter(Boolean);
-  const readiness = match.dataReadiness;
-  const labeledInsights = [
-    match.h2hSummary ? { label: 'H2H', value: String(match.h2hSummary).replace(/^H2H:\s*/i, '') } : null,
-    readiness?.status
-      ? { label: 'Data readiness', value: `${readiness.status}${typeof readiness.score === 'number' ? ` (${Math.round(readiness.score)}%)` : ''}` }
-      : null,
-  ].filter((line): line is { label: string; value: string } => Boolean(line));
-  const hasFormData = Boolean(match.homeForm || match.awayForm);
-  const modelProbability = formatSelectionChance(match.selectionDecision);
-  const impliedProbability = percentValue(match.impliedProb);
-  const expectedValue = signedPercentValue(match.expectedValue);
   const closingLineValue = signedPercentValue(match.clvPercent);
-  const hasDecisionEvidence = Boolean(
-    modelProbability || impliedProbability || expectedValue || match.decisionMode || match.decisionModelVersion,
-  );
   const hasPostmortem = Boolean(
     match.matchResult && match.matchResult !== 'PENDING'
       && (closingLineValue || typeof match.closingOdds === 'number' || match.lossClassification),
@@ -179,7 +159,6 @@ function MatchDetailRow({
 
       <View style={styles.metricRow}>
         <Text style={[styles.metric, { color: theme.primarySoft }]}>Odds {Number(match.odds ?? 0).toFixed(2)}</Text>
-        <Text style={[styles.metric, { color: theme.foreground }]}>Estimated win chance: {formatSelectionChance(match.selectionDecision)}</Text>
         <StatusBadge label={match.matchResult ?? 'PENDING'} tone={resultTone(match.matchResult)} />
       </View>
       {typeof match.baseRate === 'number' ? (
@@ -192,111 +171,8 @@ function MatchDetailRow({
           </Text>
         </View>
       ) : null}
-      <SelectionDecisionCard decision={match.selectionDecision} />
-
-      {hasDecisionEvidence ? (
-        <View style={[styles.decisionBlock, { backgroundColor: theme.field, borderColor: theme.border }]}>
-          <View style={styles.decisionHeader}>
-            <Text style={[styles.decisionTitle, { color: theme.foregroundStrong }]}>Why this leg</Text>
-            {match.decisionMode ? (
-              <StatusBadge
-                label={match.decisionMode === 'SHADOW' ? 'RESEARCH ONLY' : String(match.decisionMode)}
-                tone={match.decisionMode === 'ACTIVE' ? 'success' : 'neutral'}
-              />
-            ) : null}
-          </View>
-          <View style={styles.decisionGrid}>
-            {modelProbability ? (
-              <View style={styles.decisionMetric}>
-                <Text style={[styles.decisionValue, { color: theme.primarySoft }]}>{modelProbability}</Text>
-                <Text style={[styles.decisionLabel, { color: theme.muted }]}>Model probability</Text>
-              </View>
-            ) : null}
-            {impliedProbability ? (
-              <View style={styles.decisionMetric}>
-                <Text style={[styles.decisionValue, { color: theme.foregroundStrong }]}>{impliedProbability}</Text>
-                <Text style={[styles.decisionLabel, { color: theme.muted }]}>Market implied</Text>
-              </View>
-            ) : null}
-            {expectedValue ? (
-              <View style={styles.decisionMetric}>
-                <Text style={[styles.decisionValue, { color: (match.expectedValue ?? 0) >= 0 ? theme.success : theme.danger }]}>
-                  {expectedValue}
-                </Text>
-                <Text style={[styles.decisionLabel, { color: theme.muted }]}>Expected value</Text>
-              </View>
-            ) : null}
-          </View>
-          {match.decisionModelVersion ? (
-            <Text style={[styles.modelVersion, { color: theme.muted }]}>Decision model {match.decisionModelVersion}</Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      {evidence.slice(0, 2).map((item, index) => (
-        <View key={`${match.id}-${index}`} style={styles.evidenceRow}>
-          <View style={[styles.evidenceDot, { backgroundColor: theme.primarySoft }]} />
-          <Text style={[styles.evidenceText, { color: theme.mutedLight }]}>{String(item)}</Text>
-        </View>
-      ))}
-
-      {match.alternativeMarket && match.alternativeReason ? (
-        <View style={[styles.altBlock, { backgroundColor: theme.warningSoft, borderColor: theme.warningSoft }]}>
-          <View style={styles.altHeader}>
-            <Sparkles color={theme.warning} size={13} />
-            <Text style={[styles.altTitle, { color: theme.warning }]}>Better researched angle</Text>
-            {typeof match.alternativeConfidence === 'number' ? (
-              <Text style={[styles.altMeta, { color: theme.warning }]}>Unavailable</Text>
-            ) : null}
-            {typeof match.alternativeOdds === 'number' ? (
-              <Text style={[styles.altMeta, { color: theme.warning }]}>Odds {match.alternativeOdds.toFixed(2)}</Text>
-            ) : null}
-          </View>
-          <Text style={[styles.altMarket, { color: theme.foregroundStrong }]}>{match.alternativeMarket}</Text>
-          <Text style={[styles.altReason, { color: theme.mutedLight }]}>{match.alternativeReason}</Text>
-        </View>
-      ) : null}
-
-      {hasFormData || labeledInsights.length > 0 ? (
-        <View style={[styles.insightBox, { backgroundColor: theme.field, borderColor: theme.border }]}>
-          {match.homeForm ? (
-            <View style={styles.insightFormRow}>
-              <Text style={[styles.insightLabel, { color: theme.muted }]}>Home form</Text>
-              <FormBadges value={match.homeForm} />
-            </View>
-          ) : null}
-          {match.awayForm ? (
-            <View style={styles.insightFormRow}>
-              <Text style={[styles.insightLabel, { color: theme.muted }]}>Away form</Text>
-              <FormBadges value={match.awayForm} />
-            </View>
-          ) : null}
-          {labeledInsights.map((line) => (
-            <Text key={line.label} style={[styles.insightLine, { color: theme.mutedLight }]}>
-              <Text style={[styles.insightLabel, { color: theme.muted }]}>{line.label}: </Text>
-              {line.value}
-            </Text>
-          ))}
-        </View>
-      ) : null}
-
-      {Array.isArray(match.citations) && match.citations.filter((citation: any) => isRealUrl(citation?.url)).length > 0 ? (
-        <View style={styles.citationList}>
-          {match.citations.filter((citation: any) => isRealUrl(citation?.url)).slice(0, 2).map((citation: any) => (
-            <PressableScale
-              accessibilityLabel={citation.title ?? 'Open source'}
-              accessibilityRole="link"
-              key={citation.url}
-              onPress={() => void openExternalUrl(citation.url)}
-              style={[styles.citationPill, { borderColor: theme.border, backgroundColor: theme.field }]}>
-              <ExternalLink color={theme.primarySoft} size={13} />
-              <Text numberOfLines={1} style={[styles.citationText, { color: theme.foreground }]}>
-                {citation.title ?? citation.url}
-              </Text>
-            </PressableScale>
-          ))}
-        </View>
-      ) : null}
+      <SelectionDecisionCard decision={match.selectionDecision} presentation={match.selectionPresentation} title={`${match.homeTeam} vs ${match.awayTeam}`} market={recommendedPick} onViewEvidence={() => setEvidenceOpen(true)} inlineEvidence={<LegSelectionEvidence leg={match} />} />
+      {evidenceOpen ? <LegDetailSheet leg={match} onClose={() => setEvidenceOpen(false)} /> : null}
 
       {hasPostmortem ? (
         <View style={[styles.postmortemBlock, { backgroundColor: theme.field, borderColor: theme.border }]}>
@@ -458,7 +334,7 @@ export function TicketDetailView({
 
       {data ? (
         <>
-          <SelectionReviewPanel runId={data.evaluationRunId} />
+          <SelectionReviewPanel runId={data.evaluationRunId} initialReview={data.selectionReview} />
           <Animated.View entering={enterUp(1)}>
             <GlassCard gradient="hero" style={styles.summaryCard}>
               <View style={styles.summaryTop}>
@@ -596,37 +472,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     fontSize: 12,
   },
-  altBlock: {
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: 4,
-    padding: spacing.md,
-  },
-  altHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  altMarket: {
-    fontFamily: fonts.bold,
-    fontSize: 12,
-  },
-  altMeta: {
-    fontFamily: fonts.bold,
-    fontSize: 11,
-    fontVariant: ['tabular-nums'],
-  },
-  altReason: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  altTitle: {
-    fontFamily: fonts.bold,
-    fontSize: 11,
-    textTransform: 'uppercase',
-  },
   cardHeader: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -636,54 +481,9 @@ const styles = StyleSheet.create({
     fontFamily: fonts.extraBold,
     fontSize: 16,
   },
-  citationList: {
-    gap: spacing.xs,
-  },
-  citationPill: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.xs,
-    minHeight: 32,
-    paddingHorizontal: spacing.sm,
-  },
-  citationText: {
-    flex: 1,
-    fontFamily: fonts.medium,
-    fontSize: 11,
-  },
-  decisionBlock: {
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: spacing.sm,
-    padding: spacing.md,
-  },
-  decisionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  decisionHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  decisionLabel: {
-    fontFamily: fonts.medium,
-    fontSize: 10,
-  },
-  decisionMetric: {
-    minWidth: 84,
-  },
   decisionTitle: {
     fontFamily: fonts.bold,
     fontSize: 12,
-  },
-  decisionValue: {
-    fontFamily: fonts.extraBold,
-    fontSize: 15,
-    fontVariant: ['tabular-nums'],
   },
   codeBox: {
     alignItems: 'center',
@@ -715,45 +515,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   errorText: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  evidenceDot: {
-    borderRadius: radius.pill,
-    height: 7,
-    marginTop: 6,
-    width: 7,
-  },
-  evidenceRow: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  evidenceText: {
-    flex: 1,
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  insightBox: {
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: spacing.sm,
-    padding: spacing.md,
-  },
-  insightFormRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-    justifyContent: 'space-between',
-  },
-  insightLabel: {
-    fontFamily: fonts.bold,
-    fontSize: 11,
-    textTransform: 'uppercase',
-  },
-  insightLine: {
     fontFamily: fonts.medium,
     fontSize: 12,
     lineHeight: 18,
@@ -824,10 +585,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-  },
-  modelVersion: {
-    fontFamily: fonts.medium,
-    fontSize: 10,
   },
   platformPill: {
     borderRadius: radius.pill,
