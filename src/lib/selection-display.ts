@@ -32,10 +32,15 @@ const selectionCheckLabels: Record<string, string> = {
 };
 export function selectionCheckLabel(code: string) { return selectionCheckLabels[code] ?? code.toLowerCase().replaceAll('_', ' '); }
 
-export function selectionCopy(decision?: SelectionDecision | null, presentation?: SelectionPresentation | null) {
+export type RecordedSelectionReason = { selectionReason?: string | null; reason?: string | null };
+
+/** Saved prose is useful even when it is not a validated policy decision. */
+export function selectionCopy(decision?: SelectionDecision | null, presentation?: SelectionPresentation | null, recorded?: RecordedSelectionReason | null) {
   if (!decision) return {
-    summary: 'This selection does not have a complete recorded decision trail.',
-    risk: 'We cannot reconstruct its original win estimate or selection checks.',
+    summary: recorded?.selectionReason?.trim() || recorded?.reason?.trim() || 'This selection does not have a complete recorded decision trail.',
+    risk: recorded?.selectionReason?.trim() || recorded?.reason?.trim()
+      ? 'This is the saved analysis note. A validated win estimate and complete selection checks are unavailable.'
+      : 'We cannot reconstruct its original win estimate or selection checks.',
   };
   if (presentation?.version === 1 && presentation.summary?.trim() && presentation.risk?.trim()) return presentation;
   return {

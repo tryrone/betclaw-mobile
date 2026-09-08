@@ -60,7 +60,7 @@ export function LegDetailSheet({ leg, onClose }: { leg: TicketLeg | null; onClos
         <Text style={[styles.small, { color: theme.foreground }]}>{typeof leg.odds === 'number' && Number.isFinite(leg.odds) && leg.odds > 1 ? leg.odds.toFixed(2) : 'Unavailable'} odds</Text>
       </View>
       {leg.kickoffTime ? <Text style={[styles.small, { color: theme.mutedLight }]}>{formatDateTime(leg.kickoffTime)}</Text> : null}
-      <SelectionSummary decision={leg.selectionDecision} presentation={leg.selectionPresentation} />
+      <SelectionSummary decision={leg.selectionDecision} presentation={leg.selectionPresentation} recorded={leg} />
       <LegSelectionEvidence leg={leg} />
       {leg.fixtureId ? <PressableScale accessibilityRole="button" onPress={() => { onClose(); router.push(`/match/${leg.fixtureId}`); }}
         style={[styles.action, { borderColor: theme.border, backgroundColor: theme.field }]}>

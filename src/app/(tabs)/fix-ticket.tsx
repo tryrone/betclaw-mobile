@@ -28,7 +28,7 @@ import { useAppTheme } from '@/theme/colors';
 import { radius, spacing } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 
-type TicketRowData = BaseTicketRowData & { selectionDecision?: SelectionDecision | null; selectionPresentation?: SelectionPresentation | null };
+type TicketRowData = BaseTicketRowData & { selectionDecision?: SelectionDecision | null; selectionPresentation?: SelectionPresentation | null; selectionReason?: string | null };
 const riskLevels = ['Safe', 'Balanced', 'Bold'];
 const riskMap = {
   Balanced: 'moderate',
@@ -54,7 +54,7 @@ function TicketRow({ onPress, row }: { onPress?: () => void; row: TicketRowData 
           </View>
           <StatusBadge label={row.status} tone={keep ? 'success' : 'danger'} />
         </View>
-        <SelectionDecisionCard decision={row.selectionDecision} presentation={row.selectionPresentation} title={row.teams} market={row.market} onViewEvidence={onPress} />
+        <SelectionDecisionCard decision={row.selectionDecision} presentation={row.selectionPresentation} recorded={row} title={row.teams} market={row.market} onViewEvidence={onPress} />
 
       </GlassCard>
   );
@@ -89,8 +89,9 @@ export default function FixTicketScreen() {
       confidence: Math.round(match.confidence ?? 0),
       selectionDecision: match.selectionDecision,
       selectionPresentation: match.selectionPresentation,
+      selectionReason: match.selectionReason,
       status: match.status === 'KEPT' ? 'Keep' : 'Remove',
-      reason: match.reason ?? match.selectionReason ?? 'Decision saved from BetClaw analysis.',
+      reason: match.reason ?? '',
     }));
   }, [ticket.data]);
   const pipelineState = jobStatus.data?.status ?? (fixTicket.isPending ? 'processing' : null);

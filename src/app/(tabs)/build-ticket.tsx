@@ -129,7 +129,7 @@ function TicketMatchRow({ match }: { match: any }) {
           </View>
         ) : null}
       </View>
-      <SelectionDecisionCard decision={match.selectionDecision} presentation={match.selectionPresentation} title={`${match.homeTeam} vs ${match.awayTeam}`} market={match.market} onViewEvidence={() => setEvidenceOpen(true)} />
+      <SelectionDecisionCard decision={match.selectionDecision} presentation={match.selectionPresentation} recorded={match} title={`${match.homeTeam} vs ${match.awayTeam}`} market={match.market} onViewEvidence={() => setEvidenceOpen(true)} />
       {evidenceOpen ? <LegDetailSheet leg={match} onClose={() => setEvidenceOpen(false)} /> : null}
     </GlassCard>
   );

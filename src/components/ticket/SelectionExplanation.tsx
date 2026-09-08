@@ -7,13 +7,14 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import {
   formatSelectionChance, formatSelectionReturn, selectionCheckLabel, selectionCopy,
   selectionEvidenceSources, selectionOutcomeLabel, selectionReasonTitle,
-  type SelectionDecision, type SelectionPresentation,
+  type SelectionDecision, type SelectionPresentation, type RecordedSelectionReason,
 } from '@/lib/selection-display';
 import { useAppTheme } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 import { radius, spacing } from '@/theme/spacing';
 
 export type SelectionExplanationProps = {
+  recorded?: RecordedSelectionReason | null;
   decision?: SelectionDecision | null;
   presentation?: SelectionPresentation | null;
 };
@@ -31,11 +32,11 @@ export function SelectionOutcomeBadge({ decision }: SelectionExplanationProps) {
 }
 
 /** Compact, shared first layer. Probability appears exactly once on this surface. */
-export function SelectionSummary({ decision, presentation }: SelectionExplanationProps) {
+export function SelectionSummary({ decision, presentation, recorded }: SelectionExplanationProps) {
   const theme = useAppTheme();
   const { fontScale, width } = useWindowDimensions();
   const stacked = width < 360 || fontScale > 1.2;
-  const copy = selectionCopy(decision, presentation);
+  const copy = selectionCopy(decision, presentation, recorded);
   const unavailable = formatSelectionChance(decision) === 'Unavailable';
   const quality = decision?.evidenceQuality ?? 'Unavailable';
   const evidenceLabel = quality === 'Complete' ? 'Required evidence checks complete'
@@ -112,7 +113,7 @@ export function SelectionEvidence({ decision, context }: SelectionExplanationPro
   </View>;
 }
 
-export function SelectionEvidenceSheet({ decision, presentation, title, market, onClose, visible }: SelectionExplanationProps & {
+export function SelectionEvidenceSheet({ decision, presentation, recorded, title, market, onClose, visible }: SelectionExplanationProps & {
   title: string; market?: string; onClose: () => void; visible: boolean;
 }) {
   const theme = useAppTheme();
@@ -120,7 +121,7 @@ export function SelectionEvidenceSheet({ decision, presentation, title, market, 
   if (insideSheet) return visible ? <View style={styles.stack}>
     <PressableScale accessibilityRole="button" onPress={onClose} style={styles.action}><Text style={[styles.actionText, { color: theme.primarySoft }]}>Hide candidate evidence</Text></PressableScale>
     <Text style={[styles.title, { color: theme.foregroundStrong }]}>{title}</Text>
-    <SelectionSummary decision={decision} presentation={presentation} />
+    <SelectionSummary decision={decision} presentation={presentation} recorded={recorded} />
     <SelectionEvidence key={decision?.candidateKey ?? title} decision={decision} />
   </View> : null;
   return <BottomSheet onClose={onClose} title="Pick evidence" visible={visible}>
@@ -128,20 +129,20 @@ export function SelectionEvidenceSheet({ decision, presentation, title, market, 
       <Text accessibilityRole="header" style={[styles.title, { color: theme.foregroundStrong }]}>{title}</Text>
       {market ? <Text style={[styles.subheading, { color: theme.foreground }]}>{market}</Text> : null}
       <SelectionOutcomeBadge decision={decision} />
-      <SelectionSummary decision={decision} presentation={presentation} />
+      <SelectionSummary decision={decision} presentation={presentation} recorded={recorded} />
       <SelectionEvidence key={decision?.candidateKey ?? title} decision={decision} />
     </ScrollView> : null}
   </BottomSheet>;
 }
 
-export function SelectionDecisionCard({ decision, presentation, title = 'Recorded selection', market, onViewEvidence, inlineEvidence }: SelectionExplanationProps & {
+export function SelectionDecisionCard({ decision, presentation, recorded, title = 'Recorded selection', market, onViewEvidence, inlineEvidence }: SelectionExplanationProps & {
   title?: string; market?: string; onViewEvidence?: () => void; inlineEvidence?: ReactNode;
 }) {
   const theme = useAppTheme();
   const [open, setOpen] = useState(false);
   const insideSheet = useInsideBottomSheet();
   return <View style={styles.stack}>
-    <SelectionSummary decision={decision} presentation={presentation} />
+    <SelectionSummary decision={decision} presentation={presentation} recorded={recorded} />
     <PressableScale accessibilityRole="button" accessibilityLabel={`${open && insideSheet ? 'Hide' : 'View'} evidence for ${title}`} scaleTo={1}
       accessibilityState={insideSheet ? { expanded: open } : undefined}
       onPress={insideSheet ? () => setOpen(value => !value) : onViewEvidence ?? (() => setOpen(true))}
@@ -149,7 +150,7 @@ export function SelectionDecisionCard({ decision, presentation, title = 'Recorde
       <Text style={[styles.actionText, { color: theme.primarySoft }]}>{insideSheet && open ? 'Hide evidence' : 'View evidence'}</Text><ChevronRight size={18} color={theme.primarySoft} />
     </PressableScale>
     {insideSheet && open ? inlineEvidence ?? <SelectionEvidence key={decision?.candidateKey} decision={decision} />
-      : !onViewEvidence && open ? <SelectionEvidenceSheet decision={decision} presentation={presentation} title={title} market={market} visible onClose={() => setOpen(false)} /> : null}
+      : !onViewEvidence && open ? <SelectionEvidenceSheet decision={decision} presentation={presentation} recorded={recorded} title={title} market={market} visible onClose={() => setOpen(false)} /> : null}
   </View>;
 }
 

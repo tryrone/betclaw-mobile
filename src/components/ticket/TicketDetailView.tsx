@@ -171,7 +171,7 @@ function MatchDetailRow({
           </Text>
         </View>
       ) : null}
-      <SelectionDecisionCard decision={match.selectionDecision} presentation={match.selectionPresentation} title={`${match.homeTeam} vs ${match.awayTeam}`} market={recommendedPick} onViewEvidence={() => setEvidenceOpen(true)} inlineEvidence={<LegSelectionEvidence leg={match} />} />
+      <SelectionDecisionCard decision={match.selectionDecision} presentation={match.selectionPresentation} recorded={match} title={`${match.homeTeam} vs ${match.awayTeam}`} market={recommendedPick} onViewEvidence={() => setEvidenceOpen(true)} inlineEvidence={<LegSelectionEvidence leg={match} />} />
       {evidenceOpen ? <LegDetailSheet leg={match} onClose={() => setEvidenceOpen(false)} /> : null}
 
       {hasPostmortem ? (
