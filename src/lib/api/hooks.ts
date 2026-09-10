@@ -344,7 +344,7 @@ export function useJobStatus(jobId?: string | null) {
   return useQuery<TicketJobState>({
     enabled: status === 'authenticated' && Boolean(jobId),
     queryKey: ['ticket', 'jobStatus', jobId] as const,
-    queryFn: () => callWithMobileRefresh(() => asPromise<TicketJobState>(trpc.ticket.getJobStatus.query({ jobId }))),
+    queryFn: () => callWithMobileRefresh(() => asPromise<TicketJobState>(trpc.ticket.getJobStatus.query({ jobId, version: 2 }))),
     refetchInterval: (query) => {
       const job = query.state.data as { status?: string } | undefined;
       return job?.status === 'processing' ? 2500 : false;
@@ -497,8 +497,8 @@ export function useRegisterPushDeviceMutation() {
 
 export function useFixTicketMutation() {
   const queryClient = useQueryClient();
-  return useMutation<FixTicketResult, Error, { bookingCode: string; platform?: string; riskTolerance: 'conservative' | 'moderate' | 'aggressive' }>({
-    mutationFn: (input: { bookingCode: string; platform?: string; riskTolerance: 'conservative' | 'moderate' | 'aggressive' }) =>
+  return useMutation<FixTicketResult, Error, { bookingCode: string; platform?: string; riskTolerance: 'conservative' | 'moderate' | 'aggressive'; objective?: 'reduce_risk' | 'find_value'; allowOutsideReplacements?: boolean }>({
+    mutationFn: (input: { bookingCode: string; platform?: string; riskTolerance: 'conservative' | 'moderate' | 'aggressive'; objective?: 'reduce_risk' | 'find_value'; allowOutsideReplacements?: boolean }) =>
       callWithMobileRefresh(() => asPromise<FixTicketResult>(trpc.ticket.fixTicket.mutate(input))),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.activeJobs });

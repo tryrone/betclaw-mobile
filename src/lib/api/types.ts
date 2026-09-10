@@ -559,6 +559,7 @@ export type TicketJobState =
       stage?: string;
       status: 'processing';
     }
+  | { status: 'review'; stage: 'done'; outcome: 'review_only'; reviewId: string; summary: string }
   | { message: string; stage: 'error'; status: 'error' }
   | {
       fallbackStatus?: string;
@@ -567,6 +568,8 @@ export type TicketJobState =
       status: 'done';
       summary: string;
       ticketId: string;
+      reviewId?: string;
+      outcome?: 'repaired';
     };
 
 export type TicketDetail = {

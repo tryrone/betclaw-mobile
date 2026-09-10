@@ -1,10 +1,11 @@
+import { FixTicketReviewPanel } from "@/components/ticket/FixTicketReviewPanel";
 import { SelectionReviewPanel } from "@/components/ticket/SelectionReviewPanel";
 import { type SelectionDecision, type SelectionPresentation } from '@/lib/selection-display';
 import { SelectionDecisionCard } from '@/components/ticket/SelectionExplanation';
 import { useLocalSearchParams } from 'expo-router';
 import { Copy, SlidersHorizontal, Target, Wand2 } from '@/components/modern-icons';
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, Switch } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { JobProgressPanel } from '@/components/ticket/JobProgressPanel';
@@ -61,9 +62,11 @@ function TicketRow({ onPress, row }: { onPress?: () => void; row: TicketRowData 
 }
 
 export default function FixTicketScreen() {
-  const params = useLocalSearchParams<{ code?: string }>();
+  const params = useLocalSearchParams<{ code?: string; reviewId?: string }>();
   const [bookingCode, setBookingCode] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
+  const [objective, setObjective] = useState<'reduce_risk' | 'find_value'>('reduce_risk');
+  const [allowOutsideReplacements, setAllowOutsideReplacements] = useState(false);
 
   // Adjust state when the route param changes (React "derived state" pattern).
   const seededCode = Array.isArray(params.code) ? params.code[0] : params.code;
@@ -77,7 +80,10 @@ export default function FixTicketScreen() {
   const theme = useAppTheme();
   const fixTicket = useFixTicketMutation();
   const jobStatus = useJobStatus(jobId);
-  const ticket = useTicketById(jobStatus.data?.status === 'done' ? jobStatus.data.ticketId : null);
+  const reviewId = jobStatus.data?.status === 'done' || jobStatus.data?.status === 'review'
+    ? jobStatus.data.reviewId ?? params.reviewId ?? null : params.reviewId ?? null;
+  // Durable reviews own their result UI, including history changes and revised proposals.
+  const ticket = useTicketById(!reviewId && jobStatus.data?.status === 'done' ? jobStatus.data.ticketId : null);
   const displayRows = useMemo<TicketRowData[]>(() => {
     const matches = ticket.data?.matches;
     if (!Array.isArray(matches) || matches.length === 0) return [];
@@ -100,7 +106,7 @@ export default function FixTicketScreen() {
     fixTicket.mutate(
       {
         bookingCode: bookingCode.trim(),
-        platform: 'SPORTYBET',
+        platform: 'SPORTYBET', objective, allowOutsideReplacements,
         riskTolerance: riskMap[risk as keyof typeof riskMap],
       },
       {
@@ -124,6 +130,14 @@ export default function FixTicketScreen() {
             <StatusBadge label="SportyBet" />
           </View>
           <FormField autoCapitalize="characters" icon={Copy} label="Booking code" onChangeText={setBookingCode} placeholder="Paste SportyBet code" value={bookingCode} />
+          <View style={styles.riskGrid}>
+            {(['reduce_risk', 'find_value'] as const).map(mode => <PressableScale key={mode} accessibilityRole="button" accessibilityLabel={mode === 'reduce_risk' ? 'Reduce risk' : 'Find value'} onPress={() => setObjective(mode)} style={styles.riskPill}>
+              <Text style={{ color: objective === mode ? theme.primarySoft : theme.mutedLight }}>{mode === 'reduce_risk' ? 'Reduce risk' : 'Find value'}</Text>
+            </PressableScale>)}
+          </View>
+          <Text style={{ color: theme.mutedLight }}>Reduce risk prioritizes supported estimates and may lower payout. Find value also requires positive expected return.</Text>
+          <Text style={{ color: theme.mutedLight }}>Allow replacements from other fixtures in the original kickoff window</Text>
+          <Switch accessibilityLabel="Allow outside replacements" value={allowOutsideReplacements} onValueChange={setAllowOutsideReplacements} />
           <View style={styles.riskGrid}>
             {riskLevels.map((level) => {
               const active = level === risk;
@@ -157,12 +171,12 @@ export default function FixTicketScreen() {
           <View style={styles.cardHeader}>
             <Text style={[styles.cardTitle, { color: theme.foregroundStrong }]}>Pipeline</Text>
             <StatusBadge
-              label={pipelineState === 'done' ? 'Done' : pipelineState === 'error' ? 'Failed' : pipelineState === 'processing' ? 'Researching' : 'Ready'}
+              label={pipelineState === 'review' ? 'Review complete' : pipelineState === 'done' ? 'Done' : pipelineState === 'error' ? 'Failed' : pipelineState === 'processing' ? 'Researching' : 'Ready'}
               tone={pipelineState === 'done' ? 'success' : pipelineState === 'error' ? 'danger' : pipelineState === 'processing' ? 'warning' : 'neutral'}
             />
           </View>
           {jobStatus.data?.status === 'error' ? <Text style={[styles.reason, { color: theme.danger }]}>{jobStatus.data.message}</Text> : null}
-          {jobStatus.data?.status === 'done' ? <Text style={[styles.reason, { color: theme.mutedLight }]}>{jobStatus.data.summary}</Text> : null}
+          {(jobStatus.data?.status === 'done' || jobStatus.data?.status === 'review') ? <Text style={[styles.reason, { color: theme.mutedLight }]}>{jobStatus.data.summary}</Text> : null}
           <JobProgressPanel pending={fixTicket.isPending} state={jobStatus.data ?? null} />
         </GlassCard>
       </Animated.View>
@@ -211,6 +225,7 @@ export default function FixTicketScreen() {
         </Animated.View>
       ))}
 
+      {pipelineState !== 'processing' && <FixTicketReviewPanel reviewId={reviewId} />}
       <LegDetailSheet leg={selectedLeg} onClose={() => setSelectedLeg(null)} />
     </Screen>
   );

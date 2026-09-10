@@ -28,14 +28,14 @@ const stageToStep: Record<string, number> = {
 
 function activeStepIndex(state?: TicketJobState | null, pending?: boolean) {
   if (!state) return pending ? 0 : -1;
-  if (state.status === 'done') return steps.length;
+  if ((state.status === 'done' || state.status === 'review')) return steps.length;
   if (state.status === 'error') return -1;
   return stageToStep[state.stage ?? 'queued'] ?? 1;
 }
 
 function progressPercent(state?: TicketJobState | null, pending?: boolean) {
   if (!state) return pending ? 6 : 0;
-  if (state.status === 'done') return 100;
+  if ((state.status === 'done' || state.status === 'review')) return 100;
   if (state.status === 'error') return 0;
   if (state.chunksTotal && state.chunksTotal > 0) {
     const completed = state.chunksCompleted ?? 0;
